@@ -3131,9 +3131,9 @@ function App() {
                       const noteText = formatCellNote(note);
                       return (
                         <>
-                          {Array.from({ length: startDay - 1 }, (_, index) => (
-                            <td key={`before-${index}`} className={`mark-cell inactive-cell stage-outside-cell before-stage ${index === 0 ? 'outside-start' : ''} ${index === startDay - 2 ? 'outside-end' : ''}`} />
-                          ))}
+                          {startDay > 1 && (
+                            <td colSpan={startDay - 1} className="mark-cell inactive-cell stage-outside-cell before-stage" />
+                          )}
                           <td
                             colSpan={endDay - startDay + 1}
                             className={`mark-cell stage-span-cell ${isPast && !canBackfill ? 'past-cell' : ''} ${canBackfill ? 'backfill-cell' : ''} ${note ? 'has-note' : ''}`}
@@ -3145,9 +3145,9 @@ function App() {
                             <StatusButton value={value} disabled={isPast && !canBackfill} label={`${row.subject}${row.type}${startDay}日至${endDay}日${STATUS[value].label}${isPast && !canBackfill ? '，已锁定' : ''}`} />
                             {note && <span className="note-corner" aria-hidden="true" />}
                           </td>
-                          {Array.from({ length: month.days - endDay }, (_, index) => (
-                            <td key={`after-${index}`} className={`mark-cell inactive-cell stage-outside-cell after-stage ${index === 0 ? 'outside-start' : ''} ${index === month.days - endDay - 1 ? 'outside-end' : ''}`} />
-                          ))}
+                          {endDay < month.days && (
+                            <td colSpan={month.days - endDay} className="mark-cell inactive-cell stage-outside-cell after-stage" />
+                          )}
                         </>
                       );
                     })() : Array.from({ length: month.days }, (_, index) => {

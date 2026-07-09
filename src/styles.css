@@ -2701,8 +2701,9 @@ button {
 .mark-cell.has-note[data-note-tooltip]:hover::after {
   content: attr(data-note-tooltip);
   position: absolute;
-  right: 6px;
-  top: 28px;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 20;
   min-width: 210px;
   max-width: 300px;
@@ -2718,6 +2719,11 @@ button {
   font-size: 12px;
   font-weight: 850;
   pointer-events: none;
+}
+
+.mark-cell.has-note.tooltip-left[data-note-tooltip]:hover::after {
+  left: auto;
+  right: calc(100% + 8px);
 }
 
 .status {

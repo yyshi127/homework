@@ -3733,11 +3733,12 @@ function App() {
                         const note = month.notes?.[row.id]?.[day];
                         const noteText = isTemporaryReadonly ? formatTemporaryTaskMonthNote(note) : formatCellNote(note);
                         const cellTitle = isTemporaryReadonly ? [noteText, '操作提示：请在今日打卡中操作'].filter(Boolean).join('\n') : noteText;
+                        const shouldShowTooltipLeft = day > month.days - 5;
                         return (
                           <td
                             key={day}
-                            className={`mark-cell ${isActive ? '' : 'inactive-cell'} ${isActive && !isCheckable ? 'range-cell' : ''} ${isCheckable && isPast && !canBackfill ? 'past-cell' : ''} ${isCheckable && canBackfill ? 'backfill-cell' : ''} ${isTemporaryReadonly ? 'temporary-readonly-cell' : ''} ${note ? 'has-note' : ''}`}
-                            title={cellTitle || undefined}
+                            className={`mark-cell ${isActive ? '' : 'inactive-cell'} ${isActive && !isCheckable ? 'range-cell' : ''} ${isCheckable && isPast && !canBackfill ? 'past-cell' : ''} ${isCheckable && canBackfill ? 'backfill-cell' : ''} ${isTemporaryReadonly ? 'temporary-readonly-cell' : ''} ${shouldShowTooltipLeft ? 'tooltip-left' : ''} ${note ? 'has-note' : ''}`}
+                            title={!isTemporaryReadonly && cellTitle ? cellTitle : undefined}
                             data-note-tooltip={cellTitle || undefined}
                             onClick={() => {
                               if (canEdit) cycleStatus(row.id, day, { allowActiveToday: canBackfill, manualSaveOnly: true });

@@ -2719,7 +2719,7 @@ function App() {
     const statusChips = isHabit
       ? [{ key: 'habit', label: `完成 +${Number(row.habitPoints || 2)} 分`, active: visualStatus !== 'empty' }]
       : [
-        { key: 'done', label: '已完成 0 分', active: visualStatus === 'done' },
+        { key: 'done', label: '完成', active: visualStatus === 'done' },
         { key: 'excellent', label: '优秀 +1 分', active: visualStatus === 'excellent' },
         { key: 'super', label: '玫瑰 +2 分', active: visualStatus === 'super' },
       ];
@@ -2773,7 +2773,6 @@ function App() {
             {!isHabit && (value === 'done' || completedStageDay) && <Check size={26} strokeWidth={3.2} />}
             {!isHabit && value === 'excellent' && <Star size={28} fill="currentColor" strokeWidth={2.8} />}
             {((isHabit && visualStatus !== 'empty') || value === 'super') && <span className="rose-icon" aria-hidden="true">🌹</span>}
-            {value === 'empty' && <span className="empty-ring" />}
             <strong>{statusLabel}</strong>
           </button>
           {isStageCheckMode && !completedStageDay && (

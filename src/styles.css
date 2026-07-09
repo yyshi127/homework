@@ -3162,7 +3162,7 @@ button {
 .reading-plan-head,
 .reading-plan-row {
   display: grid;
-  grid-template-columns: 52px 54px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr) 62px;
   align-items: center;
   gap: 8px;
 }
@@ -3188,6 +3188,24 @@ button {
   border-top: 1px dashed #e8eeeb;
 }
 
+.reading-plan-row.today {
+  margin: 0 -6px;
+  padding: 7px 6px;
+  border-radius: 12px;
+  border-top-color: transparent;
+  background: linear-gradient(180deg, #eef8ff, #f8fcff);
+  box-shadow: inset 0 0 0 1px rgba(93, 157, 232, 0.18);
+}
+
+.reading-plan-row.missed {
+  margin: 0 -6px;
+  padding: 7px 6px;
+  border-radius: 12px;
+  border-top-color: transparent;
+  background: linear-gradient(180deg, #fff0ee, #fff8f5);
+  box-shadow: inset 0 0 0 1px rgba(223, 47, 50, 0.16);
+}
+
 .reading-plan-row > span {
   color: #347bc6;
   font-size: 13px;
@@ -3196,6 +3214,7 @@ button {
 
 .reading-plan-row > i {
   width: fit-content;
+  justify-self: start;
   border-radius: 999px;
   padding: 3px 7px;
   font-style: normal;
@@ -3203,37 +3222,55 @@ button {
   font-weight: 950;
 }
 
-.reading-plan-pages {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 6px;
+.reading-plan .record-done {
+  color: #1e8a4e;
+  background: #e9f8ed;
 }
 
-.reading-plan-pages input {
-  width: 100%;
+.reading-plan .record-plan {
+  color: #64727a;
+  background: #eef3f1;
+}
+
+.reading-plan .record-missed {
+  color: #df2f32;
+  background: #ffe2df;
+}
+
+.reading-plan-range {
   min-width: 0;
-  height: 30px;
-  border: 1px solid #dce8e4;
-  border-radius: 10px;
-  outline: 0;
-  padding: 0 8px;
   color: #26383e;
-  background: #fbfffd;
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.reading-plan-pages input:focus {
-  border-color: #87b9ef;
-  box-shadow: 0 0 0 3px rgba(95, 159, 228, 0.14);
+.reading-plan-unset {
+  width: fit-content;
+  height: 28px;
+  border: 1px solid #cfe5f7;
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #347bc6;
+  background: #eef8ff;
+  font-size: 12px;
+  font-weight: 950;
 }
 
-.reading-plan-pages em {
-  color: #7c898d;
+.reading-plan-unset:hover {
+  color: #fff;
+  border-color: #5b9de8;
+  background: linear-gradient(180deg, #67aaf0, #4d8edc);
+}
+
+.reading-plan-alert {
+  grid-column: 2 / -1;
+  color: #df2f32;
   font-style: normal;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 950;
 }
 
 .reading-records {

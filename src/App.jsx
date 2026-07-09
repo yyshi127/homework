@@ -943,6 +943,7 @@ function App() {
   const [activeView, setActiveView] = useState(initialActiveView);
   const [categoryDraft, setCategoryDraft] = useState('语文');
   const [readingNoteEditor, setReadingNoteEditor] = useState(null);
+  const [readingPlanEditor, setReadingPlanEditor] = useState(null);
   const [rewardCelebration, setRewardCelebration] = useState(null);
   const [rewardExchangeCelebration, setRewardExchangeCelebration] = useState(null);
   const [readingTab, setReadingTab] = useState('reading');
@@ -1220,6 +1221,25 @@ function App() {
       }
       return next;
     });
+  };
+
+  const saveReadingPlanRange = () => {
+    if (!readingPlanEditor) return;
+    const nextStartPage = String(readingPlanEditor.startPage || '').replace(/[^\d]/g, '');
+    const nextEndPage = String(readingPlanEditor.endPage || '').replace(/[^\d]/g, '');
+    if (!nextStartPage || !nextEndPage) return;
+    setState((current) => {
+      const next = structuredClone(current || {});
+      const targetMonth = next.months.find((item) => item.id === month.id);
+      targetMonth.notes ||= {};
+      targetMonth.notes[readingPlanEditor.bookId] ||= {};
+      targetMonth.notes[readingPlanEditor.bookId][readingPlanEditor.day] = {
+        startPage: nextStartPage,
+        endPage: nextEndPage,
+      };
+      return next;
+    });
+    setReadingPlanEditor(null);
   };
 
   const setField = (path, value) => {
@@ -2121,9 +2141,14 @@ function App() {
       const status = normalizeStatus(month.checks?.[book.id]?.[day] || 'empty');
       const note = month.notes?.[book.id]?.[day];
       const pageNote = typeof note === 'object' && note ? note : {};
+      const isCompleted = status !== 'empty';
+      const isToday = Boolean(todayDay && day === todayDay && isCurrentMonth);
+      const isMissed = !isCompleted && isBeforeToday(month.key, day);
       return {
         day,
-        isCompleted: status !== 'empty',
+        isCompleted,
+        isToday,
+        isMissed,
         startPage: pageNote.startPage || '',
         endPage: pageNote.endPage || '',
       };
@@ -2174,19 +2199,20 @@ function App() {
             <>
               <div className="reading-plan-head">
                 <span>日期</span>
-                <span>状态</span>
                 <span>阅读范围</span>
+                <span>状态</span>
               </div>
               <div className="reading-plan-list">
                 {readingPlanRows.map((record) => (
-                  <div className="reading-plan-row" key={`${book.id}-plan-${record.day}`}>
+                  <div className={`reading-plan-row ${record.isToday ? 'today' : ''} ${record.isMissed ? 'missed' : ''}`} key={`${book.id}-plan-${record.day}`}>
                     <span>{record.day}日</span>
-                    <i className={record.isCompleted ? 'record-done' : 'record-plan'}>{record.isCompleted ? '已读' : '计划'}</i>
-                    <div className="reading-plan-pages">
-                      <input inputMode="numeric" value={record.startPage} placeholder="起始页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'startPage', event.target.value)} />
-                      <em>到</em>
-                      <input inputMode="numeric" value={record.endPage} placeholder="结束页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'endPage', event.target.value)} />
-                    </div>
+                    {record.startPage && record.endPage ? (
+                      <strong className="reading-plan-range">{record.startPage} 至 {record.endPage} 页</strong>
+                    ) : (
+                      <button className="reading-plan-unset" type="button" onClick={() => setReadingPlanEditor({ bookId: book.id, bookName: book.name || '未命名书目', day: record.day, startPage: record.startPage, endPage: record.endPage })}>未设置</button>
+                    )}
+                    <i className={record.isCompleted ? 'record-done' : record.isMissed ? 'record-missed' : 'record-plan'}>{record.isCompleted ? '已读' : record.isMissed ? '未完成' : '未开始'}</i>
+                    {record.isMissed && <em className="reading-plan-alert">未按计划完成</em>}
                   </div>
                 ))}
               </div>
@@ -2194,23 +2220,6 @@ function App() {
           )}
         </div>
       )}
-
-      <div className="reading-records">
-        <strong>最近阅读记录</strong>
-        {stats.records.length ? (
-          stats.records.map((record) => (
-            <p key={`${book.id}-${record.day}`}>
-              <span>{record.day}日</span>
-              <em>
-                <i className={record.isCompleted ? 'record-done' : 'record-plan'}>{record.isCompleted ? '已完成' : '计划中'}</i>
-                {record.noteText || STATUS[record.status].label}
-              </em>
-            </p>
-          ))
-        ) : (
-          <p className="empty-record">还没有阅读记录</p>
-        )}
-      </div>
 
       <div className="reading-reward-stage">
         {stats.isComplete && !stats.isClaimed ? (
@@ -3458,6 +3467,43 @@ function App() {
                 </label>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {readingPlanEditor && (
+        <section className="settings-mask" role="dialog" aria-modal="true" aria-label="设置阅读范围">
+          <div className="reading-note-panel">
+            <header>
+              <div>
+                <h2>设置阅读范围</h2>
+                <p>{readingPlanEditor.bookName} · {readingPlanEditor.day}日</p>
+              </div>
+            </header>
+            <div className="reading-page-range">
+              <label>
+                <span>从第</span>
+                <input
+                  inputMode="numeric"
+                  value={readingPlanEditor.startPage}
+                  onChange={(event) => setReadingPlanEditor((current) => ({ ...current, startPage: event.target.value.replace(/[^\d]/g, '') }))}
+                />
+                <em>页</em>
+              </label>
+              <label>
+                <span>读到</span>
+                <input
+                  inputMode="numeric"
+                  value={readingPlanEditor.endPage}
+                  onChange={(event) => setReadingPlanEditor((current) => ({ ...current, endPage: event.target.value.replace(/[^\d]/g, '') }))}
+                />
+                <em>页</em>
+              </label>
+            </div>
+            <footer>
+              <button className="ghost" onClick={() => setReadingPlanEditor(null)}>取消</button>
+              <button onClick={saveReadingPlanRange} disabled={!readingPlanEditor.startPage || !readingPlanEditor.endPage}>保存范围</button>
+            </footer>
           </div>
         </section>
       )}

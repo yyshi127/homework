@@ -2339,6 +2339,24 @@ function App() {
     return map;
   }, {});
   Object.values(libraryHistoryMap).forEach((records) => records.sort((a, b) => b.key.localeCompare(a.key)));
+  const libraryPlanMap = months.reduce((map, targetMonth) => {
+    (targetMonth.readingBooks || []).forEach((book) => {
+      const startDay = Math.max(1, Math.min(targetMonth.days, Number(book.startDay || 1)));
+      const endDay = Math.max(startDay, Math.min(targetMonth.days, Number(book.endDay || targetMonth.days)));
+      const startDate = new Date(Number(targetMonth.year), Number(targetMonth.month) - 1, startDay);
+      const endDate = new Date(Number(targetMonth.year), Number(targetMonth.month) - 1, endDay);
+      const existing = map[book.id];
+      if (!existing || startDate < existing.startDate) {
+        map[book.id] = {
+          startDate,
+          endDate: existing && existing.endDate > endDate ? existing.endDate : endDate,
+        };
+      } else if (endDate > existing.endDate) {
+        existing.endDate = endDate;
+      }
+    });
+    return map;
+  }, {});
   const readingGroups = {
     reading: readingBooksWithStats.filter((item) => item.stats.statusGroup === 'reading'),
     finished: readingBooksWithStats.filter((item) => item.stats.statusGroup === 'finished'),
@@ -2392,11 +2410,18 @@ function App() {
     if (plannedLibraryBookIds.has(book.id)) return '计划中';
     return '未安排';
   };
+  const libraryBookPlanLabel = (book) => {
+    const plan = libraryPlanMap[book.id];
+    if (!plan) return '';
+    const format = (date) => `${date.getFullYear()}年${date.getMonth() + 1}月 ${date.getDate()}日`;
+    return `${format(plan.startDate)} - ${format(plan.endDate)}`;
+  };
   const changeMonth = (direction) => {
     setMonthIndex((current) => Math.max(0, Math.min(months.length - 1, current + direction)));
   };
   const renderLibraryBookCard = (book) => {
     const status = libraryBookStatus(book);
+    const planLabel = libraryBookPlanLabel(book);
     const history = libraryHistoryMap[book.id] || [];
     return (
       <article className={`library-book-card ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
@@ -2410,6 +2435,7 @@ function App() {
           <p>{book.totalPages ? `共 ${book.totalPages} 页` : '总页数未设置'} · 读完奖励 +{book.rewardPoints || 10}</p>
         </div>
         <em>{status}</em>
+        {planLabel && <p className="library-plan-range">计划时间：{planLabel}</p>}
         {history.length > 0 && (
           <div className="library-book-history">
             <b>阅读历史</b>
@@ -2424,6 +2450,7 @@ function App() {
   };
   const renderLibraryBookRow = (book) => {
     const status = libraryBookStatus(book);
+    const planLabel = libraryBookPlanLabel(book);
     const history = libraryHistoryMap[book.id] || [];
     return (
       <article className={`library-book-row ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
@@ -2446,6 +2473,10 @@ function App() {
         <div>
           <span>状态</span>
           <strong>{status}</strong>
+        </div>
+        <div>
+          <span>计划时间</span>
+          <strong>{planLabel || '未安排'}</strong>
         </div>
         <div className="library-row-history">
           <span>阅读历史</span>

@@ -2976,6 +2976,14 @@ button {
   font-weight: 800;
 }
 
+.library-book-card .library-plan-range {
+  margin: -4px 0 0;
+  color: #3f696f;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 900;
+}
+
 .library-book-history {
   border-radius: 14px;
   padding: 10px;

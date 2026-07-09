@@ -672,6 +672,12 @@ function temporaryTaskTitleFromNote(note) {
   return note.split('｜')[0]?.trim() || '';
 }
 
+function temporaryTaskRemarkFromNote(note) {
+  if (typeof note !== 'string') return '';
+  const parts = note.split('｜');
+  return parts.length > 1 ? parts.slice(1).join('｜').trim() : '';
+}
+
 function temporaryDraftKey(monthId, categoryId) {
   return `${monthId || 'month'}-${categoryId || 'category'}`;
 }
@@ -1609,6 +1615,11 @@ function App() {
       }
       return next;
     });
+  };
+
+  const updateTemporaryTaskRemark = (row, day, value) => {
+    const title = temporaryTaskTitleFromNote(month.notes?.[row.id]?.[day]) || TEMPORARY_TASK_TITLE;
+    updateCellNote(row.id, day, formatTemporaryTaskNote(title, value));
   };
 
   const updateReadingPageNote = (rowId, day, field, value) => {
@@ -3212,7 +3223,7 @@ function App() {
     const isNoteExpanded = Boolean(expandedTodayNotes[notePanelKey]);
     const isReading = row.typeKey === 'reading';
     const readingNote = typeof note === 'object' && note ? note : {};
-    const noteText = formatCellNote(note);
+    const noteText = isTemporaryTask ? temporaryTaskRemarkFromNote(note) : formatCellNote(note);
     const isHabit = row.subject === '好习惯';
     const displayTitle = isTemporaryTask ? temporaryTaskTitleFromNote(note) || TEMPORARY_TASK_TITLE : row.item;
     const taskTypeLabel = isTemporaryTask ? '临时' : isStageRangeTask ? '阶段' : '每日';
@@ -3246,6 +3257,11 @@ function App() {
 
     return (
       <article className={`today-task-card row-${row.color} task-${row.typeKey} ${isStageRangeTask ? 'today-stage-task' : 'today-daily-task'} ${todayFocusTaskId === row.id ? 'today-task-focus' : ''}`} data-today-task-id={row.id} key={row.id}>
+        {isTemporaryTask && (
+          <button className="today-temporary-delete" type="button" onClick={() => deleteTemporaryTaskEntry(row, effectiveDay)} title="删除临时任务" aria-label="删除临时任务">
+            <Trash2 size={15} />
+          </button>
+        )}
         <div className="today-task-main">
           <div className="today-task-badge">
             <i>{row.badge}</i>
@@ -3279,12 +3295,6 @@ function App() {
             {((isHabit && visualStatus !== 'empty') || value === 'super') && <span className="rose-icon" aria-hidden="true">🌹</span>}
             <strong>{todayStatusLabel}</strong>
           </button>
-          {isTemporaryTask && (
-            <button className="today-temporary-delete" type="button" onClick={() => deleteTemporaryTaskEntry(row, effectiveDay)} title="删除临时任务" aria-label="删除临时任务">
-              <Trash2 size={15} />
-              删除
-            </button>
-          )}
           {isStageCheckMode && (
             <button className="today-skip-button" onClick={() => setExpandedTodayStageTasks((current) => {
               const next = { ...current };
@@ -3316,7 +3326,18 @@ function App() {
               </label>
             </div>
           ) : (
-            <input className="today-note-input" value={typeof note === 'string' ? note : ''} placeholder="写下今天完成了什么、哪里需要改进..." onChange={(event) => updateCellNote(row.id, noteDay, event.target.value)} />
+            <input
+              className="today-note-input"
+              value={isTemporaryTask ? temporaryTaskRemarkFromNote(note) : typeof note === 'string' ? note : ''}
+              placeholder="写下今天完成了什么、哪里需要改进..."
+              onChange={(event) => {
+                if (isTemporaryTask) {
+                  updateTemporaryTaskRemark(row, noteDay, event.target.value);
+                } else {
+                  updateCellNote(row.id, noteDay, event.target.value);
+                }
+              }}
+            />
           )}
         </div>
       </article>

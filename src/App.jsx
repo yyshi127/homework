@@ -2634,6 +2634,36 @@ function App() {
     await persistState(next, '临时任务已保存到 SQLite');
   };
 
+  const deleteTemporaryTaskEntry = async (row, day) => {
+    if (!row || row.typeKey !== 'temporary' || !day) return;
+    if (!window.confirm('确定删除这条临时任务吗？删除后会同步清除全月表对应日期的状态和备注。')) return;
+    const next = structuredClone(stateRef.current || state || {});
+    const targetMonth = next.months.find((item) => item.id === month.id);
+    const category = targetMonth?.categories?.find((item) => item.id === row.categoryId || item.name === row.subject);
+    if (!targetMonth || !category) return;
+    targetMonth.checks ||= {};
+    targetMonth.notes ||= {};
+    if (targetMonth.checks[row.id]) {
+      delete targetMonth.checks[row.id][day];
+      if (!Object.keys(targetMonth.checks[row.id]).length) delete targetMonth.checks[row.id];
+    }
+    if (targetMonth.notes[row.id]) {
+      delete targetMonth.notes[row.id][day];
+      if (!Object.keys(targetMonth.notes[row.id]).length) delete targetMonth.notes[row.id];
+    }
+    const hasAnyTemporaryRecord = Boolean(
+      Object.keys(targetMonth.checks?.[row.id] || {}).length ||
+      Object.keys(targetMonth.notes?.[row.id] || {}).length
+    );
+    if (!hasAnyTemporaryRecord) {
+      category.tasks = (category.tasks || []).filter((task) => task.id !== row.id);
+      delete targetMonth.checks[row.id];
+      delete targetMonth.notes[row.id];
+    }
+    setState(next);
+    await persistState(next, '临时任务已删除并保存到 SQLite');
+  };
+
   const enableBackfillMode = () => {
     if (isBackfillMode) return;
     if (!window.confirm('开启补录后，可以修改本月今天以前的打卡记录。补录完成后必须点击保存才会写入数据库，确定开启吗？')) return;
@@ -3243,6 +3273,12 @@ function App() {
             {((isHabit && visualStatus !== 'empty') || value === 'super') && <span className="rose-icon" aria-hidden="true">🌹</span>}
             <strong>{todayStatusLabel}</strong>
           </button>
+          {isTemporaryTask && (
+            <button className="today-temporary-delete" type="button" onClick={() => deleteTemporaryTaskEntry(row, effectiveDay)} title="删除临时任务" aria-label="删除临时任务">
+              <Trash2 size={15} />
+              删除
+            </button>
+          )}
           {isStageCheckMode && (
             <button className="today-skip-button" onClick={() => setExpandedTodayStageTasks((current) => {
               const next = { ...current };

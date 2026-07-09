@@ -2240,6 +2240,28 @@ button {
   background: #fff8ec;
 }
 
+.today-temporary-delete {
+  min-width: 136px;
+  height: 30px;
+  border: 1px solid rgba(255, 107, 107, 0.28);
+  border-radius: 999px;
+  color: #d94d49;
+  background: #fff4f4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 950;
+  box-shadow: 0 8px 18px rgba(240, 90, 87, 0.08);
+}
+
+.today-temporary-delete:hover {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(180deg, #ff8582, #f05a57);
+}
+
 .today-note-panel {
   border-radius: 18px;
   background: rgba(247, 251, 250, 0.72);

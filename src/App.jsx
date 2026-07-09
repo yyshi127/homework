@@ -3143,22 +3143,18 @@ function App() {
                 <article>
                   <span>本月书单</span>
                   <strong>{readingBooksWithStats.length}</strong>
-                  <em>本</em>
                 </article>
                 <article className="active">
                   <span>正在读</span>
                   <strong>{readingGroups.reading.length}</strong>
-                  <em>本</em>
                 </article>
                 <article className="done">
                   <span>已读完</span>
                   <strong>{readingGroups.finished.length}</strong>
-                  <em>{claimableReadingCount ? `${claimableReadingCount} 个待兑换` : '本'}</em>
                 </article>
                 <article className="points">
                   <span>已兑换/未兑换积分</span>
                   <strong>{readingRewardPoints}/{claimableReadingPoints}</strong>
-                  <em>已兑换 {readingRewardPoints} · 未兑换 {claimableReadingPoints}</em>
                 </article>
               </div>
 

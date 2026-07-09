@@ -667,6 +667,11 @@ function formatTemporaryTaskNote(content, remark) {
   return title || detail;
 }
 
+function temporaryTaskTitleFromNote(note) {
+  if (typeof note !== 'string') return '';
+  return note.split('｜')[0]?.trim() || '';
+}
+
 function temporaryDraftKey(monthId, categoryId) {
   return `${monthId || 'month'}-${categoryId || 'category'}`;
 }
@@ -3209,6 +3214,7 @@ function App() {
     const readingNote = typeof note === 'object' && note ? note : {};
     const noteText = formatCellNote(note);
     const isHabit = row.subject === '好习惯';
+    const displayTitle = isTemporaryTask ? temporaryTaskTitleFromNote(note) || TEMPORARY_TASK_TITLE : row.item;
     const taskTypeLabel = isTemporaryTask ? '临时' : isStageRangeTask ? '阶段' : '每日';
     const checkModeLabel = isTemporaryTask ? '临时打卡' : isStageCheckMode ? '阶段打卡' : '每日打卡';
     const stageTaskKey = `${todayHidePrefix}-${row.id}`;
@@ -3248,7 +3254,7 @@ function App() {
           <div className="today-task-copy">
             <p>
               {row.importance === 'important' && <Flag className="important-mark" size={16} fill="currentColor" title="重要任务" />}
-              {row.item}
+              {displayTitle}
             </p>
             <div>
               <span className={`task-type-pill ${isTemporaryTask ? 'temporary-type' : isStageRangeTask ? 'stage-type' : 'daily-type'}`}>

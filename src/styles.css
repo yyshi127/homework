@@ -2752,6 +2752,7 @@ button {
   width: auto;
   height: 40px;
   min-width: 176px;
+  max-width: min(420px, 52vw);
   border: 0;
   border-radius: 14px;
   padding: 0 18px;
@@ -2764,6 +2765,16 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.reading-month-switch .reading-month-current.return-month {
+  min-width: 238px;
+}
+
+.reading-month-switch .reading-month-current strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reading-month-switch .reading-month-current svg {
@@ -3191,6 +3202,7 @@ button {
   background: linear-gradient(145deg, #ff8a68, #e84d45);
 }
 
+.library-reading-summary article:first-child,
 .library-reading-summary .done {
   cursor: pointer;
 }

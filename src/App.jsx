@@ -3284,24 +3284,29 @@ function App() {
               </button>
             </div>
 
-            {readingScope === 'month' && (
-              <div className="reading-scope-row">
-                <div className="reading-hero-actions">
-                  <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
-                    <button onClick={() => changeMonth(-1)} aria-label="上个月">
-                      <ChevronLeft size={21} />
-                    </button>
-                    <button className="reading-month-current" type="button" aria-label="当前月份书单">
-                      <CalendarDays size={20} />
-                      <strong>{month.label}</strong>
-                    </button>
-                    <button onClick={() => changeMonth(1)} aria-label="下个月">
-                      <ChevronRight size={21} />
-                    </button>
-                  </div>
+            <div className="reading-scope-row">
+              <div className="reading-hero-actions">
+                <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
+                  <button onClick={() => changeMonth(-1)} aria-label="上个月">
+                    <ChevronLeft size={21} />
+                  </button>
+                  <button
+                    className={`reading-month-current ${readingScope === 'library' ? 'return-month' : ''}`}
+                    type="button"
+                    aria-label={readingScope === 'library' ? '返回本月书单' : '当前月份书单'}
+                    onClick={() => {
+                      if (readingScope === 'library') setReadingScope('month');
+                    }}
+                  >
+                    <CalendarDays size={20} />
+                    <strong>{readingScope === 'library' ? `返回本月书单 · ${month.label}` : month.label}</strong>
+                  </button>
+                  <button onClick={() => changeMonth(1)} aria-label="下个月">
+                    <ChevronRight size={21} />
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
 
             {readingScope === 'library' ? (
               <section className="library-section">
@@ -3313,7 +3318,21 @@ function App() {
                   <button className="new-book-button" onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
                 </div>
                 <div className="reading-summary library-summary library-reading-summary">
-                  <article>
+                  <article
+                    className={!libraryStatusFilter && libraryTypeFilter === '所有' ? 'active-summary-filter' : ''}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setLibraryStatusFilter('');
+                      setLibraryTypeFilter('所有');
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      setLibraryStatusFilter('');
+                      setLibraryTypeFilter('所有');
+                    }}
+                  >
                     <span>所有书单</span>
                     <strong>{libraryBooks.length}</strong>
                   </article>

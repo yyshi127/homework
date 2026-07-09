@@ -1159,7 +1159,8 @@ button {
 }
 
 .today-summary .pending {
-  background: linear-gradient(145deg, #ffbd4b, #f07835);
+  background: linear-gradient(145deg, #ff6b5b, #df2f32);
+  box-shadow: 0 18px 34px rgba(223, 47, 50, 0.2);
 }
 
 .today-summary .points {
@@ -1175,7 +1176,7 @@ button {
 .today-summary .clickable:focus-visible {
   transform: translateY(-2px);
   filter: saturate(1.05);
-  box-shadow: 0 20px 36px rgba(240, 120, 53, 0.24);
+  box-shadow: 0 22px 40px rgba(223, 47, 50, 0.28);
   outline: 0;
 }
 
@@ -1202,14 +1203,23 @@ button {
 
 .today-summary small {
   display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 8px;
-  padding: 5px 9px;
+  padding: 5px 10px;
   border-radius: 999px;
-  color: #8a4718;
-  background: rgba(255, 255, 255, 0.78);
+  color: #b31822;
+  background: rgba(255, 255, 255, 0.86);
   font-size: 12px;
   font-weight: 950;
   position: relative;
+}
+
+.today-summary small b {
+  color: #df2f32;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 950;
 }
 
 .today-task-list {

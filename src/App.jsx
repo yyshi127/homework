@@ -2456,6 +2456,11 @@ function App() {
             </div>
 
             <div className="today-summary">
+              <article className="points">
+                <span>今日积分</span>
+                <strong>{todayPoints}</strong>
+                <em>分</em>
+              </article>
               <article className="tasks">
                 <span>今日任务</span>
                 <strong>{todayRows.length}</strong>
@@ -2475,12 +2480,7 @@ function App() {
                 <span>未打卡</span>
                 <strong>{todayPendingCount}</strong>
                 <em>项</em>
-                <small>含 {todayRequiredPendingCount} 个必打卡</small>
-              </article>
-              <article className="points">
-                <span>今日积分</span>
-                <strong>{todayPoints}</strong>
-                <em>分</em>
+                <small>含 <b>{todayRequiredPendingCount}</b> 个必打卡</small>
               </article>
             </div>
 

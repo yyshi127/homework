@@ -1357,7 +1357,7 @@ button {
 .today-task-group-body {
   padding: 0 14px 14px;
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .row-blue .today-task-group-title > i { background: var(--blue); }
@@ -1380,15 +1380,18 @@ button {
 
 .today-task-card {
   position: relative;
-  border: 1px solid #e2ebe7;
-  border-radius: 22px;
-  background: #fffefa;
-  box-shadow: 0 12px 26px rgba(61, 79, 88, 0.07);
-  padding: 18px;
+  border: 1px solid rgba(226, 235, 231, 0.9);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 98% 0%, rgba(255, 255, 255, 0.9), transparent 120px),
+    linear-gradient(180deg, #ffffff, #fbfdfb);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 10px 22px rgba(61, 79, 88, 0.065);
+  padding: 16px 16px 16px 20px;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) 180px minmax(260px, .9fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.35fr) 164px minmax(250px, .9fr);
+  gap: 14px;
   align-items: stretch;
+  overflow: hidden;
 }
 
 .today-task-card.today-task-focus {
@@ -1401,15 +1404,52 @@ button {
   content: "";
   position: absolute;
   left: 0;
-  top: 18px;
-  bottom: 18px;
-  width: 5px;
-  border-radius: 0 999px 999px 0;
+  top: 14px;
+  bottom: 14px;
+  width: 6px;
+  border-radius: 0 12px 12px 0;
   background: #dfe8e3;
 }
 
 .today-task-card.today-daily-task {
-  background: linear-gradient(180deg, #fffefa, #f8fdfb);
+  background:
+    radial-gradient(circle at 98% 0%, rgba(255, 255, 255, 0.9), transparent 120px),
+    linear-gradient(180deg, #ffffff, #f8fdfb);
+}
+
+.row-blue.today-task-card.today-daily-task {
+  border-color: #d8eafa;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(255, 255, 255, 0.88), transparent 128px),
+    linear-gradient(180deg, #f2f9ff, #ffffff);
+}
+
+.row-green.today-task-card.today-daily-task {
+  border-color: #ddf0d7;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(255, 255, 255, 0.88), transparent 128px),
+    linear-gradient(180deg, #f2fbef, #ffffff);
+}
+
+.row-red.today-task-card.today-daily-task {
+  border-color: #ffe0de;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(255, 255, 255, 0.88), transparent 128px),
+    linear-gradient(180deg, #fff5f5, #ffffff);
+}
+
+.row-purple.today-task-card.today-daily-task {
+  border-color: #eadfff;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(255, 255, 255, 0.88), transparent 128px),
+    linear-gradient(180deg, #faf6ff, #ffffff);
+}
+
+.row-orange.today-task-card.today-daily-task {
+  border-color: #ffe8b0;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(255, 255, 255, 0.88), transparent 128px),
+    linear-gradient(180deg, #fff8e8, #ffffff);
 }
 
 .today-task-card.today-stage-task {
@@ -1427,25 +1467,26 @@ button {
 .today-task-main {
   min-width: 0;
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 13px;
   align-items: center;
 }
 
 .today-task-badge {
-  min-height: 76px;
-  border-radius: 18px;
+  min-height: 58px;
+  border-radius: 17px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 6px;
+  gap: 4px;
   font-weight: 950;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
 }
 
 .today-task-badge i {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
   color: white;
   display: grid;
   place-items: center;
@@ -1469,9 +1510,9 @@ button {
 }
 
 .today-task-copy p {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   color: #173f46;
-  font-size: 21px;
+  font-size: 19px;
   line-height: 1.28;
   font-weight: 950;
 }
@@ -1484,10 +1525,10 @@ button {
 
 .today-task-copy span {
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   color: #687579;
-  background: #f3f7f6;
-  font-size: 13px;
+  background: rgba(243, 247, 246, 0.92);
+  font-size: 12px;
   font-weight: 900;
 }
 
@@ -1503,8 +1544,8 @@ button {
   border-radius: 999px;
   padding: 5px 8px;
   color: #7b878b;
-  background: #eef3f1;
-  font-size: 13px;
+  background: rgba(238, 243, 241, 0.88);
+  font-size: 12px;
   font-weight: 950;
   transition: color .15s ease, background .15s ease, box-shadow .15s ease;
 }
@@ -1584,16 +1625,18 @@ button {
 .today-check-panel {
   display: grid;
   place-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .today-status-button {
-  width: 148px;
-  min-height: 112px;
+  width: 132px;
+  min-height: 96px;
   border: 0;
-  border-radius: 24px;
+  border-radius: 22px;
   color: #687579;
-  background: #f6f8f7;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.76), transparent 32%),
+    #f6f8f7;
   display: grid;
   place-items: center;
   align-content: center;
@@ -1605,7 +1648,9 @@ button {
 
 .today-status-button.status-done {
   color: white;
-  background: linear-gradient(180deg, #55bd70, #36a955);
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.3), transparent 34%),
+    linear-gradient(180deg, #55bd70, #36a955);
   box-shadow: 0 14px 24px rgba(54, 169, 85, 0.2);
 }
 
@@ -1633,8 +1678,8 @@ button {
 }
 
 .today-skip-button {
-  min-width: 148px;
-  height: 38px;
+  min-width: 132px;
+  height: 34px;
   border: 1px solid #e2e9e6;
   border-radius: 999px;
   color: #687579;
@@ -1660,12 +1705,13 @@ button {
 
 .today-note-panel {
   border-radius: 18px;
-  background: #f7fbfa;
-  border: 1px solid #e4ece8;
-  padding: 14px;
+  background: rgba(247, 251, 250, 0.72);
+  border: 1px solid rgba(228, 236, 232, 0.92);
+  padding: 13px;
   display: grid;
   align-content: center;
   gap: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
 .today-note-title {
@@ -1677,7 +1723,7 @@ button {
 
 .today-note-title strong {
   color: #164148;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 950;
 }
 
@@ -1694,7 +1740,7 @@ button {
 .today-note-input,
 .today-reading-note input {
   width: 100%;
-  height: 44px;
+  height: 40px;
   border: 1px solid #dfe8e3;
   border-radius: 14px;
   padding: 0 12px;

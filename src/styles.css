@@ -7189,14 +7189,120 @@ button {
   font-weight: 950;
 }
 
-.point-config-fields {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.point-config-panel {
+  max-width: 720px;
 }
 
-.point-config-fields label input {
-  font-size: 20px;
-  font-weight: 950;
+.point-config-summary {
+  margin: 0 22px;
+  border: 1px solid rgba(255, 205, 122, 0.68);
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: #9a5a12;
+  background: linear-gradient(135deg, #fff8df, #fffefa);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.point-config-summary svg {
+  color: #f08a24;
+  flex: 0 0 auto;
+}
+
+.point-config-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 22px 10px;
+}
+
+.point-config-card {
+  position: relative;
+  min-height: 164px;
+  border: 1px solid rgba(224, 232, 229, 0.9);
+  border-radius: 18px;
+  padding: 16px;
+  background: linear-gradient(180deg, #ffffff, #fbfaf2);
+  box-shadow: 0 12px 24px rgba(54, 67, 72, 0.07);
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 12px;
+}
+
+.point-config-card i {
+  grid-row: 1 / span 2;
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff9f45, #ff6f61);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 18px rgba(255, 118, 73, 0.18);
+}
+
+.point-config-card span {
   color: #164148;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.point-config-card small {
+  color: #718186;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.point-config-card div {
+  grid-column: 1 / -1;
+  height: 48px;
+  margin-top: 10px;
+  border: 1px solid #e4ebe9;
+  border-radius: 14px;
+  padding: 0 12px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.point-config-card input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: #164148;
+  font-size: 25px;
+  font-weight: 950;
+}
+
+.point-config-card b {
+  color: #f08a24;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.point-config-excellent i {
+  background: linear-gradient(135deg, #ffca55, #f4a000);
+}
+
+.point-config-super i {
+  background: linear-gradient(135deg, #ff6f61, #e9466c);
+}
+
+.point-config-habit i {
+  background: linear-gradient(135deg, #55bd70, #2fa65c);
+}
+
+.point-config-readingBook i {
+  background: linear-gradient(135deg, #7aa7ff, #6b67e8);
 }
 
 .reading-page-range label {

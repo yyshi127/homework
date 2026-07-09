@@ -426,6 +426,11 @@ function statusPoints(status, pointConfig = DEFAULT_POINT_CONFIG) {
   return STATUS[status]?.points || 0;
 }
 
+function habitPoints(value, pointConfig = DEFAULT_POINT_CONFIG) {
+  if (value === undefined || value === null || value === '') return Number(pointConfig.habit ?? DEFAULT_POINT_CONFIG.habit);
+  return Math.max(0, Number(value || 0));
+}
+
 function sortRewardsByPoints(rewards = []) {
   return [...rewards].sort((a, b) => {
     const aPoints = Number(a.points || 0) || Number.MAX_SAFE_INTEGER;
@@ -662,7 +667,7 @@ function buildTaskRows(month) {
           endDay: Number(task.endDay || month.days),
           checkMode: task.checkMode || 'daily',
           importance: task.importance || 'normal',
-          habitPoints: Number(task.habitPoints || DEFAULT_HABIT_POINTS),
+          habitPoints: habitPoints(task.habitPoints),
         };
         isFirstSubjectRow = false;
         return taskRow;
@@ -929,7 +934,7 @@ function normalizeMonth(month) {
         importance: task.importance === 'important' ? 'important' : 'normal',
         ...(selectedBook ? { bookId: selectedBook.id, checkMode: task.checkMode || 'daily' } : {}),
       };
-      if (category.name === '好习惯') normalizedTask.habitPoints = Number(task.habitPoints || DEFAULT_HABIT_POINTS);
+      if (category.name === '好习惯') normalizedTask.habitPoints = habitPoints(task.habitPoints);
       return normalizedTask;
     }),
   }));
@@ -1746,7 +1751,7 @@ function App() {
         delete task.bookId;
       }
       task.checkMode = task.type === 'stage' || task.bookId ? task.checkMode || 'daily' : 'daily';
-      if (category.name === '好习惯') task.habitPoints = Math.max(0, Number(task.habitPoints || pointConfig.habit));
+      if (category.name === '好习惯') task.habitPoints = habitPoints(task.habitPoints, pointConfig);
       task.startDay = Math.max(1, Math.min(target.days, Number(task.startDay || 1)));
       task.endDay = Math.max(task.startDay, Math.min(target.days, Number(task.endDay || target.days)));
       if (task.bookId) {
@@ -2477,7 +2482,7 @@ function App() {
     rows.reduce((sum, row) => {
       if (!isTaskCheckableOnDay(row, day)) return sum;
       const status = getStatus(row.id, day);
-      const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || pointConfig.habit) : statusPoints(status, pointConfig);
+      const base = row.subject === '好习惯' && status !== 'empty' ? habitPoints(row.habitPoints, pointConfig) : statusPoints(status, pointConfig);
       return sum + base;
     }, 0);
 
@@ -2578,7 +2583,7 @@ function App() {
   const todayPoints = todayDay ? todayRows.reduce((sum, row) => {
     const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
     const status = getStatus(row.id, checkDay);
-    const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || pointConfig.habit) : statusPoints(status, pointConfig);
+    const base = row.subject === '好习惯' && status !== 'empty' ? habitPoints(row.habitPoints, pointConfig) : statusPoints(status, pointConfig);
     return sum + base;
   }, 0) : 0;
   const readingRewardPoints = completedReadingRewards(month, pointConfig);
@@ -2589,7 +2594,7 @@ function App() {
       daySum + candidateRows.reduce((rowSum, row) => {
         if (!isTaskCheckableOnDay(row, day)) return rowSum;
         const status = normalizeStatus(candidateMonth.checks?.[row.id]?.[day] || 'empty');
-        const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || pointConfig.habit) : statusPoints(status, pointConfig);
+        const base = row.subject === '好习惯' && status !== 'empty' ? habitPoints(row.habitPoints, pointConfig) : statusPoints(status, pointConfig);
         return rowSum + base;
       }, 0)
     ), 0);
@@ -2974,7 +2979,7 @@ function App() {
     const stageTaskKey = `${todayHidePrefix}-${row.id}`;
     const isCollapsed = isStageCheckMode && !expandedTodayStageTasks[stageTaskKey];
     const statusChips = isHabit
-      ? [{ key: 'habit', label: `完成 +${Number(row.habitPoints || pointConfig.habit)} 分`, active: visualStatus !== 'empty' }]
+      ? [{ key: 'habit', label: `完成 +${habitPoints(row.habitPoints, pointConfig)} 分`, active: visualStatus !== 'empty' }]
       : [
         { key: 'done', label: '完成', active: visualStatus === 'done' },
         { key: 'excellent', label: `优秀 +${pointConfig.excellent} 分`, active: visualStatus === 'excellent' },
@@ -3508,13 +3513,13 @@ function App() {
                 <span>当前可用积分：<strong>{availableRewardPoints}</strong> 分</span>
               </div>
               <div className="reward-hero-actions">
-                <button className="reward-config-button" onClick={openPointConfigDialog}>
-                  <Wrench size={18} />
-                  积分配置
-                </button>
                 <button className="reward-add-button" onClick={() => setNewRewardDialog({ name: '', points: '', description: '', type: '文具用品', icon: 'PenLine' })}>
                   <Gift size={18} />
                   新增奖励
+                </button>
+                <button className="reward-config-button" onClick={openPointConfigDialog}>
+                  <Wrench size={18} />
+                  积分配置
                 </button>
                 <div className="reward-hero-badge">
                   <Trophy size={35} />
@@ -4305,7 +4310,7 @@ function App() {
                                 {isHabit && (
                                   <label className="compact-number">
                                     <span>积分</span>
-                                    <input type="number" min="0" value={task.habitPoints || pointConfig.habit} onChange={(event) => updateTask(category.id, task.id, { habitPoints: event.target.value })} />
+                                    <input type="number" min="0" value={task.habitPoints ?? pointConfig.habit} onChange={(event) => updateTask(category.id, task.id, { habitPoints: event.target.value })} />
                                   </label>
                                 )}
                                 <button className="icon-danger" title="删除任务" aria-label="删除任务" onClick={() => deleteTask(category.id, task.id)}><Trash2 size={14} /></button>
@@ -4589,43 +4594,38 @@ function App() {
             <header>
               <div>
                 <h2>积分配置</h2>
-                <p>配置基础默认积分，保存后会影响后续积分计算和新建默认值。</p>
+                <p>统一配置基础积分规则，保存后会影响统计、图例和后续新建默认值。</p>
               </div>
             </header>
-            <div className="book-dialog-fields point-config-fields">
-              <label>
-                <span>每日打卡优秀</span>
-                <input
-                  autoFocus
-                  inputMode="numeric"
-                  value={pointConfigDialog.excellent}
-                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, excellent: event.target.value.replace(/[^\d]/g, '') }))}
-                />
-              </label>
-              <label>
-                <span>每日打卡非常优秀</span>
-                <input
-                  inputMode="numeric"
-                  value={pointConfigDialog.super}
-                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, super: event.target.value.replace(/[^\d]/g, '') }))}
-                />
-              </label>
-              <label>
-                <span>好习惯默认</span>
-                <input
-                  inputMode="numeric"
-                  value={pointConfigDialog.habit}
-                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, habit: event.target.value.replace(/[^\d]/g, '') }))}
-                />
-              </label>
-              <label>
-                <span>读完一本书默认</span>
-                <input
-                  inputMode="numeric"
-                  value={pointConfigDialog.readingBook}
-                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, readingBook: event.target.value.replace(/[^\d]/g, '') }))}
-                />
-              </label>
+            <div className="point-config-summary">
+              <Sparkles size={20} />
+              <span>当前规则：优秀 +{pointConfigDialog.excellent || 0}，非常优秀 +{pointConfigDialog.super || 0}，好习惯 +{pointConfigDialog.habit || 0}，读完一本书 +{pointConfigDialog.readingBook || 0}</span>
+            </div>
+            <div className="point-config-fields">
+              {[
+                { key: 'excellent', title: '每日打卡优秀', desc: '普通学习任务完成质量较好时使用', icon: Star, autoFocus: true },
+                { key: 'super', title: '每日打卡非常优秀', desc: '表现特别好时使用，适合少量高质量奖励', icon: Trophy },
+                { key: 'habit', title: '好习惯默认', desc: '新建好习惯任务时的默认完成积分', icon: Target },
+                { key: 'readingBook', title: '读完一本书默认', desc: '新建书单时默认的读完奖励积分', icon: BookOpen },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <label className={`point-config-card point-config-${item.key}`} key={item.key}>
+                    <i><Icon size={22} /></i>
+                    <span>{item.title}</span>
+                    <small>{item.desc}</small>
+                    <div>
+                      <input
+                        autoFocus={item.autoFocus}
+                        inputMode="numeric"
+                        value={pointConfigDialog[item.key]}
+                        onChange={(event) => setPointConfigDialog((current) => ({ ...current, [item.key]: event.target.value.replace(/[^\d]/g, '') }))}
+                      />
+                      <b>分</b>
+                    </div>
+                  </label>
+                );
+              })}
             </div>
             <footer>
               <button className="ghost" onClick={() => setPointConfigDialog(null)}>取消</button>

@@ -678,6 +678,16 @@ function temporaryTaskRemarkFromNote(note) {
   return parts.length > 1 ? parts.slice(1).join('｜').trim() : '';
 }
 
+function formatTemporaryTaskMonthNote(note) {
+  const title = temporaryTaskTitleFromNote(note);
+  const remark = temporaryTaskRemarkFromNote(note);
+  if (!title && !remark) return '';
+  return [
+    `任务内容：${title || '未填写'}`,
+    `备注信息：${remark || '无'}`,
+  ].join('\n');
+}
+
 function temporaryDraftKey(monthId, categoryId) {
   return `${monthId || 'month'}-${categoryId || 'category'}`;
 }
@@ -3257,11 +3267,6 @@ function App() {
 
     return (
       <article className={`today-task-card row-${row.color} task-${row.typeKey} ${isStageRangeTask ? 'today-stage-task' : 'today-daily-task'} ${todayFocusTaskId === row.id ? 'today-task-focus' : ''}`} data-today-task-id={row.id} key={row.id}>
-        {isTemporaryTask && (
-          <button className="today-temporary-delete" type="button" onClick={() => deleteTemporaryTaskEntry(row, effectiveDay)} title="删除临时任务" aria-label="删除临时任务">
-            <Trash2 size={15} />
-          </button>
-        )}
         <div className="today-task-main">
           <div className="today-task-badge">
             <i>{row.badge}</i>
@@ -3312,6 +3317,11 @@ function App() {
             {noteText && <span>{noteText}</span>}
             <ChevronDown size={16} />
           </button>
+          {isTemporaryTask && (
+            <button className="today-temporary-delete" type="button" onClick={() => deleteTemporaryTaskEntry(row, effectiveDay)} title="删除临时任务" aria-label="删除临时任务">
+              <Trash2 size={15} />
+            </button>
+          )}
           {isReading ? (
             <div className="today-reading-note">
               <label>
@@ -3715,13 +3725,14 @@ function App() {
                         const canBackfill = !isTemporaryReadonly && Boolean(isBackfillMode && isCurrentMonth && todayDay && day < todayDay);
                         const canEdit = isCheckable && !isTemporaryReadonly && (!isPast || canBackfill);
                         const note = month.notes?.[row.id]?.[day];
-                        const noteText = formatCellNote(note);
-                        const cellTitle = isTemporaryReadonly ? [noteText, '临时任务请在今日打卡中操作'].filter(Boolean).join('；') : noteText;
+                        const noteText = isTemporaryReadonly ? formatTemporaryTaskMonthNote(note) : formatCellNote(note);
+                        const cellTitle = isTemporaryReadonly ? [noteText, '操作提示：请在今日打卡中操作'].filter(Boolean).join('\n') : noteText;
                         return (
                           <td
                             key={day}
                             className={`mark-cell ${isActive ? '' : 'inactive-cell'} ${isActive && !isCheckable ? 'range-cell' : ''} ${isCheckable && isPast && !canBackfill ? 'past-cell' : ''} ${isCheckable && canBackfill ? 'backfill-cell' : ''} ${isTemporaryReadonly ? 'temporary-readonly-cell' : ''} ${note ? 'has-note' : ''}`}
                             title={cellTitle || undefined}
+                            data-note-tooltip={cellTitle || undefined}
                             onClick={() => {
                               if (canEdit) cycleStatus(row.id, day, { allowActiveToday: canBackfill, manualSaveOnly: true });
                             }}

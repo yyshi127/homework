@@ -2869,10 +2869,6 @@ button {
   gap: 6px;
 }
 
-.library-type-select {
-  display: none;
-}
-
 .library-type-tabs button.active {
   border-color: transparent;
   color: white;
@@ -7339,30 +7335,21 @@ button {
   }
 
   .library-type-tabs {
-    display: none;
+    width: calc(100vw - 36px);
+    flex: 0 0 auto;
+    overflow-x: auto;
+    padding: 3px 2px 8px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .library-type-select {
-    display: grid;
-    gap: 7px;
-  }
-
-  .library-type-select span {
-    color: #4d5a5e;
-    font-size: 13px;
-    font-weight: 950;
-  }
-
-  .library-type-select select {
-    width: 100%;
-    height: 42px;
-    border: 1px solid #dce8e9;
-    border-radius: 14px;
+  .library-type-tabs button {
+    flex: 0 0 auto;
+    min-width: 72px;
+    min-height: 38px;
     padding: 0 12px;
-    color: #26383e;
-    background: #fffefa;
-    font-size: 14px;
-    font-weight: 900;
+    scroll-snap-align: start;
+    box-shadow: 0 8px 16px rgba(54, 67, 72, 0.05);
   }
 
   .library-card-actions {

@@ -3251,12 +3251,6 @@ function App() {
                       </button>
                     ))}
                   </div>
-                  <label className="library-type-select">
-                    <span>分类</span>
-                    <select value={libraryTypeFilter} onChange={(event) => setLibraryTypeFilter(event.target.value)}>
-                      {libraryCategoryTabs.map((item) => <option key={item.type} value={item.type}>{item.type}（{item.count}）</option>)}
-                    </select>
-                  </label>
                   <div className="reading-view-switch" aria-label="我的图书馆显示方式">
                     <button className={libraryViewMode === 'card' ? 'active' : ''} onClick={() => setLibraryViewMode('card')} type="button">卡片显示</button>
                     <button className={libraryViewMode === 'list' ? 'active' : ''} onClick={() => setLibraryViewMode('list')} type="button">列表显示</button>

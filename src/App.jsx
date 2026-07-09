@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Camera,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
@@ -1019,6 +1020,7 @@ function App() {
   const [readingTab, setReadingTab] = useState('reading');
   const [readingViewMode, setReadingViewMode] = useState('card');
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('所有');
+  const [isLibraryTypeMenuOpen, setIsLibraryTypeMenuOpen] = useState(false);
   const [libraryViewMode, setLibraryViewMode] = useState('card');
   const [newBookDialog, setNewBookDialog] = useState(null);
   const [bookTypesDialog, setBookTypesDialog] = useState(null);
@@ -2307,6 +2309,7 @@ function App() {
     { type: '所有', count: libraryBooks.length },
     ...bookTypes.map((type) => ({ type, count: libraryBooks.filter((book) => (book.type || '其它') === type).length })),
   ];
+  const currentLibraryCategory = libraryCategoryTabs.find((item) => item.type === libraryTypeFilter) || libraryCategoryTabs[0];
   const filteredLibraryBooks = libraryBooks.filter((book) => libraryTypeFilter === '所有' || (book.type || '其它') === libraryTypeFilter);
   const libraryHistoryMap = months.reduce((map, targetMonth) => {
     (targetMonth.readingBooks || []).forEach((book) => {
@@ -3277,6 +3280,44 @@ function App() {
                   </article>
                 </div>
                 <div className="library-controls-row">
+                  <div className="library-type-mobile-filter">
+                    <button
+                      type="button"
+                      className={isLibraryTypeMenuOpen ? 'open' : ''}
+                      onClick={() => setIsLibraryTypeMenuOpen((value) => !value)}
+                      aria-expanded={isLibraryTypeMenuOpen}
+                      aria-label="选择书籍分类"
+                    >
+                      <span>
+                        <small>书籍分类</small>
+                        <strong>{currentLibraryCategory.type}</strong>
+                      </span>
+                      <em>{currentLibraryCategory.count}</em>
+                      <ChevronDown size={18} />
+                    </button>
+                    {isLibraryTypeMenuOpen && (
+                      <>
+                        <button className="library-type-menu-backdrop" type="button" aria-label="关闭书籍分类" onClick={() => setIsLibraryTypeMenuOpen(false)} />
+                        <div className="library-type-menu" role="menu" aria-label="书籍分类">
+                          {libraryCategoryTabs.map((item) => (
+                            <button
+                              className={libraryTypeFilter === item.type ? 'active' : ''}
+                              type="button"
+                              key={item.type}
+                              onClick={() => {
+                                setLibraryTypeFilter(item.type);
+                                setIsLibraryTypeMenuOpen(false);
+                              }}
+                              role="menuitem"
+                            >
+                              <span>{item.type}</span>
+                              <em>{item.count}</em>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                   <div className="library-type-tabs" aria-label="书籍分类">
                     {libraryCategoryTabs.map((item) => (
                       <button className={libraryTypeFilter === item.type ? 'active' : ''} type="button" key={item.type} onClick={() => setLibraryTypeFilter(item.type)}>

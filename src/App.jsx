@@ -2218,8 +2218,12 @@ function App() {
   const availableRewardPoints = Math.max(0, monthPoints - redeemedRewardPoints);
   const readingBooksWithStats = (month.readingBooks || []).map((book) => ({ book, stats: readingBookStats(month, book) }));
   const plannedLibraryBookIds = new Set(months.flatMap((item) => item.readingBooks || []).map((book) => book.id));
+  const finishedLibraryBookIds = new Set(months.flatMap((item) => (
+    (item.readingBooks || [])
+      .filter((book) => readingBookStats(item, book).isComplete)
+      .map((book) => book.id)
+  )));
   const currentMonthBookIds = new Set((month.readingBooks || []).map((book) => book.id));
-  const unplannedLibraryBooks = libraryBooks.filter((book) => !plannedLibraryBookIds.has(book.id));
   const libraryTypeStats = BOOK_TYPES.map((type) => ({
     type,
     count: libraryBooks.filter((book) => (book.type || '其它') === type).length,
@@ -3101,24 +3105,24 @@ function App() {
                 </div>
                 <div className="reading-summary library-summary">
                   <article>
-                    <span>全年书单</span>
+                    <span>所有书单</span>
                     <strong>{libraryBooks.length}</strong>
                     <em>本</em>
                   </article>
                   <article className="active">
-                    <span>未安排阅读任务</span>
-                    <strong>{unplannedLibraryBooks.length}</strong>
-                    <em>本</em>
+                    <span>书籍种类</span>
+                    <strong>{libraryTypeStats.length}</strong>
+                    <em>类</em>
                   </article>
                   <article className="done">
-                    <span>已安排阅读任务</span>
-                    <strong>{Math.max(0, libraryBooks.length - unplannedLibraryBooks.length)}</strong>
+                    <span>已读书单</span>
+                    <strong>{finishedLibraryBookIds.size}</strong>
                     <em>本</em>
                   </article>
                   <article className="points">
-                    <span>书籍类型</span>
-                    <strong>{libraryTypeStats.length}</strong>
-                    <em>类</em>
+                    <span>未读书单</span>
+                    <strong>{Math.max(0, libraryBooks.length - finishedLibraryBookIds.size)}</strong>
+                    <em>本</em>
                   </article>
                 </div>
                 {libraryTypeStats.length > 0 && (

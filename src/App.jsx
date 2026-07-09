@@ -75,6 +75,7 @@ const DEFAULT_POINT_CONFIG = {
 };
 const DEFAULT_READING_REWARD_POINTS = DEFAULT_POINT_CONFIG.readingBook;
 const DEFAULT_HABIT_POINTS = DEFAULT_POINT_CONFIG.habit;
+const READING_REWARD_VERSION = 2;
 
 const NAV_ITEMS = [
   { label: '今日打卡', icon: Home },
@@ -420,6 +421,21 @@ function normalizePointConfig(config = {}) {
   };
 }
 
+function upgradeLegacyReadingRewardPoints(state) {
+  const targetPoints = normalizePointConfig(state.pointConfig).readingBook;
+  const upgradeBook = (book) => {
+    if (Number(book.rewardPoints) === 10) book.rewardPoints = targetPoints;
+    return book;
+  };
+  state.months = (state.months || []).map((month) => ({
+    ...month,
+    readingBooks: (month.readingBooks || []).map((book) => upgradeBook({ ...book })),
+  }));
+  state.libraryBooks = (state.libraryBooks || []).map((book) => upgradeBook({ ...book }));
+  state.readingRewardVersion = READING_REWARD_VERSION;
+  return state;
+}
+
 function statusPoints(status, pointConfig = DEFAULT_POINT_CONFIG) {
   if (status === 'excellent') return Number(pointConfig.excellent ?? DEFAULT_POINT_CONFIG.excellent);
   if (status === 'super') return Number(pointConfig.super ?? DEFAULT_POINT_CONFIG.super);
@@ -730,6 +746,13 @@ function sanitizeLoadedState(saved) {
     next.rewardConfig = normalizeRewardConfig(next.rewardConfig || DEFAULT_REWARDS);
   }
   next.pointConfig = normalizePointConfig(next.pointConfig);
+  next.profile = {
+    ...(next.profile || {}),
+    avatarData: typeof next.profile?.avatarData === 'string' && next.profile.avatarData.startsWith('data:image/') ? next.profile.avatarData : '',
+  };
+  if (next.readingRewardVersion !== READING_REWARD_VERSION) {
+    upgradeLegacyReadingRewardPoints(next);
+  }
   next.libraryBooks = normalizeLibraryBooks(next.libraryBooks?.length ? next.libraryBooks : collectLibraryBooks(next));
   next.bookTypes = normalizeBookTypes(next.bookTypes);
   next.learningTools = normalizeLearningTools(next.learningTools);
@@ -750,6 +773,11 @@ function createLocalCacheState(current) {
     rewardConfig: normalizeRewardConfig(current.rewardConfig || DEFAULT_REWARDS),
     rewardCatalogVersion: current.rewardCatalogVersion || REWARD_CATALOG_VERSION,
     pointConfig: normalizePointConfig(current.pointConfig),
+    readingRewardVersion: current.readingRewardVersion || READING_REWARD_VERSION,
+    profile: {
+      ...(current.profile || {}),
+      avatarData: typeof current.profile?.avatarData === 'string' && current.profile.avatarData.startsWith('data:image/') ? current.profile.avatarData : '',
+    },
     libraryBooks: normalizeLibraryBooks(current.libraryBooks || []),
     bookTypes: normalizeBookTypes(current.bookTypes),
     learningTools: normalizeLearningTools(current.learningTools),
@@ -999,6 +1027,8 @@ function migrateLegacyState(saved) {
     rewardConfig: DEFAULT_REWARDS,
     rewardCatalogVersion: REWARD_CATALOG_VERSION,
     pointConfig: DEFAULT_POINT_CONFIG,
+    readingRewardVersion: READING_REWARD_VERSION,
+    profile: { avatarData: '' },
     libraryBooks: collectLibraryBooks({ ...saved, months }),
     bookTypes: normalizeBookTypes(saved.bookTypes),
     learningTools: normalizeLearningTools(saved.learningTools),
@@ -1014,6 +1044,8 @@ function createSeedState() {
     rewardConfig: DEFAULT_REWARDS,
     rewardCatalogVersion: REWARD_CATALOG_VERSION,
     pointConfig: DEFAULT_POINT_CONFIG,
+    readingRewardVersion: READING_REWARD_VERSION,
+    profile: { avatarData: '' },
     libraryBooks: normalizeLibraryBooks(DEFAULT_BOOKS.map((name, index) => ({ id: `library-default-${index}`, name, type: '其它' }))),
     bookTypes: DEFAULT_BOOK_TYPES,
     books: DEFAULT_BOOKS,
@@ -1178,6 +1210,7 @@ function App() {
   const [state, setState] = useState(loadState);
   const [monthIndex, setMonthIndex] = useState(() => findCurrentMonthIndex((state.months?.length ? state.months : createDefaultMonths()).map(normalizeMonth)));
   const stateRef = useRef(state);
+  const avatarInputRef = useRef(null);
   const loadingFromDatabase = useRef(true);
   const [databaseReady, setDatabaseReady] = useState(false);
   const [databaseStatus, setDatabaseStatus] = useState('正在连接数据库...');
@@ -1231,6 +1264,7 @@ function App() {
   const [isBackfillMode, setIsBackfillMode] = useState(false);
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
+  const profile = state.profile || {};
   const pointConfig = useMemo(() => normalizePointConfig(state.pointConfig), [state.pointConfig]);
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
   const pointRules = useMemo(() => [
@@ -2106,6 +2140,56 @@ function App() {
     };
     image.src = objectUrl;
   });
+
+  const readAvatarImage = (file) => new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('请选择图片格式的头像'));
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const size = 360;
+        const sourceSize = Math.min(image.width, image.height);
+        const sourceX = Math.max(0, Math.round((image.width - sourceSize) / 2));
+        const sourceY = Math.max(0, Math.round((image.height - sourceSize) / 2));
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, size, size);
+        context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL('image/jpeg', 0.84));
+      } catch (error) {
+        URL.revokeObjectURL(objectUrl);
+        reject(error);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('头像图片读取失败，请换一张清晰图片'));
+    };
+    image.src = objectUrl;
+  });
+
+  const handleAvatarImageChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const avatarData = await readAvatarImage(file);
+      const next = structuredClone(stateRef.current || state || {});
+      next.profile = { ...(next.profile || {}), avatarData };
+      setState(next);
+      await persistState(next, '头像已保存到 SQLite');
+    } catch (error) {
+      window.alert(error?.message || '头像更换失败，请重试');
+    } finally {
+      event.target.value = '';
+    }
+  };
 
   const handleHomeworkImageChange = async (event) => {
     const file = event.target.files?.[0];
@@ -3137,9 +3221,11 @@ function App() {
         <header className="topbar">
           <div className="topbar-main">
             <div className="brand-block">
-              <div className="mascot-card">
-                <img src={mascotImage} alt="严艺欣小朋友" />
-              </div>
+              <button className="mascot-card" type="button" onClick={() => avatarInputRef.current?.click()} aria-label="更换头像" title="点击更换头像">
+                <img src={profile.avatarData || mascotImage} alt="严艺欣小朋友" />
+                <span>更换头像</span>
+              </button>
+              <input ref={avatarInputRef} className="avatar-file-input" type="file" accept="image/*" onChange={handleAvatarImageChange} />
               <div className="brand-copy">
                 <h1>{month.title || '学习好习惯·快乐成长每一天'}<Star className="title-star" size={25} fill="#ffc84a" /></h1>
                 <p>每天进步一点点，成长收获满满！</p>

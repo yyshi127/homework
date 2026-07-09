@@ -189,9 +189,11 @@ button {
 }
 
 .mascot-card {
+  position: relative;
   width: 132px;
   height: 132px;
   flex: 0 0 132px;
+  border: 0;
   border-radius: 28px;
   padding: 4px;
   background: #fff;
@@ -199,6 +201,7 @@ button {
   overflow: hidden;
   grid-column: 1;
   align-self: center;
+  cursor: pointer;
 }
 
 .mascot-card img {
@@ -207,6 +210,36 @@ button {
   display: block;
   object-fit: cover;
   border-radius: 22px;
+}
+
+.mascot-card span {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  min-height: 30px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(22, 65, 72, 0.72);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 950;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .16s ease, transform .16s ease;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.mascot-card:hover span,
+.mascot-card:focus-visible span {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.avatar-file-input {
+  display: none;
 }
 
 .brand-copy {

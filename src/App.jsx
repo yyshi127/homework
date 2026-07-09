@@ -3063,23 +3063,23 @@ function App() {
                 <h2>对世界保持好奇，让书成为打开美好世界的伙伴</h2>
                 <span>{month.label} · 当前月份清单中的阅读计划</span>
               </div>
+              <button className={`library-hero-button ${readingScope === 'library' ? 'active' : ''}`} onClick={() => setReadingScope('library')} type="button" aria-label="我的图书馆">
+                <BookOpen size={34} />
+                <span>我的图书馆</span>
+              </button>
             </div>
 
             <div className="reading-scope-row">
-              <div className="reading-scope-tabs" role="tablist" aria-label="阅读书单范围">
-                <button className={readingScope === 'month' ? 'active' : ''} onClick={() => setReadingScope('month')} type="button">本月书单</button>
-                <button className={readingScope === 'library' ? 'active' : ''} onClick={() => setReadingScope('library')} type="button">我的图书馆</button>
-              </div>
               <div className="reading-hero-actions">
                 <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
-                  <button onClick={() => changeMonth(-1)} aria-label="上个月">
+                  <button onClick={() => { setReadingScope('month'); changeMonth(-1); }} aria-label="上个月">
                     <ChevronLeft size={21} />
                   </button>
-                  <div>
+                  <button className="reading-month-current" onClick={() => setReadingScope('month')} type="button" aria-label="显示当前月份书单">
                     <CalendarDays size={20} />
                     <strong>{month.label}</strong>
-                  </div>
-                  <button onClick={() => changeMonth(1)} aria-label="下个月">
+                  </button>
+                  <button onClick={() => { setReadingScope('month'); changeMonth(1); }} aria-label="下个月">
                     <ChevronRight size={21} />
                   </button>
                 </div>

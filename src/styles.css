@@ -2701,67 +2701,80 @@ button {
   font-weight: 850;
 }
 
-.reading-hero-actions {
+.library-hero-button {
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.reading-month-switch {
-  flex: 0 0 auto;
-}
-
-.reading-page-hero .new-book-button {
-  flex: 0 0 auto;
-  height: 50px;
+  min-width: 150px;
+  min-height: 118px;
   border: 0;
-  border-radius: 15px;
-  padding: 0 18px;
-  color: white;
-  background: linear-gradient(180deg, #55b37a, #38a567);
-  font-size: 16px;
+  border-radius: 22px;
+  padding: 16px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 78% 24%, rgba(255, 255, 255, 0.28), transparent 38%),
+    linear-gradient(135deg, #6ea6ff, #6a63e8 54%, #7c4edc);
+  box-shadow: 0 18px 34px rgba(91, 112, 221, 0.28);
+  display: grid;
+  place-items: center;
+  gap: 9px;
+  font-size: 17px;
   font-weight: 950;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 12px 24px rgba(56, 165, 103, 0.2);
+}
+
+.library-hero-button.active {
+  box-shadow: 0 0 0 5px rgba(109, 139, 239, 0.16), 0 18px 34px rgba(91, 112, 221, 0.32);
+}
+
+.library-hero-button svg {
+  filter: drop-shadow(0 5px 9px rgba(47, 55, 142, 0.24));
+}
+
+.library-hero-button span {
+  margin: 0;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 950;
 }
 
 .reading-scope-row {
   margin: 18px 0 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 14px;
 }
 
-.reading-scope-tabs {
-  border: 1px solid #e4ebe9;
-  border-radius: 16px;
-  padding: 5px;
-  background: #fffefa;
-  display: inline-flex;
-  gap: 5px;
-  box-shadow: 0 8px 18px rgba(54, 67, 72, 0.05);
+.reading-hero-actions,
+.reading-month-switch {
+  flex: 0 0 auto;
 }
 
-.reading-scope-tabs button {
-  min-width: 106px;
-  height: 36px;
+.reading-month-switch .reading-month-current {
+  width: auto;
+  height: 40px;
+  min-width: 176px;
   border: 0;
-  border-radius: 12px;
-  color: #68787d;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 950;
+  border-radius: 14px;
+  padding: 0 18px;
+  background:
+    radial-gradient(circle at 82% 82%, rgba(255, 255, 255, 0.24), transparent 36%),
+    linear-gradient(135deg, #78aefa 0%, #5b8ee8 100%);
+  color: white;
+  box-shadow: 0 16px 30px rgba(64, 127, 215, 0.24);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.reading-scope-tabs button.active {
-  color: #fff;
-  background: linear-gradient(180deg, #61c878, #3da65d);
-  box-shadow: 0 8px 16px rgba(61, 166, 93, 0.18);
+.reading-month-switch .reading-month-current svg {
+  color: rgba(255, 255, 255, 0.92);
+  filter: drop-shadow(0 2px 3px rgba(38, 79, 148, 0.2));
+}
+
+.reading-month-switch .reading-month-current strong {
+  color: white;
+  font-weight: 950;
+  text-shadow: 0 2px 6px rgba(30, 65, 125, 0.2);
 }
 
 .reading-summary {
@@ -7044,13 +7057,13 @@ button {
     justify-content: space-between;
   }
 
-  .reading-month-switch > div {
+  .reading-month-switch .reading-month-current {
     flex: 1 1 auto;
   }
 
-  .reading-page-hero .new-book-button {
+  .library-hero-button {
     width: 100%;
-    justify-content: center;
+    min-height: 86px;
   }
 
   .library-toolbar {
@@ -7061,16 +7074,6 @@ button {
   .library-toolbar .new-book-button {
     width: 100%;
     justify-content: center;
-  }
-
-  .reading-scope-tabs {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .reading-scope-tabs button {
-    min-width: 0;
   }
 
   .library-book-grid {

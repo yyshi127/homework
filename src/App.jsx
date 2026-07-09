@@ -2509,7 +2509,7 @@ function App() {
     );
   };
   const renderReadingBookCard = ({ book, stats }) => {
-    const readingPlanRows = stats.rangeDays.map((day) => {
+    const readingPlanRows = stats.rangeDays.map((day, index) => {
       const status = normalizeStatus(month.checks?.[book.id]?.[day] || 'empty');
       const note = month.notes?.[book.id]?.[day];
       const pageNote = typeof note === 'object' && note ? note : {};
@@ -2518,6 +2518,7 @@ function App() {
       const isMissed = !isCompleted && isBeforeToday(month.key, day);
       return {
         day,
+        dayIndex: index + 1,
         isCompleted,
         isToday,
         isMissed,
@@ -2529,12 +2530,14 @@ function App() {
     const isReadingPlanOpen = Boolean(expandedReadingPlans[book.id]);
     const showReadingCheckinAction = !stats.isComplete && stats.statusGroup !== 'upcoming';
     const showReadingSettingsAction = !stats.isComplete && stats.statusGroup === 'upcoming';
+    const formatReadingDate = (day) => `${month.year}年${month.month}月${day}日`;
+    const readingDateRange = `${formatReadingDate(stats.startDay)} - ${formatReadingDate(stats.endDay)}`;
 
     return (
     <article className={`reading-book-card reading-status-${stats.statusGroup} ${stats.isComplete ? 'finished' : ''}`} key={book.id}>
       <div className="reading-book-head">
         <div>
-          <span>{stats.startDay}日 - {stats.endDay}日</span>
+          <span>{readingDateRange}</span>
           <h3>{book.name || '未命名书目'}</h3>
         </div>
         <strong>+{stats.rewardPoints}分</strong>
@@ -2579,7 +2582,7 @@ function App() {
               <div className="reading-plan-list">
                 {readingPlanRows.map((record) => (
                   <div className={`reading-plan-row ${record.isToday ? 'today' : ''} ${record.isMissed ? 'missed' : ''}`} key={`${book.id}-plan-${record.day}`}>
-                    <span>{record.day}日</span>
+                    <span>第{record.dayIndex}天</span>
                     {record.startPage && record.endPage ? (
                       <strong className="reading-plan-range">{record.startPage} 至 {record.endPage} 页</strong>
                     ) : (

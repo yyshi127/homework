@@ -67,8 +67,14 @@ const STATUS = {
 };
 
 const REQUIRED_TODAY_SUBJECTS = ['语文', '数学', '英语', '阅读'];
-const DEFAULT_READING_REWARD_POINTS = 20;
-const DEFAULT_HABIT_POINTS = 5;
+const DEFAULT_POINT_CONFIG = {
+  excellent: 2,
+  super: 5,
+  habit: 5,
+  readingBook: 20,
+};
+const DEFAULT_READING_REWARD_POINTS = DEFAULT_POINT_CONFIG.readingBook;
+const DEFAULT_HABIT_POINTS = DEFAULT_POINT_CONFIG.habit;
 
 const NAV_ITEMS = [
   { label: '今日打卡', icon: Home },
@@ -405,6 +411,21 @@ function normalizeRewardConfig(config = DEFAULT_REWARDS) {
   });
 }
 
+function normalizePointConfig(config = {}) {
+  return {
+    excellent: Math.max(0, Number(config.excellent ?? DEFAULT_POINT_CONFIG.excellent)),
+    super: Math.max(0, Number(config.super ?? DEFAULT_POINT_CONFIG.super)),
+    habit: Math.max(0, Number(config.habit ?? DEFAULT_POINT_CONFIG.habit)),
+    readingBook: Math.max(0, Number(config.readingBook ?? DEFAULT_POINT_CONFIG.readingBook)),
+  };
+}
+
+function statusPoints(status, pointConfig = DEFAULT_POINT_CONFIG) {
+  if (status === 'excellent') return Number(pointConfig.excellent ?? DEFAULT_POINT_CONFIG.excellent);
+  if (status === 'super') return Number(pointConfig.super ?? DEFAULT_POINT_CONFIG.super);
+  return STATUS[status]?.points || 0;
+}
+
 function sortRewardsByPoints(rewards = []) {
   return [...rewards].sort((a, b) => {
     const aPoints = Number(a.points || 0) || Number.MAX_SAFE_INTEGER;
@@ -703,6 +724,7 @@ function sanitizeLoadedState(saved) {
   } else {
     next.rewardConfig = normalizeRewardConfig(next.rewardConfig || DEFAULT_REWARDS);
   }
+  next.pointConfig = normalizePointConfig(next.pointConfig);
   next.libraryBooks = normalizeLibraryBooks(next.libraryBooks?.length ? next.libraryBooks : collectLibraryBooks(next));
   next.bookTypes = normalizeBookTypes(next.bookTypes);
   next.learningTools = normalizeLearningTools(next.learningTools);
@@ -722,6 +744,7 @@ function createLocalCacheState(current) {
     ...current,
     rewardConfig: normalizeRewardConfig(current.rewardConfig || DEFAULT_REWARDS),
     rewardCatalogVersion: current.rewardCatalogVersion || REWARD_CATALOG_VERSION,
+    pointConfig: normalizePointConfig(current.pointConfig),
     libraryBooks: normalizeLibraryBooks(current.libraryBooks || []),
     bookTypes: normalizeBookTypes(current.bookTypes),
     learningTools: normalizeLearningTools(current.learningTools),
@@ -970,6 +993,7 @@ function migrateLegacyState(saved) {
     snapshots: [],
     rewardConfig: DEFAULT_REWARDS,
     rewardCatalogVersion: REWARD_CATALOG_VERSION,
+    pointConfig: DEFAULT_POINT_CONFIG,
     libraryBooks: collectLibraryBooks({ ...saved, months }),
     bookTypes: normalizeBookTypes(saved.bookTypes),
     learningTools: normalizeLearningTools(saved.learningTools),
@@ -984,6 +1008,7 @@ function createSeedState() {
     activeMonthId: months[0]?.id,
     rewardConfig: DEFAULT_REWARDS,
     rewardCatalogVersion: REWARD_CATALOG_VERSION,
+    pointConfig: DEFAULT_POINT_CONFIG,
     libraryBooks: normalizeLibraryBooks(DEFAULT_BOOKS.map((name, index) => ({ id: `library-default-${index}`, name, type: '其它' }))),
     bookTypes: DEFAULT_BOOK_TYPES,
     books: DEFAULT_BOOKS,
@@ -1063,7 +1088,7 @@ function formatCellNote(note) {
   return '';
 }
 
-function completedReadingRewards(month) {
+function completedReadingRewards(month, pointConfig = DEFAULT_POINT_CONFIG) {
   return (month.readingBooks || []).reduce((sum, book) => {
     const start = Number(book.startDay || 1);
     const end = Number(book.endDay || month.days);
@@ -1071,11 +1096,11 @@ function completedReadingRewards(month) {
       ? normalizeStatus(month.checks?.[book.id]?.[start] || 'empty') !== 'empty'
       : Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index)
         .every((day) => normalizeStatus(month.checks?.[book.id]?.[day] || 'empty') !== 'empty');
-    return sum + (isComplete && month.claimedReadingRewards?.[book.id] ? Number(book.rewardPoints || DEFAULT_READING_REWARD_POINTS) : 0);
+    return sum + (isComplete && month.claimedReadingRewards?.[book.id] ? Number(book.rewardPoints || pointConfig.readingBook) : 0);
   }, 0);
 }
 
-function readingBookStats(month, book) {
+function readingBookStats(month, book, pointConfig = DEFAULT_POINT_CONFIG) {
   const startDay = Math.max(1, Math.min(month.days, Number(book.startDay || 1)));
   const endDay = Math.max(startDay, Math.min(month.days, Number(book.endDay || month.days)));
   const rangeDays = Array.from({ length: Math.max(0, endDay - startDay + 1) }, (_, index) => startDay + index);
@@ -1129,7 +1154,7 @@ function readingBookStats(month, book) {
     progress,
     displayProgress,
     records,
-    rewardPoints: Number(book.rewardPoints || DEFAULT_READING_REWARD_POINTS),
+    rewardPoints: Number(book.rewardPoints || pointConfig.readingBook),
     statusGroup,
   };
 }
@@ -1175,6 +1200,7 @@ function App() {
   const [bookTypesDialog, setBookTypesDialog] = useState(null);
   const [bookPagesDialog, setBookPagesDialog] = useState(null);
   const [newRewardDialog, setNewRewardDialog] = useState(null);
+  const [pointConfigDialog, setPointConfigDialog] = useState(null);
   const [rewardTypeFilter, setRewardTypeFilter] = useState('全部');
   const [expandedReadingPlans, setExpandedReadingPlans] = useState({});
   const [learningTab, setLearningTab] = useState('grader');
@@ -1200,7 +1226,35 @@ function App() {
   const [isBackfillMode, setIsBackfillMode] = useState(false);
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
+  const pointConfig = useMemo(() => normalizePointConfig(state.pointConfig), [state.pointConfig]);
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
+  const pointRules = useMemo(() => [
+    { status: 'done', label: '已完成', score: '0分', note: '任务完成，打勾记录，不额外加积分。' },
+    { status: 'excellent', label: '优秀', score: `+${pointConfig.excellent}分`, note: `完成质量好，奖励${pointConfig.excellent}个积分。` },
+    { status: 'super', label: '非常优秀', score: `+${pointConfig.super}分`, note: `完成质量非常棒，奖励${pointConfig.super}个积分。` },
+  ], [pointConfig]);
+  const pointRuleDetails = useMemo(() => [
+    {
+      title: '普通学习任务',
+      badge: '打卡',
+      score: `0 / +${pointConfig.excellent} / +${pointConfig.super}`,
+      note: `语文、数学、英语、阅读等普通任务有三种有效状态：已完成只记录进度不加分；优秀 +${pointConfig.excellent} 分；非常优秀 +${pointConfig.super} 分。`,
+    },
+    {
+      title: '好习惯任务',
+      badge: '习惯',
+      score: '完成即加分',
+      note: `好习惯不区分优秀等级，只要当天完成，就按该习惯设置的积分计入本月积分；默认每项 +${pointConfig.habit} 分。`,
+    },
+    {
+      title: '阅读奖励',
+      badge: '阅读',
+      score: '领取后计入',
+      note: `书本达到阅读计划后，需要在阅读页领取读完奖励；新建书单默认 +${pointConfig.readingBook} 分。领取后才会加入本月积分和可用积分。`,
+    },
+    POINT_RULE_DETAILS[3],
+    POINT_RULE_DETAILS[4],
+  ], [pointConfig]);
   const rewardTypeCounts = useMemo(() => rewardConfig.reduce((counts, item) => {
     counts[item.type] = (counts[item.type] || 0) + 1;
     return counts;
@@ -1648,7 +1702,7 @@ function App() {
         endDay: target.days,
         checkMode: 'daily',
         importance: 'normal',
-        ...(category.name === '好习惯' ? { habitPoints: DEFAULT_HABIT_POINTS } : {}),
+        ...(category.name === '好习惯' ? { habitPoints: pointConfig.habit } : {}),
       });
       return next;
     });
@@ -1692,7 +1746,7 @@ function App() {
         delete task.bookId;
       }
       task.checkMode = task.type === 'stage' || task.bookId ? task.checkMode || 'daily' : 'daily';
-      if (category.name === '好习惯') task.habitPoints = Math.max(0, Number(task.habitPoints || DEFAULT_HABIT_POINTS));
+      if (category.name === '好习惯') task.habitPoints = Math.max(0, Number(task.habitPoints || pointConfig.habit));
       task.startDay = Math.max(1, Math.min(target.days, Number(task.startDay || 1)));
       task.endDay = Math.max(task.startDay, Math.min(target.days, Number(task.endDay || target.days)));
       if (task.bookId) {
@@ -1808,6 +1862,25 @@ function App() {
     await persistState(next, '奖励已删除并保存到 SQLite');
   };
 
+  const openPointConfigDialog = () => {
+    setPointConfigDialog({
+      excellent: String(pointConfig.excellent),
+      super: String(pointConfig.super),
+      habit: String(pointConfig.habit),
+      readingBook: String(pointConfig.readingBook),
+    });
+  };
+
+  const confirmPointConfig = async () => {
+    if (!pointConfigDialog) return;
+    const nextPointConfig = normalizePointConfig(pointConfigDialog);
+    const next = structuredClone(stateRef.current || state || {});
+    next.pointConfig = nextPointConfig;
+    setState(next);
+    setPointConfigDialog(null);
+    await persistState(next, '积分默认值已保存到 SQLite');
+  };
+
   const updateBooks = (text) => {
     const nextBooks = text.split('\n').map((line) => line.trim()).filter(Boolean);
     setState((current) => ({
@@ -1821,7 +1894,7 @@ function App() {
       const next = structuredClone(current || {});
       next.libraryBooks = normalizeLibraryBooks([
         ...(next.libraryBooks || []),
-        { id: createId('book'), type: '其它', totalPages: '', rewardPoints: DEFAULT_READING_REWARD_POINTS, addedAt: new Date().toISOString(), ...bookPatch },
+        { id: createId('book'), type: '其它', totalPages: '', rewardPoints: pointConfig.readingBook, addedAt: new Date().toISOString(), ...bookPatch },
       ]);
       return next;
     });
@@ -1829,7 +1902,7 @@ function App() {
   };
 
   const openNewBookDialog = () => {
-    setNewBookDialog({ name: '', type: '其它', totalPages: '', rewardPoints: String(DEFAULT_READING_REWARD_POINTS) });
+    setNewBookDialog({ name: '', type: '其它', totalPages: '', rewardPoints: String(pointConfig.readingBook) });
   };
 
   const openBookTypesDialog = () => {
@@ -1854,7 +1927,7 @@ function App() {
       name: book.name || '',
       type: book.type || '其它',
       totalPages: book.totalPages === '' || book.totalPages === undefined ? '' : String(book.totalPages),
-      rewardPoints: String(book.rewardPoints || DEFAULT_READING_REWARD_POINTS),
+      rewardPoints: String(book.rewardPoints || pointConfig.readingBook),
     });
   };
 
@@ -1903,7 +1976,7 @@ function App() {
       name,
       type: newBookDialog.type || '其它',
       totalPages: newBookDialog.totalPages === '' ? '' : Math.max(0, Number(newBookDialog.totalPages || 0)),
-      rewardPoints: Math.max(0, Number(newBookDialog.rewardPoints || DEFAULT_READING_REWARD_POINTS)),
+      rewardPoints: Math.max(0, Number(newBookDialog.rewardPoints || pointConfig.readingBook)),
     };
     if (newBookDialog.id) {
       setState((current) => {
@@ -1939,7 +2012,7 @@ function App() {
       book.startDay = Math.max(1, Math.min(target.days, Number(book.startDay || 1)));
       book.endDay = Math.max(book.startDay, Math.min(target.days, Number(book.endDay || target.days)));
       book.totalPages = book.totalPages === '' || book.totalPages === undefined ? '' : Math.max(0, Number(book.totalPages || 0));
-      book.rewardPoints = Math.max(0, Number(book.rewardPoints || DEFAULT_READING_REWARD_POINTS));
+      book.rewardPoints = Math.max(0, Number(book.rewardPoints || pointConfig.readingBook));
       return next;
     });
   };
@@ -2404,7 +2477,7 @@ function App() {
     rows.reduce((sum, row) => {
       if (!isTaskCheckableOnDay(row, day)) return sum;
       const status = getStatus(row.id, day);
-      const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || DEFAULT_HABIT_POINTS) : STATUS[status].points;
+      const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || pointConfig.habit) : statusPoints(status, pointConfig);
       return sum + base;
     }, 0);
 
@@ -2505,10 +2578,10 @@ function App() {
   const todayPoints = todayDay ? todayRows.reduce((sum, row) => {
     const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
     const status = getStatus(row.id, checkDay);
-    const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || DEFAULT_HABIT_POINTS) : STATUS[status].points;
+    const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || pointConfig.habit) : statusPoints(status, pointConfig);
     return sum + base;
   }, 0) : 0;
-  const readingRewardPoints = completedReadingRewards(month);
+  const readingRewardPoints = completedReadingRewards(month, pointConfig);
   const monthPoints = (cumulativePoints.at(-1) || 0) + readingRewardPoints;
   const allMonthPoints = months.reduce((sum, candidateMonth) => {
     const candidateRows = buildTaskRows(candidateMonth);
@@ -2516,20 +2589,20 @@ function App() {
       daySum + candidateRows.reduce((rowSum, row) => {
         if (!isTaskCheckableOnDay(row, day)) return rowSum;
         const status = normalizeStatus(candidateMonth.checks?.[row.id]?.[day] || 'empty');
-        const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || DEFAULT_HABIT_POINTS) : STATUS[status].points;
+        const base = row.subject === '好习惯' && status !== 'empty' ? Number(row.habitPoints || pointConfig.habit) : statusPoints(status, pointConfig);
         return rowSum + base;
       }, 0)
     ), 0);
-    return sum + taskPoints + completedReadingRewards(candidateMonth);
+    return sum + taskPoints + completedReadingRewards(candidateMonth, pointConfig);
   }, 0);
   const redeemedRewards = month.redeemedRewards || [];
   const redeemedRewardPoints = redeemedRewards.reduce((sum, item) => sum + Number(item.points || 0), 0);
   const availableRewardPoints = Math.max(0, monthPoints - redeemedRewardPoints);
-  const readingBooksWithStats = (month.readingBooks || []).map((book) => ({ book, stats: readingBookStats(month, book) }));
+  const readingBooksWithStats = (month.readingBooks || []).map((book) => ({ book, stats: readingBookStats(month, book, pointConfig) }));
   const plannedLibraryBookIds = new Set(months.flatMap((item) => item.readingBooks || []).map((book) => book.id));
   const finishedLibraryBookIds = new Set(months.flatMap((item) => (
     (item.readingBooks || [])
-      .filter((book) => readingBookStats(item, book).isComplete)
+      .filter((book) => readingBookStats(item, book, pointConfig).isComplete)
       .map((book) => book.id)
   )));
   const libraryTypeStats = Array.from(new Set(libraryBooks.map((book) => book.type || '其它').filter(Boolean)));
@@ -2630,7 +2703,7 @@ function App() {
     if (finishedLibraryBookIds.has(book.id)) return '已读完';
     const currentMonthBook = (month.readingBooks || []).find((item) => item.id === book.id);
     if (currentMonthBook) {
-      const stats = readingBookStats(month, currentMonthBook);
+      const stats = readingBookStats(month, currentMonthBook, pointConfig);
       if (stats.statusGroup === 'reading' || stats.statusGroup === 'unfinished') return '正在读';
       return '计划中';
     }
@@ -2665,7 +2738,7 @@ function App() {
         <div>
           <span>{book.type || '其它'}</span>
           <strong>{book.name || '未命名书目'}</strong>
-          <p>{book.totalPages ? `共 ${book.totalPages} 页` : '总页数未设置'} · 读完奖励 +{book.rewardPoints || DEFAULT_READING_REWARD_POINTS}</p>
+          <p>{book.totalPages ? `共 ${book.totalPages} 页` : '总页数未设置'} · 读完奖励 +{book.rewardPoints || pointConfig.readingBook}</p>
         </div>
         <em>{status}</em>
         {planLabel && <p className="library-plan-range">计划时间：{planLabel}</p>}
@@ -2701,7 +2774,7 @@ function App() {
         </div>
         <div>
           <span>积分</span>
-          <strong>+{book.rewardPoints || DEFAULT_READING_REWARD_POINTS}</strong>
+          <strong>+{book.rewardPoints || pointConfig.readingBook}</strong>
         </div>
         <div>
           <span>计划时间</span>
@@ -2901,11 +2974,11 @@ function App() {
     const stageTaskKey = `${todayHidePrefix}-${row.id}`;
     const isCollapsed = isStageCheckMode && !expandedTodayStageTasks[stageTaskKey];
     const statusChips = isHabit
-      ? [{ key: 'habit', label: `完成 +${Number(row.habitPoints || DEFAULT_HABIT_POINTS)} 分`, active: visualStatus !== 'empty' }]
+      ? [{ key: 'habit', label: `完成 +${Number(row.habitPoints || pointConfig.habit)} 分`, active: visualStatus !== 'empty' }]
       : [
         { key: 'done', label: '完成', active: visualStatus === 'done' },
-        { key: 'excellent', label: '优秀 +2 分', active: visualStatus === 'excellent' },
-        { key: 'super', label: '非常优秀 +5 分', active: visualStatus === 'super' },
+        { key: 'excellent', label: `优秀 +${pointConfig.excellent} 分`, active: visualStatus === 'excellent' },
+        { key: 'super', label: `非常优秀 +${pointConfig.super} 分`, active: visualStatus === 'super' },
       ];
 
     const todayStatusLabel = isHabit && visualStatus !== 'empty' ? '完成' : value === 'empty' ? '未打卡' : STATUS[value].label;
@@ -3229,8 +3302,8 @@ function App() {
           <div className="legend-bar">
             <div className="legend-items">
               <span><i className="legend-dot status-done"><Check size={12} /></i>已完成</span>
-              <span><i className="legend-dot status-excellent"><Star size={12} fill="currentColor" /></i>优秀 +2分</span>
-              <span><i className="legend-dot status-super"><span className="rose-icon">🌹</span></i>非常优秀 +5分</span>
+              <span><i className="legend-dot status-excellent"><Star size={12} fill="currentColor" /></i>优秀 +{pointConfig.excellent}分</span>
+              <span><i className="legend-dot status-super"><span className="rose-icon">🌹</span></i>非常优秀 +{pointConfig.super}分</span>
             </div>
             <p>小贴士：点击圆点打卡，点格子右上角“+”记录当天具体内容。</p>
             <div className="legend-controls">
@@ -3435,6 +3508,10 @@ function App() {
                 <span>当前可用积分：<strong>{availableRewardPoints}</strong> 分</span>
               </div>
               <div className="reward-hero-actions">
+                <button className="reward-config-button" onClick={openPointConfigDialog}>
+                  <Wrench size={18} />
+                  积分配置
+                </button>
                 <button className="reward-add-button" onClick={() => setNewRewardDialog({ name: '', points: '', description: '', type: '文具用品', icon: 'PenLine' })}>
                   <Gift size={18} />
                   新增奖励
@@ -4228,7 +4305,7 @@ function App() {
                                 {isHabit && (
                                   <label className="compact-number">
                                     <span>积分</span>
-                                    <input type="number" min="0" value={task.habitPoints || DEFAULT_HABIT_POINTS} onChange={(event) => updateTask(category.id, task.id, { habitPoints: event.target.value })} />
+                                    <input type="number" min="0" value={task.habitPoints || pointConfig.habit} onChange={(event) => updateTask(category.id, task.id, { habitPoints: event.target.value })} />
                                   </label>
                                 )}
                                 <button className="icon-danger" title="删除任务" aria-label="删除任务" onClick={() => deleteTask(category.id, task.id)}><Trash2 size={14} /></button>
@@ -4282,7 +4359,7 @@ function App() {
                 <div className="rules-detail">
                   <section className="rules-detail-section">
                     <h3>打卡状态分值</h3>
-                    {POINT_RULES.map((rule) => (
+                    {pointRules.map((rule) => (
                       <article key={rule.status}>
                         <i className={`legend-dot status-${rule.status}`}>
                           {rule.status === 'done' && <Check size={12} />}
@@ -4297,7 +4374,7 @@ function App() {
                   </section>
                   <section className="rules-detail-section">
                     <h3>系统积分口径</h3>
-                    {POINT_RULE_DETAILS.map((rule) => (
+                    {pointRuleDetails.map((rule) => (
                       <article key={rule.title}>
                         <i className="rule-badge">{rule.badge}</i>
                         <strong>{rule.title}</strong>
@@ -4501,6 +4578,58 @@ function App() {
             <footer>
               <button className="ghost" onClick={() => setBookPagesDialog(null)}>取消</button>
               <button onClick={confirmBookPages} disabled={Number(bookPagesDialog.totalPages || 0) <= 0}>保存页数</button>
+            </footer>
+          </div>
+        </section>
+      )}
+
+      {pointConfigDialog && (
+        <section className="settings-mask" role="dialog" aria-modal="true" aria-label="积分配置">
+          <div className="book-dialog-panel point-config-panel">
+            <header>
+              <div>
+                <h2>积分配置</h2>
+                <p>配置基础默认积分，保存后会影响后续积分计算和新建默认值。</p>
+              </div>
+            </header>
+            <div className="book-dialog-fields point-config-fields">
+              <label>
+                <span>每日打卡优秀</span>
+                <input
+                  autoFocus
+                  inputMode="numeric"
+                  value={pointConfigDialog.excellent}
+                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, excellent: event.target.value.replace(/[^\d]/g, '') }))}
+                />
+              </label>
+              <label>
+                <span>每日打卡非常优秀</span>
+                <input
+                  inputMode="numeric"
+                  value={pointConfigDialog.super}
+                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, super: event.target.value.replace(/[^\d]/g, '') }))}
+                />
+              </label>
+              <label>
+                <span>好习惯默认</span>
+                <input
+                  inputMode="numeric"
+                  value={pointConfigDialog.habit}
+                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, habit: event.target.value.replace(/[^\d]/g, '') }))}
+                />
+              </label>
+              <label>
+                <span>读完一本书默认</span>
+                <input
+                  inputMode="numeric"
+                  value={pointConfigDialog.readingBook}
+                  onChange={(event) => setPointConfigDialog((current) => ({ ...current, readingBook: event.target.value.replace(/[^\d]/g, '') }))}
+                />
+              </label>
+            </div>
+            <footer>
+              <button className="ghost" onClick={() => setPointConfigDialog(null)}>取消</button>
+              <button onClick={confirmPointConfig}>保存配置</button>
             </footer>
           </div>
         </section>

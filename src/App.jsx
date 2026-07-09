@@ -2274,7 +2274,7 @@ function App() {
   const libraryCategoryTabs = [
     { type: '所有', count: libraryBooks.length },
     ...BOOK_TYPES.map((type) => ({ type, count: libraryBooks.filter((book) => (book.type || '其它') === type).length })),
-  ].filter((item) => item.type === '所有' || item.count > 0);
+  ];
   const filteredLibraryBooks = libraryBooks.filter((book) => libraryTypeFilter === '所有' || (book.type || '其它') === libraryTypeFilter);
   const libraryHistoryMap = months.reduce((map, targetMonth) => {
     (targetMonth.readingBooks || []).forEach((book) => {

@@ -2729,8 +2729,15 @@ button {
   box-shadow: 0 12px 24px rgba(56, 165, 103, 0.2);
 }
 
-.reading-scope-tabs {
+.reading-scope-row {
   margin: 18px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.reading-scope-tabs {
   border: 1px solid #e4ebe9;
   border-radius: 16px;
   padding: 5px;
@@ -2765,11 +2772,54 @@ button {
 }
 
 .library-section {
-  margin-top: 0;
+  margin-top: 18px;
 }
 
 .library-summary {
   margin-top: 18px;
+}
+
+.library-toolbar {
+  border: 1px solid #e4ebe9;
+  border-radius: 20px;
+  padding: 16px;
+  background: #fffefa;
+  box-shadow: 0 10px 22px rgba(54, 67, 72, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.library-toolbar strong {
+  display: block;
+  color: #164148;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.library-toolbar span {
+  display: block;
+  margin-top: 5px;
+  color: #748084;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.library-toolbar .new-book-button {
+  flex: 0 0 auto;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 16px;
+  color: white;
+  background: linear-gradient(180deg, #55b37a, #38a567);
+  font-size: 15px;
+  font-weight: 950;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 12px 24px rgba(56, 165, 103, 0.18);
 }
 
 .library-type-strip {
@@ -6978,6 +7028,11 @@ button {
     font-size: 25px;
   }
 
+  .reading-scope-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .reading-hero-actions {
     width: 100%;
     flex-direction: column;
@@ -6994,6 +7049,16 @@ button {
   }
 
   .reading-page-hero .new-book-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .library-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .library-toolbar .new-book-button {
     width: 100%;
     justify-content: center;
   }

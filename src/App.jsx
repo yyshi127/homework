@@ -3063,8 +3063,14 @@ function App() {
                 <h2>对世界保持好奇，让书成为打开美好世界的伙伴</h2>
                 <span>{month.label} · 当前月份清单中的阅读计划</span>
               </div>
+            </div>
+
+            <div className="reading-scope-row">
+              <div className="reading-scope-tabs" role="tablist" aria-label="阅读书单范围">
+                <button className={readingScope === 'month' ? 'active' : ''} onClick={() => setReadingScope('month')} type="button">本月书单</button>
+                <button className={readingScope === 'library' ? 'active' : ''} onClick={() => setReadingScope('library')} type="button">我的图书馆</button>
+              </div>
               <div className="reading-hero-actions">
-                <button className="new-book-button" onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
                 <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
                   <button onClick={() => changeMonth(-1)} aria-label="上个月">
                     <ChevronLeft size={21} />
@@ -3080,13 +3086,15 @@ function App() {
               </div>
             </div>
 
-            <div className="reading-scope-tabs" role="tablist" aria-label="阅读书单范围">
-              <button className={readingScope === 'month' ? 'active' : ''} onClick={() => setReadingScope('month')} type="button">本月计划</button>
-              <button className={readingScope === 'library' ? 'active' : ''} onClick={() => setReadingScope('library')} type="button">全局书单</button>
-            </div>
-
             {readingScope === 'library' ? (
               <section className="library-section">
+                <div className="library-toolbar">
+                  <div>
+                    <strong>我的图书馆</strong>
+                    <span>新买的书先放在这里，再安排到具体月份阅读。</span>
+                  </div>
+                  <button className="new-book-button" onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
+                </div>
                 <div className="reading-summary library-summary">
                   <article>
                     <span>全年书单</span>

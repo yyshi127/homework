@@ -3071,22 +3071,24 @@ function App() {
               </button>
             </div>
 
-            <div className="reading-scope-row">
-              <div className="reading-hero-actions">
-                <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
-                  <button onClick={() => { setReadingScope('month'); changeMonth(-1); }} aria-label="上个月">
-                    <ChevronLeft size={21} />
-                  </button>
-                  <button className="reading-month-current" onClick={() => setReadingScope('month')} type="button" aria-label="显示当前月份书单">
-                    <CalendarDays size={20} />
-                    <strong>{month.label}</strong>
-                  </button>
-                  <button onClick={() => { setReadingScope('month'); changeMonth(1); }} aria-label="下个月">
-                    <ChevronRight size={21} />
-                  </button>
+            {readingScope === 'month' && (
+              <div className="reading-scope-row">
+                <div className="reading-hero-actions">
+                  <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
+                    <button onClick={() => changeMonth(-1)} aria-label="上个月">
+                      <ChevronLeft size={21} />
+                    </button>
+                    <button className="reading-month-current" type="button" aria-label="当前月份书单">
+                      <CalendarDays size={20} />
+                      <strong>{month.label}</strong>
+                    </button>
+                    <button onClick={() => changeMonth(1)} aria-label="下个月">
+                      <ChevronRight size={21} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {readingScope === 'library' ? (
               <section className="library-section">

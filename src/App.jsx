@@ -3040,6 +3040,18 @@ function App() {
     const base = row.subject === '好习惯' && status !== 'empty' ? habitPoints(row.habitPoints, pointConfig) : statusPoints(status, pointConfig);
     return sum + base;
   }, 0) : 0;
+  const todayCompletionPercent = todayRows.length ? Math.round((todayCompletedCount / todayRows.length) * 100) : 0;
+  const todayEnergyOffset = 100 - todayCompletionPercent;
+  const streakEndDay = isCurrentMonth && todayDay ? todayDay : Math.min(selectedCheckDay, month.days);
+  const dayHasCheckin = (day) => rows.some((row) => {
+    if (!isTaskCheckableOnDay(row, day)) return false;
+    return getStatus(row.id, day) !== 'empty';
+  });
+  let currentStreak = 0;
+  for (let day = streakEndDay; day >= 1; day -= 1) {
+    if (!dayHasCheckin(day)) break;
+    currentStreak += 1;
+  }
   const readingRewardPoints = completedReadingRewards(month, pointConfig);
   const monthPoints = cumulativePointsWithReadingRewards.at(-1) || 0;
   const allMonthPoints = months.reduce((sum, candidateMonth) => {
@@ -3624,6 +3636,20 @@ function App() {
     <main className="premium-app">
       <aside className="side-rail">
         <div className="rail-card">
+          <div className="rail-energy-card" aria-label="成长能量">
+            <div className="energy-ring" style={{ '--energy-offset': todayEnergyOffset }}>
+              <svg viewBox="0 0 44 44" aria-hidden="true">
+                <circle className="energy-ring-track" cx="22" cy="22" r="17" />
+                <circle className="energy-ring-value" cx="22" cy="22" r="17" pathLength="100" />
+              </svg>
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <strong>{todayCompletionPercent}%</strong>
+              <span>今日能量</span>
+            </div>
+            <em>连续 {currentStreak} 天</em>
+          </div>
           <nav>
             {NAV_ITEMS.map(({ label, icon: Icon }, index) => (
               <button

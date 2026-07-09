@@ -2277,20 +2277,6 @@ button {
   background: rgba(248, 251, 250, 0.96);
 }
 
-.task-stage .inactive-cell::after,
-.task-reading .inactive-cell::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 2px;
-  border-radius: 999px;
-  background: rgba(73, 86, 91, 0.34);
-  transform: translateY(-50%);
-  z-index: 1;
-}
-
 .row-blue.task-stage .inactive-cell,
 .row-blue.task-reading .inactive-cell { background: rgba(242, 249, 255, 0.62) !important; }
 .row-green.task-stage .inactive-cell,

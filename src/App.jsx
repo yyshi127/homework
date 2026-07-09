@@ -2568,7 +2568,7 @@ function App() {
     const key = temporaryDraftKey(month.id, group.categoryId);
     setTemporaryTaskDrafts((current) => ({
       ...current,
-      [key]: { content: '', remark: '', status: 'done' },
+      [key]: { content: '', remark: '' },
     }));
   };
 
@@ -2576,7 +2576,7 @@ function App() {
     const key = temporaryDraftKey(month.id, group.categoryId);
     setTemporaryTaskDrafts((current) => ({
       ...current,
-      [key]: { content: '', remark: '', status: 'done', ...(current[key] || {}), ...patch },
+      [key]: { content: '', remark: '', ...(current[key] || {}), ...patch },
     }));
   };
 
@@ -2627,12 +2627,7 @@ function App() {
     task.checkMode = 'daily';
     targetMonth.checks[task.id] ||= {};
     targetMonth.notes[task.id] ||= {};
-    const nextStatus = normalizeStatus(draft.status || 'done');
-    if (nextStatus === 'empty') {
-      delete targetMonth.checks[task.id][todayDay];
-    } else {
-      targetMonth.checks[task.id][todayDay] = nextStatus;
-    }
+    delete targetMonth.checks[task.id][todayDay];
     targetMonth.notes[task.id][todayDay] = formatTemporaryTaskNote(content, remark);
     setState(next);
     cancelTemporaryTaskDraft(group);
@@ -3290,11 +3285,6 @@ function App() {
     const total = group.rows.length;
     const draftKey = temporaryDraftKey(month.id, group.categoryId);
     const temporaryDraft = temporaryTaskDrafts[draftKey];
-    const temporaryStatusOptions = [
-      { key: 'done', label: '完成' },
-      { key: 'excellent', label: `优秀 +${pointConfig.excellent}` },
-      { key: 'super', label: `非常优秀 +${pointConfig.super}` },
-    ];
     return (
       <section className={`today-task-group row-${group.color} ${isCollapsed ? 'collapsed' : ''}`} key={group.subject}>
         <button
@@ -3336,22 +3326,11 @@ function App() {
                   </label>
                 </div>
                 <div className="temporary-task-actions">
-                  <div className="temporary-status-options" role="group" aria-label="临时任务打卡状态">
-                    {temporaryStatusOptions.map((option) => (
-                      <button
-                        key={option.key}
-                        className={temporaryDraft.status === option.key ? 'active' : ''}
-                        type="button"
-                        onClick={() => updateTemporaryTaskDraft(group, { status: option.key })}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
+                  <p>保存后先显示为未打卡，再像其它任务一样点击打卡。</p>
                   <div className="temporary-task-save-actions">
                     <button className="ghost" type="button" onClick={() => cancelTemporaryTaskDraft(group)}>取消</button>
                     <button className="primary" type="button" onClick={() => saveTemporaryTaskDraft(group)}>
-                      <Check size={16} />打卡保存
+                      <Save size={16} />保存
                     </button>
                   </div>
                 </div>
@@ -3668,23 +3647,25 @@ function App() {
                         const value = getStatus(row.id, day);
                         const isActive = isTaskActiveOnDay(row, day);
                         const isCheckable = isTaskCheckableOnDay(row, day);
+                        const isTemporaryReadonly = row.typeKey === 'temporary';
                         const isPast = isBeforeToday(month.key, day);
-                        const canBackfill = Boolean(isBackfillMode && isCurrentMonth && todayDay && day < todayDay);
-                        const canEdit = isCheckable && (!isPast || canBackfill);
+                        const canBackfill = !isTemporaryReadonly && Boolean(isBackfillMode && isCurrentMonth && todayDay && day < todayDay);
+                        const canEdit = isCheckable && !isTemporaryReadonly && (!isPast || canBackfill);
                         const note = month.notes?.[row.id]?.[day];
                         const noteText = formatCellNote(note);
+                        const cellTitle = isTemporaryReadonly ? [noteText, '临时任务请在今日打卡中操作'].filter(Boolean).join('；') : noteText;
                         return (
                           <td
                             key={day}
-                            className={`mark-cell ${isActive ? '' : 'inactive-cell'} ${isActive && !isCheckable ? 'range-cell' : ''} ${isCheckable && isPast && !canBackfill ? 'past-cell' : ''} ${isCheckable && canBackfill ? 'backfill-cell' : ''} ${note ? 'has-note' : ''}`}
-                            title={noteText || undefined}
+                            className={`mark-cell ${isActive ? '' : 'inactive-cell'} ${isActive && !isCheckable ? 'range-cell' : ''} ${isCheckable && isPast && !canBackfill ? 'past-cell' : ''} ${isCheckable && canBackfill ? 'backfill-cell' : ''} ${isTemporaryReadonly ? 'temporary-readonly-cell' : ''} ${note ? 'has-note' : ''}`}
+                            title={cellTitle || undefined}
                             onClick={() => {
                               if (canEdit) cycleStatus(row.id, day, { allowActiveToday: canBackfill, manualSaveOnly: true });
                             }}
                           >
                             {isCheckable && (
                               <>
-                                <StatusButton value={value} disabled={isPast && !canBackfill} label={`${row.subject}${row.type}${day}日${STATUS[value].label}${isPast && !canBackfill ? '，已锁定' : ''}`} />
+                                <StatusButton value={value} disabled={isTemporaryReadonly || (isPast && !canBackfill)} label={`${row.subject}${row.type}${day}日${STATUS[value].label}${isTemporaryReadonly ? '，请在今日打卡中操作' : isPast && !canBackfill ? '，已锁定' : ''}`} />
                                 {note && <span className="note-corner" aria-hidden="true" />}
                               </>
                             )}

@@ -1211,6 +1211,19 @@ function completedReadingRewards(month, pointConfig = DEFAULT_POINT_CONFIG) {
   }, 0);
 }
 
+function completedReadingRewardsThroughDay(month, day, pointConfig = DEFAULT_POINT_CONFIG) {
+  return (month.readingBooks || []).reduce((sum, book) => {
+    const start = Number(book.startDay || 1);
+    const end = Number(book.endDay || month.days);
+    if (day < end) return sum;
+    const isComplete = book.checkMode === 'stage'
+      ? normalizeStatus(month.checks?.[book.id]?.[start] || 'empty') !== 'empty'
+      : Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index)
+        .every((checkDay) => normalizeStatus(month.checks?.[book.id]?.[checkDay] || 'empty') !== 'empty');
+    return sum + (isComplete && month.claimedReadingRewards?.[book.id] ? Number(book.rewardPoints || pointConfig.readingBook) : 0);
+  }, 0);
+}
+
 function readingBookStats(month, book, pointConfig = DEFAULT_POINT_CONFIG) {
   const startDay = Math.max(1, Math.min(month.days, Number(book.startDay || 1)));
   const endDay = Math.max(startDay, Math.min(month.days, Number(book.endDay || month.days)));
@@ -2755,6 +2768,9 @@ function App() {
     list.push(value + (list[index - 1] || 0));
     return list;
   }, []);
+  const cumulativePointsWithReadingRewards = cumulativePoints.map((value, index) => (
+    value + completedReadingRewardsThroughDay(month, index + 1, pointConfig)
+  ));
   const today = new Date();
   const isCurrentMonth = month.key === createMonthKey(today.getFullYear(), today.getMonth() + 1);
   const todayDay = isCurrentMonth ? today.getDate() : null;
@@ -2853,7 +2869,7 @@ function App() {
     return sum + base;
   }, 0) : 0;
   const readingRewardPoints = completedReadingRewards(month, pointConfig);
-  const monthPoints = (cumulativePoints.at(-1) || 0) + readingRewardPoints;
+  const monthPoints = cumulativePointsWithReadingRewards.at(-1) || 0;
   const allMonthPoints = months.reduce((sum, candidateMonth) => {
     const candidateRows = buildTaskRows(candidateMonth);
     const taskPoints = Array.from({ length: candidateMonth.days }, (_, index) => index + 1).reduce((daySum, day) => (
@@ -3761,7 +3777,7 @@ function App() {
                 </tr>
                 <tr className="sum-row">
                   <th colSpan={3}>本月积分合计（含已兑换阅读奖励{readingRewardPoints ? ` +${readingRewardPoints}` : ''}）</th>
-                  {cumulativePoints.map((value, index) => <td key={index}>{value || '-'}</td>)}
+                  {cumulativePointsWithReadingRewards.map((value, index) => <td key={index}>{value || '-'}</td>)}
                 </tr>
               </tbody>
             </table>

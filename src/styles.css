@@ -1411,6 +1411,12 @@ button {
   background: #dfe8e3;
 }
 
+.row-blue.today-task-card::before { background: var(--blue); }
+.row-green.today-task-card::before { background: var(--green); }
+.row-red.today-task-card::before { background: var(--red); }
+.row-purple.today-task-card::before { background: var(--purple); }
+.row-orange.today-task-card::before { background: var(--yellow); }
+
 .today-task-card.today-daily-task {
   background:
     radial-gradient(circle at 98% 0%, rgba(255, 255, 255, 0.9), transparent 120px),
@@ -1468,13 +1474,6 @@ button {
   border: 1px dashed rgba(111, 143, 155, 0.38);
   border-radius: 16px;
   pointer-events: none;
-}
-
-.today-task-card.today-stage-task::before {
-  background:
-    linear-gradient(#6fa6b2, #6fa6b2) top / 100% 30% no-repeat,
-    linear-gradient(#f4c55f, #f4c55f) center / 100% 30% no-repeat,
-    linear-gradient(#56bd78, #56bd78) bottom / 100% 30% no-repeat;
 }
 
 .today-task-main {

@@ -2231,13 +2231,15 @@ function App() {
   };
   const unreadBookOptions = readingGroups.other.map(({ book }) => book);
   const claimableReadingCount = readingGroups.finished.filter((item) => !item.stats.isClaimed).length;
+  const claimableReadingPoints = readingGroups.finished
+    .filter((item) => !item.stats.isClaimed)
+    .reduce((sum, item) => sum + item.stats.rewardPoints, 0);
   const readingTabMeta = {
     reading: { label: '正在读', count: readingGroups.reading.length, empty: '当前没有正在阅读的书。' },
     finished: { label: '已读完', count: readingGroups.finished.length, badge: claimableReadingCount ? `${claimableReadingCount} 个待兑换` : '', empty: '读完整本书后，会出现在这里并显示已获得积分。' },
     other: { label: '未开始', count: readingGroups.other.length, empty: '没有未开始或逾期未完成的书。' },
   };
   const currentReadingBooks = readingGroups[readingTab] || readingGroups.reading;
-  const readingRewardAvailable = readingBooksWithStats.reduce((sum, item) => sum + item.stats.rewardPoints, 0);
   const filteredMistakes = mistakeItems.filter((item) => (
     (mistakeTermFilter === '全部学期' || item.term === mistakeTermFilter) &&
     (mistakeSubjectFilter === '全部' || item.subject === mistakeSubjectFilter)
@@ -3155,8 +3157,8 @@ function App() {
                 </article>
                 <article className="points">
                   <span>已兑换/未兑换积分</span>
-                  <strong>{readingRewardPoints}/{Math.max(0, readingRewardAvailable - readingRewardPoints)}</strong>
-                  <em>已兑换 {readingRewardPoints} · 未兑换 {Math.max(0, readingRewardAvailable - readingRewardPoints)}</em>
+                  <strong>{readingRewardPoints}/{claimableReadingPoints}</strong>
+                  <em>已兑换 {readingRewardPoints} · 未兑换 {claimableReadingPoints}</em>
                 </article>
               </div>
 

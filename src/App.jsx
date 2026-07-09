@@ -1050,6 +1050,7 @@ function App() {
   const [mistakeTermFilter, setMistakeTermFilter] = useState('二年级上学期');
   const [mistakeSubjectFilter, setMistakeSubjectFilter] = useState('全部');
   const [hiddenTodayStageTasks, setHiddenTodayStageTasks] = useState({});
+  const [collapsedTodaySubjects, setCollapsedTodaySubjects] = useState({});
   const [todayFocusTaskId, setTodayFocusTaskId] = useState('');
   const [settingsFocusCategory, setSettingsFocusCategory] = useState('');
   const [isBackfillMode, setIsBackfillMode] = useState(false);
@@ -2231,9 +2232,12 @@ function App() {
   const todayDay = isCurrentMonth ? today.getDate() : null;
   const todayHidePrefix = todayDay ? `${month.key}-${todayDay}` : '';
   const todayRows = todayDay ? rows.filter((row) => taskCheckDayForToday(row, todayDay) !== null) : [];
-  const todayCompletedCount = todayDay ? todayRows.filter((row) => {
+  const isTodayRowCompleted = (row) => {
     const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
-    return getStatus(row.id, checkDay) !== 'empty';
+    return checkDay !== null && getStatus(row.id, checkDay) !== 'empty';
+  };
+  const todayCompletedCount = todayDay ? todayRows.filter((row) => {
+    return isTodayRowCompleted(row);
   }).length : 0;
   const isRequiredTodayTask = (row) => (
     REQUIRED_TODAY_SUBJECTS.includes(row.subject) &&
@@ -2252,9 +2256,32 @@ function App() {
     return checkDay !== null && getStatus(row.id, checkDay) === 'empty';
   }) : [];
   const todayRequiredPendingCount = todayRequiredPendingRows.length;
+  const todayTaskGroups = todayRows.reduce((groups, row) => {
+    const existing = groups.find((group) => group.subject === row.subject);
+    if (existing) {
+      existing.rows.push(row);
+      return groups;
+    }
+    groups.push({
+      subject: row.subject,
+      color: row.color,
+      badge: row.badge,
+      rows: [row],
+    });
+    return groups;
+  }, []).map((group) => ({
+    ...group,
+    completedCount: group.rows.filter(isTodayRowCompleted).length,
+    requiredPendingCount: group.rows.filter((row) => {
+      if (!isRequiredTodayTask(row)) return false;
+      const checkDay = taskCheckDayForToday(row, todayDay);
+      return checkDay !== null && getStatus(row.id, checkDay) === 'empty';
+    }).length,
+  }));
   const jumpToFirstRequiredPendingTask = () => {
     const target = todayRequiredPendingRows[0];
     if (!target) return;
+    setCollapsedTodaySubjects((current) => ({ ...current, [target.subject]: false }));
     setTodayFocusTaskId(target.id);
     window.setTimeout(() => {
       const element = document.querySelector(`[data-today-task-id="${target.id}"]`);
@@ -2280,6 +2307,7 @@ function App() {
       return;
     }
     setActiveView('today');
+    setCollapsedTodaySubjects((current) => ({ ...current, [target.subject]: false }));
     setTodayFocusTaskId(target.id);
     setHiddenTodayStageTasks((current) => {
       const next = { ...current };
@@ -2780,6 +2808,37 @@ function App() {
       </article>
     );
   };
+  const renderTodayTaskGroup = (group) => {
+    const isCollapsed = Boolean(collapsedTodaySubjects[group.subject]);
+    const total = group.rows.length;
+    return (
+      <section className={`today-task-group row-${group.color} ${isCollapsed ? 'collapsed' : ''}`} key={group.subject}>
+        <button
+          className="today-task-group-head"
+          type="button"
+          aria-expanded={!isCollapsed}
+          onClick={() => setCollapsedTodaySubjects((current) => ({ ...current, [group.subject]: !current[group.subject] }))}
+        >
+          <div className="today-task-group-title">
+            <i>{group.badge}</i>
+            <span>
+              <strong>{group.subject}</strong>
+              <em>{group.completedCount}/{total} 已打卡{group.requiredPendingCount ? ` · ${group.requiredPendingCount} 个必打卡未完成` : ''}</em>
+            </span>
+          </div>
+          <div className="today-task-group-meta">
+            <b>{total} 项</b>
+            <ChevronDown size={20} />
+          </div>
+        </button>
+        {!isCollapsed && (
+          <div className="today-task-group-body">
+            {group.rows.map(renderTodayTaskCard)}
+          </div>
+        )}
+      </section>
+    );
+  };
 
   return (
     <main className="premium-app">
@@ -2936,7 +2995,7 @@ function App() {
 
             {todayRows.length ? (
               <div className="today-task-list">
-                {todayRows.map(renderTodayTaskCard)}
+                {todayTaskGroups.map(renderTodayTaskGroup)}
               </div>
             ) : (
               <div className="today-empty">

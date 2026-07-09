@@ -2965,6 +2965,76 @@ button {
   color: #ff7046;
 }
 
+.month-reading-summary article {
+  position: relative;
+  min-height: 118px;
+  border: 0;
+  color: #fff;
+  background: linear-gradient(145deg, #52bfe9, #2d8ed0);
+  box-shadow: 0 16px 30px rgba(61, 79, 88, 0.15);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.month-reading-summary article::before {
+  content: "";
+  position: absolute;
+  right: -22px;
+  bottom: -28px;
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  z-index: -1;
+}
+
+.month-reading-summary article::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.58), transparent 32%);
+  z-index: -1;
+}
+
+.month-reading-summary article:nth-child(1) {
+  background: linear-gradient(145deg, #4ec5d8, #2d91ca);
+}
+
+.month-reading-summary .active {
+  background: linear-gradient(145deg, #6aa3ff, #4d7fd5);
+}
+
+.month-reading-summary .done {
+  background: linear-gradient(145deg, #42cd79, #1ea95b);
+}
+
+.month-reading-summary .points {
+  background: linear-gradient(145deg, #ff9a4a, #ef6b38);
+}
+
+.month-reading-summary span,
+.month-reading-summary em {
+  color: rgba(255, 255, 255, 0.92);
+  position: relative;
+}
+
+.month-reading-summary strong,
+.month-reading-summary .active strong,
+.month-reading-summary .done strong,
+.month-reading-summary .points strong {
+  display: block;
+  margin: 8px 0 4px;
+  color: #fff;
+  font-size: 42px;
+  line-height: 0.95;
+  text-shadow: 0 5px 12px rgba(32, 45, 55, 0.2);
+  position: relative;
+}
+
+.month-reading-summary .points strong {
+  font-size: 34px;
+}
+
 .reading-sections {
   display: grid;
   gap: 18px;

@@ -3137,9 +3137,9 @@ function App() {
               </section>
             ) : (
               <>
-              <div className="reading-summary">
+              <div className="reading-summary month-reading-summary">
                 <article>
-                  <span>本月书籍</span>
+                  <span>本月书单</span>
                   <strong>{readingBooksWithStats.length}</strong>
                   <em>本</em>
                 </article>
@@ -3149,14 +3149,14 @@ function App() {
                   <em>本</em>
                 </article>
                 <article className="done">
-                  <span>已经读完</span>
+                  <span>已读完</span>
                   <strong>{readingGroups.finished.length}</strong>
                   <em>{claimableReadingCount ? `${claimableReadingCount} 个待兑换` : '本'}</em>
                 </article>
                 <article className="points">
-                  <span>已兑换奖励</span>
-                  <strong>{readingRewardPoints}</strong>
-                  <em>分 / 可获 {readingRewardAvailable} 分</em>
+                  <span>已兑换/未兑换积分</span>
+                  <strong>{readingRewardPoints}/{Math.max(0, readingRewardAvailable - readingRewardPoints)}</strong>
+                  <em>已兑换 {readingRewardPoints} · 未兑换 {Math.max(0, readingRewardAvailable - readingRewardPoints)}</em>
                 </article>
               </div>
 

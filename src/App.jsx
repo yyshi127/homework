@@ -939,6 +939,7 @@ function App() {
   const localSaveTimerRef = useRef(null);
   const databaseSaveTimerRef = useRef(null);
   const saveToastTimerRef = useRef(null);
+  const manualSavePendingRef = useRef(false);
   const [activePanel, setActivePanel] = useState(null);
   const [activeView, setActiveView] = useState(initialActiveView);
   const [categoryDraft, setCategoryDraft] = useState('语文');
@@ -969,6 +970,7 @@ function App() {
   const [mistakeSubjectFilter, setMistakeSubjectFilter] = useState('全部');
   const [hiddenTodayStageTasks, setHiddenTodayStageTasks] = useState({});
   const [todayFocusTaskId, setTodayFocusTaskId] = useState('');
+  const [isBackfillMode, setIsBackfillMode] = useState(false);
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
@@ -998,6 +1000,15 @@ function App() {
     }, 900);
 
     if (!databaseReady || loadingFromDatabase.current) return undefined;
+    if (manualSavePendingRef.current) {
+      setHasUnsavedChanges(true);
+      setDatabaseStatus('全月表有未保存修改，请点击保存');
+      if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
+      return () => {
+        if (localSaveTimerRef.current) window.clearTimeout(localSaveTimerRef.current);
+        if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
+      };
+    }
     setHasUnsavedChanges(true);
     setDatabaseStatus('有未保存修改，正在自动保存...');
     if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
@@ -1105,6 +1116,7 @@ function App() {
     const row = rows.find((candidate) => candidate.id === rowId);
     if (!row || !isTaskCheckableOnDay(row, day)) return;
     if (isBeforeToday(month.key, day) && !options.allowActiveToday) return;
+    if (options.manualSaveOnly) manualSavePendingRef.current = true;
     setState((current) => {
       const next = structuredClone(current || {});
       const targetMonth = next.months.find((item) => item.id === month.id);
@@ -1123,6 +1135,7 @@ function App() {
     const row = rows.find((candidate) => candidate.id === rowId);
     if (!row || !isTaskCheckableOnDay(row, day)) return;
     if (isBeforeToday(month.key, day) && !options.allowActiveToday) return;
+    if (options.manualSaveOnly) manualSavePendingRef.current = true;
     setState((current) => {
       const next = structuredClone(current || {});
       const targetMonth = next.months.find((item) => item.id === month.id);
@@ -1977,7 +1990,17 @@ function App() {
   };
 
   const saveCurrentState = async () => {
-    await persistState(stateRef.current, '当前状态已保存到 SQLite');
+    const ok = await persistState(stateRef.current, '当前状态已保存到 SQLite');
+    if (ok) {
+      manualSavePendingRef.current = false;
+      setIsBackfillMode(false);
+    }
+  };
+
+  const enableBackfillMode = () => {
+    if (isBackfillMode) return;
+    if (!window.confirm('开启补录后，可以修改本月今天以前的打卡记录。补录完成后必须点击保存才会写入数据库，确定开启吗？')) return;
+    setIsBackfillMode(true);
   };
 
   const createSnapshot = async () => {
@@ -2606,6 +2629,9 @@ function App() {
               <div className={`database-pill ${databaseReady ? 'ready' : 'offline'} ${hasUnsavedChanges ? 'dirty' : ''}`}>
                 {databaseStatus}
               </div>
+              <button className={`legend-backfill ${isBackfillMode ? 'active' : ''}`} onClick={enableBackfillMode} type="button" title="补录历史打卡" aria-label="补录历史打卡">
+                补录
+              </button>
               <button className="legend-save" onClick={saveCurrentState} title="保存当前状态" aria-label="保存当前状态">
                 <Save size={15} />
               </button>
@@ -2662,6 +2688,8 @@ function App() {
                       const endDay = Math.max(startDay, Math.min(month.days, Number(row.endDay || startDay)));
                       const value = getStatus(row.id, startDay);
                       const isPast = isBeforeToday(month.key, startDay);
+                      const canBackfill = Boolean(isBackfillMode && isCurrentMonth && todayDay && startDay < todayDay);
+                      const canEdit = !isPast || canBackfill;
                       const note = month.notes?.[row.id]?.[startDay];
                       const noteText = formatCellNote(note);
                       return (
@@ -2671,13 +2699,13 @@ function App() {
                           ))}
                           <td
                             colSpan={endDay - startDay + 1}
-                            className={`mark-cell stage-span-cell ${isPast ? 'past-cell' : ''} ${note ? 'has-note' : ''}`}
+                            className={`mark-cell stage-span-cell ${isPast && !canBackfill ? 'past-cell' : ''} ${canBackfill ? 'backfill-cell' : ''} ${note ? 'has-note' : ''}`}
                             title={noteText || undefined}
                             onClick={() => {
-                              if (!isPast) cycleStatus(row.id, startDay);
+                              if (canEdit) cycleStatus(row.id, startDay, { allowActiveToday: canBackfill, manualSaveOnly: true });
                             }}
                           >
-                            <StatusButton value={value} disabled={isPast} label={`${row.subject}${row.type}${startDay}日至${endDay}日${STATUS[value].label}${isPast ? '，已锁定' : ''}`} />
+                            <StatusButton value={value} disabled={isPast && !canBackfill} label={`${row.subject}${row.type}${startDay}日至${endDay}日${STATUS[value].label}${isPast && !canBackfill ? '，已锁定' : ''}`} />
                             {note && <span className="note-corner" aria-hidden="true" />}
                           </td>
                           {Array.from({ length: month.days - endDay }, (_, index) => (
@@ -2691,20 +2719,22 @@ function App() {
                         const isActive = isTaskActiveOnDay(row, day);
                         const isCheckable = isTaskCheckableOnDay(row, day);
                         const isPast = isBeforeToday(month.key, day);
+                        const canBackfill = Boolean(isBackfillMode && isCurrentMonth && todayDay && day < todayDay);
+                        const canEdit = isCheckable && (!isPast || canBackfill);
                         const note = month.notes?.[row.id]?.[day];
                         const noteText = formatCellNote(note);
                         return (
                           <td
                             key={day}
-                            className={`mark-cell ${isActive ? '' : 'inactive-cell'} ${isActive && !isCheckable ? 'range-cell' : ''} ${isCheckable && isPast ? 'past-cell' : ''} ${note ? 'has-note' : ''}`}
+                            className={`mark-cell ${isActive ? '' : 'inactive-cell'} ${isActive && !isCheckable ? 'range-cell' : ''} ${isCheckable && isPast && !canBackfill ? 'past-cell' : ''} ${isCheckable && canBackfill ? 'backfill-cell' : ''} ${note ? 'has-note' : ''}`}
                             title={noteText || undefined}
                             onClick={() => {
-                              if (isCheckable && !isPast) cycleStatus(row.id, day);
+                              if (canEdit) cycleStatus(row.id, day, { allowActiveToday: canBackfill, manualSaveOnly: true });
                             }}
                           >
                             {isCheckable && (
                               <>
-                                <StatusButton value={value} disabled={isPast} label={`${row.subject}${row.type}${day}日${STATUS[value].label}${isPast ? '，已锁定' : ''}`} />
+                                <StatusButton value={value} disabled={isPast && !canBackfill} label={`${row.subject}${row.type}${day}日${STATUS[value].label}${isPast && !canBackfill ? '，已锁定' : ''}`} />
                                 {note && <span className="note-corner" aria-hidden="true" />}
                               </>
                             )}

@@ -836,6 +836,7 @@ button {
 }
 
 .legend-save,
+.legend-backfill,
 .legend-settings {
   flex: 0 0 auto;
   width: 32px;
@@ -847,6 +848,20 @@ button {
   display: grid;
   place-items: center;
   box-shadow: 0 7px 14px rgba(56, 168, 92, 0.22);
+}
+
+.legend-backfill {
+  width: auto;
+  padding: 0 12px;
+  background: linear-gradient(180deg, #ffbd55, #f08a24);
+  font-size: 13px;
+  font-weight: 950;
+  box-shadow: 0 7px 14px rgba(240, 138, 36, 0.22);
+}
+
+.legend-backfill.active {
+  background: linear-gradient(180deg, #ff7046, #df3c31);
+  box-shadow: 0 8px 16px rgba(223, 60, 49, 0.26);
 }
 
 .legend-save:hover {
@@ -1723,6 +1738,16 @@ button {
 
 .past-cell {
   background: #f8faf9 !important;
+}
+
+.backfill-cell {
+  background: #fff7ea !important;
+  box-shadow: inset 0 0 0 1px rgba(240, 138, 36, 0.28);
+  cursor: pointer;
+}
+
+.backfill-cell:hover {
+  background: #fff0d4 !important;
 }
 
 .note-dot,

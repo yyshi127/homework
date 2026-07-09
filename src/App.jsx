@@ -889,17 +889,11 @@ function isTaskActiveOnDay(row, day) {
 
 function isTaskCheckableOnDay(row, day) {
   if (!isTaskActiveOnDay(row, day)) return false;
-  if ((row.typeKey === 'stage' || row.typeKey === 'reading') && row.checkMode === 'stage') {
-    return day === Number(row.startDay || 1);
-  }
   return true;
 }
 
 function taskCheckDayForToday(row, day) {
   if (!row || !isTaskActiveOnDay(row, day)) return null;
-  if ((row.typeKey === 'stage' || row.typeKey === 'reading') && row.checkMode === 'stage') {
-    return Number(row.startDay || day);
-  }
   return day;
 }
 
@@ -3123,11 +3117,14 @@ function App() {
                     {(row.typeKey === 'stage' || row.typeKey === 'reading') && row.checkMode === 'stage' ? (() => {
                       const startDay = Math.max(1, Math.min(month.days, Number(row.startDay || 1)));
                       const endDay = Math.max(startDay, Math.min(month.days, Number(row.endDay || startDay)));
-                      const value = getStatus(row.id, startDay);
-                      const isPast = isBeforeToday(month.key, startDay);
-                      const canBackfill = Boolean(isBackfillMode && isCurrentMonth && todayDay && startDay < todayDay);
-                      const canEdit = !isPast || canBackfill;
-                      const note = month.notes?.[row.id]?.[startDay];
+                      const activeStageDay = isCurrentMonth && todayDay && todayDay >= startDay && todayDay <= endDay ? todayDay : null;
+                      const completedDay = stageCompletedDay(row, month, todayDay || endDay);
+                      const checkDay = completedDay || activeStageDay || startDay;
+                      const value = getStatus(row.id, checkDay);
+                      const isPast = isBeforeToday(month.key, checkDay);
+                      const canBackfill = Boolean(isBackfillMode && isCurrentMonth && todayDay && checkDay < todayDay);
+                      const canEdit = Boolean(activeStageDay) || !isPast || canBackfill;
+                      const note = month.notes?.[row.id]?.[checkDay];
                       const noteText = formatCellNote(note);
                       return (
                         <>
@@ -3136,13 +3133,13 @@ function App() {
                           ))}
                           <td
                             colSpan={endDay - startDay + 1}
-                            className={`mark-cell stage-span-cell ${isPast && !canBackfill ? 'past-cell' : ''} ${canBackfill ? 'backfill-cell' : ''} ${note ? 'has-note' : ''}`}
+                            className={`mark-cell stage-span-cell ${!canEdit ? 'past-cell' : ''} ${canBackfill ? 'backfill-cell' : ''} ${note ? 'has-note' : ''}`}
                             title={noteText || undefined}
                             onClick={() => {
-                              if (canEdit) cycleStatus(row.id, startDay, { allowActiveToday: canBackfill, manualSaveOnly: true });
+                              if (canEdit) cycleStatus(row.id, checkDay, { allowActiveToday: Boolean(activeStageDay) || canBackfill, manualSaveOnly: true });
                             }}
                           >
-                            <StatusButton value={value} disabled={isPast && !canBackfill} label={`${row.subject}${row.type}${startDay}日至${endDay}日${STATUS[value].label}${isPast && !canBackfill ? '，已锁定' : ''}`} />
+                            <StatusButton value={value} disabled={!canEdit} label={`${row.subject}${row.type}${startDay}日至${endDay}日${STATUS[value].label}${!canEdit ? '，已锁定' : ''}`} />
                             {note && <span className="note-corner" aria-hidden="true" />}
                           </td>
                           {Array.from({ length: month.days - endDay }, (_, index) => (

@@ -2181,16 +2181,12 @@ button {
 
 .task-stage .plan-cell,
 .task-stage .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background:
-    repeating-linear-gradient(135deg, rgba(96, 125, 139, 0.035) 0 7px, transparent 7px 15px),
-    rgba(255, 255, 255, 0.72);
+  background-color: rgba(255, 255, 255, 0.72);
 }
 
 .task-reading .plan-cell,
 .task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background:
-    repeating-linear-gradient(135deg, rgba(96, 125, 139, 0.035) 0 7px, transparent 7px 15px),
-    rgba(255, 255, 255, 0.72);
+  background-color: rgba(255, 255, 255, 0.72);
 }
 
 .row-blue.task-daily .plan-cell,
@@ -2222,45 +2218,35 @@ button {
 .row-blue.task-reading .plan-cell,
 .row-blue.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-blue.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background:
-    repeating-linear-gradient(135deg, rgba(74, 144, 226, 0.06) 0 7px, transparent 7px 15px),
-    rgba(242, 249, 255, 0.92);
+  background-color: rgba(242, 249, 255, 0.92);
 }
 
 .row-green.task-stage .plan-cell,
 .row-green.task-reading .plan-cell,
 .row-green.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-green.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background:
-    repeating-linear-gradient(135deg, rgba(76, 175, 80, 0.06) 0 7px, transparent 7px 15px),
-    rgba(242, 251, 239, 0.92);
+  background-color: rgba(242, 251, 239, 0.92);
 }
 
 .row-red.task-stage .plan-cell,
 .row-red.task-reading .plan-cell,
 .row-red.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-red.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 107, 107, 0.06) 0 7px, transparent 7px 15px),
-    rgba(255, 245, 245, 0.92);
+  background-color: rgba(255, 245, 245, 0.92);
 }
 
 .row-purple.task-stage .plan-cell,
 .row-purple.task-reading .plan-cell,
 .row-purple.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-purple.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background:
-    repeating-linear-gradient(135deg, rgba(155, 118, 255, 0.06) 0 7px, transparent 7px 15px),
-    rgba(250, 246, 255, 0.92);
+  background-color: rgba(250, 246, 255, 0.92);
 }
 
 .row-orange.task-stage .plan-cell,
 .row-orange.task-reading .plan-cell,
 .row-orange.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-orange.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 184, 62, 0.075) 0 7px, transparent 7px 15px),
-    rgba(255, 248, 232, 0.94);
+  background-color: rgba(255, 248, 232, 0.94);
 }
 
 .mark-cell {
@@ -2279,40 +2265,28 @@ button {
 }
 
 .stage-span-cell {
-  background:
-    repeating-linear-gradient(135deg, rgba(96, 125, 139, 0.055) 0 7px, transparent 7px 15px),
-    rgba(255, 255, 255, 0.72) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
   position: relative;
 }
 
 .row-blue .stage-span-cell {
-  background:
-    repeating-linear-gradient(135deg, rgba(74, 144, 226, 0.07) 0 7px, transparent 7px 15px),
-    linear-gradient(90deg, rgba(74, 144, 226, 0.13), rgba(242, 249, 255, 0.9), rgba(74, 144, 226, 0.13)) !important;
+  background: linear-gradient(90deg, rgba(74, 144, 226, 0.13), rgba(242, 249, 255, 0.9), rgba(74, 144, 226, 0.13)) !important;
 }
 
 .row-green .stage-span-cell {
-  background:
-    repeating-linear-gradient(135deg, rgba(76, 175, 80, 0.07) 0 7px, transparent 7px 15px),
-    linear-gradient(90deg, rgba(76, 175, 80, 0.13), rgba(242, 251, 239, 0.9), rgba(76, 175, 80, 0.13)) !important;
+  background: linear-gradient(90deg, rgba(76, 175, 80, 0.13), rgba(242, 251, 239, 0.9), rgba(76, 175, 80, 0.13)) !important;
 }
 
 .row-red .stage-span-cell {
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 107, 107, 0.07) 0 7px, transparent 7px 15px),
-    linear-gradient(90deg, rgba(255, 107, 107, 0.13), rgba(255, 245, 245, 0.9), rgba(255, 107, 107, 0.13)) !important;
+  background: linear-gradient(90deg, rgba(255, 107, 107, 0.13), rgba(255, 245, 245, 0.9), rgba(255, 107, 107, 0.13)) !important;
 }
 
 .row-purple .stage-span-cell {
-  background:
-    repeating-linear-gradient(135deg, rgba(155, 118, 255, 0.07) 0 7px, transparent 7px 15px),
-    linear-gradient(90deg, rgba(155, 118, 255, 0.13), rgba(250, 246, 255, 0.9), rgba(155, 118, 255, 0.13)) !important;
+  background: linear-gradient(90deg, rgba(155, 118, 255, 0.13), rgba(250, 246, 255, 0.9), rgba(155, 118, 255, 0.13)) !important;
 }
 
 .row-orange .stage-span-cell {
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 184, 62, 0.08) 0 7px, transparent 7px 15px),
-    linear-gradient(90deg, rgba(255, 184, 62, 0.16), rgba(255, 248, 232, 0.92), rgba(255, 184, 62, 0.16)) !important;
+  background: linear-gradient(90deg, rgba(255, 184, 62, 0.16), rgba(255, 248, 232, 0.92), rgba(255, 184, 62, 0.16)) !important;
 }
 
 .stage-span-cell .status {

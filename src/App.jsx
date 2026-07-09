@@ -1026,6 +1026,7 @@ function App() {
   const [readingTab, setReadingTab] = useState('reading');
   const [readingViewMode, setReadingViewMode] = useState('card');
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('所有');
+  const [libraryStatusFilter, setLibraryStatusFilter] = useState('');
   const [isLibraryTypeMenuOpen, setIsLibraryTypeMenuOpen] = useState(false);
   const [libraryViewMode, setLibraryViewMode] = useState('card');
   const [newBookDialog, setNewBookDialog] = useState(null);
@@ -2321,12 +2322,19 @@ function App() {
       .filter((book) => readingBookStats(item, book).isComplete)
       .map((book) => book.id)
   )));
+  const libraryTypeStats = Array.from(new Set(libraryBooks.map((book) => book.type || '其它').filter(Boolean)));
   const libraryCategoryTabs = [
     { type: '所有', count: libraryBooks.length },
     ...bookTypes.map((type) => ({ type, count: libraryBooks.filter((book) => (book.type || '其它') === type).length })),
   ];
   const currentLibraryCategory = libraryCategoryTabs.find((item) => item.type === libraryTypeFilter) || libraryCategoryTabs[0];
-  const filteredLibraryBooks = libraryBooks.filter((book) => libraryTypeFilter === '所有' || (book.type || '其它') === libraryTypeFilter);
+  const currentLibraryFilter = libraryStatusFilter === 'finished'
+    ? { type: '已读书单', count: finishedLibraryBookIds.size }
+    : currentLibraryCategory;
+  const filteredLibraryBooks = libraryBooks.filter((book) => {
+    if (libraryStatusFilter === 'finished') return finishedLibraryBookIds.has(book.id);
+    return libraryTypeFilter === '所有' || (book.type || '其它') === libraryTypeFilter;
+  });
   const libraryHistoryMap = months.reduce((map, targetMonth) => {
     (targetMonth.readingBooks || []).forEach((book) => {
       const startDay = Math.max(1, Math.min(targetMonth.days, Number(book.startDay || 1)));
@@ -3316,9 +3324,23 @@ function App() {
                         <Settings size={16} />
                       </button>
                     </div>
-                    <strong>{bookTypes.length}</strong>
+                    <strong>{libraryTypeStats.length}</strong>
                   </article>
-                  <article className="done">
+                  <article
+                    className={`done ${libraryStatusFilter === 'finished' ? 'active-summary-filter' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setLibraryStatusFilter('finished');
+                      setLibraryTypeFilter('所有');
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      setLibraryStatusFilter('finished');
+                      setLibraryTypeFilter('所有');
+                    }}
+                  >
                     <span>已读书单</span>
                     <strong>{finishedLibraryBookIds.size}</strong>
                   </article>
@@ -3338,9 +3360,9 @@ function App() {
                     >
                       <span>
                         <small>书籍分类</small>
-                        <strong>{currentLibraryCategory.type}</strong>
+                        <strong>{currentLibraryFilter.type}</strong>
                       </span>
-                      <em>{currentLibraryCategory.count}</em>
+                      <em>{currentLibraryFilter.count}</em>
                       <ChevronDown size={18} />
                     </button>
                     {isLibraryTypeMenuOpen && (
@@ -3349,11 +3371,12 @@ function App() {
                         <div className="library-type-menu" role="menu" aria-label="书籍分类">
                           {libraryCategoryTabs.map((item) => (
                             <button
-                              className={libraryTypeFilter === item.type ? 'active' : ''}
+                              className={!libraryStatusFilter && libraryTypeFilter === item.type ? 'active' : ''}
                               type="button"
                               key={item.type}
                               onClick={() => {
                                 setLibraryTypeFilter(item.type);
+                                setLibraryStatusFilter('');
                                 setIsLibraryTypeMenuOpen(false);
                               }}
                               role="menuitem"
@@ -3368,7 +3391,15 @@ function App() {
                   </div>
                   <div className="library-type-tabs" aria-label="书籍分类">
                     {libraryCategoryTabs.map((item) => (
-                      <button className={libraryTypeFilter === item.type ? 'active' : ''} type="button" key={item.type} onClick={() => setLibraryTypeFilter(item.type)}>
+                      <button
+                        className={!libraryStatusFilter && libraryTypeFilter === item.type ? 'active' : ''}
+                        type="button"
+                        key={item.type}
+                        onClick={() => {
+                          setLibraryTypeFilter(item.type);
+                          setLibraryStatusFilter('');
+                        }}
+                      >
                         {item.type}<span>{item.count}</span>
                       </button>
                     ))}

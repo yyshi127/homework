@@ -3191,6 +3191,14 @@ button {
   background: linear-gradient(145deg, #ff8a68, #e84d45);
 }
 
+.library-reading-summary .done {
+  cursor: pointer;
+}
+
+.library-reading-summary .active-summary-filter {
+  box-shadow: 0 0 0 4px rgba(66, 205, 121, 0.18), 0 18px 34px rgba(30, 169, 91, 0.22);
+}
+
 .month-reading-summary span,
 .month-reading-summary em,
 .library-reading-summary span,

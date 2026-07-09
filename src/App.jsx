@@ -694,8 +694,8 @@ function formatTemporaryTaskMonthNote(note) {
   ].join('\n');
 }
 
-function temporaryDraftKey(monthId, categoryId) {
-  return `${monthId || 'month'}-${categoryId || 'category'}`;
+function temporaryDraftKey(monthId, categoryId, day) {
+  return `${monthId || 'month'}-${categoryId || 'category'}-${day || 'day'}`;
 }
 
 function buildTaskRows(month) {
@@ -1329,6 +1329,7 @@ function App() {
   const [rewardTypeFilter, setRewardTypeFilter] = useState('全部');
   const [expandedReadingPlans, setExpandedReadingPlans] = useState({});
   const [temporaryTaskDrafts, setTemporaryTaskDrafts] = useState({});
+  const [selectedTodayDay, setSelectedTodayDay] = useState(null);
   const [learningTab, setLearningTab] = useState('grader');
   const [graderDraft, setGraderDraft] = useState(DEFAULT_GRADER_DRAFT);
   const [latestReview, setLatestReview] = useState(null);
@@ -2610,7 +2611,7 @@ function App() {
   };
 
   const openTemporaryTaskDraft = (group) => {
-    const key = temporaryDraftKey(month.id, group.categoryId);
+    const key = temporaryDraftKey(month.id, group.categoryId, selectedCheckDay);
     setTemporaryTaskDrafts((current) => ({
       ...current,
       [key]: { content: '', remark: '' },
@@ -2618,7 +2619,7 @@ function App() {
   };
 
   const updateTemporaryTaskDraft = (group, patch) => {
-    const key = temporaryDraftKey(month.id, group.categoryId);
+    const key = temporaryDraftKey(month.id, group.categoryId, selectedCheckDay);
     setTemporaryTaskDrafts((current) => ({
       ...current,
       [key]: { content: '', remark: '', ...(current[key] || {}), ...patch },
@@ -2626,7 +2627,7 @@ function App() {
   };
 
   const cancelTemporaryTaskDraft = (group) => {
-    const key = temporaryDraftKey(month.id, group.categoryId);
+    const key = temporaryDraftKey(month.id, group.categoryId, selectedCheckDay);
     setTemporaryTaskDrafts((current) => {
       const next = { ...current };
       delete next[key];
@@ -2635,8 +2636,8 @@ function App() {
   };
 
   const saveTemporaryTaskDraft = async (group) => {
-    if (!todayDay) return;
-    const key = temporaryDraftKey(month.id, group.categoryId);
+    if (!selectedCheckDay) return;
+    const key = temporaryDraftKey(month.id, group.categoryId, selectedCheckDay);
     const draft = temporaryTaskDrafts[key] || {};
     const content = String(draft.content || '').trim();
     const remark = String(draft.remark || '').trim();
@@ -2655,7 +2656,7 @@ function App() {
       .filter((task) => task.type === 'temporary')
       .sort((a, b) => temporaryTaskIndex(a) - temporaryTaskIndex(b));
     const usedSlots = new Set(temporaryTasks
-      .filter((task) => targetMonth.checks?.[task.id]?.[todayDay] || targetMonth.notes?.[task.id]?.[todayDay])
+      .filter((task) => targetMonth.checks?.[task.id]?.[selectedCheckDay] || targetMonth.notes?.[task.id]?.[selectedCheckDay])
       .map((task) => temporaryTaskIndex(task)));
     let slot = 1;
     while (usedSlots.has(slot)) slot += 1;
@@ -2672,8 +2673,8 @@ function App() {
     task.checkMode = 'daily';
     targetMonth.checks[task.id] ||= {};
     targetMonth.notes[task.id] ||= {};
-    delete targetMonth.checks[task.id][todayDay];
-    targetMonth.notes[task.id][todayDay] = formatTemporaryTaskNote(content, remark);
+    delete targetMonth.checks[task.id][selectedCheckDay];
+    targetMonth.notes[task.id][selectedCheckDay] = formatTemporaryTaskNote(content, remark);
     setState(next);
     cancelTemporaryTaskDraft(group);
     await persistState(next, '临时任务已保存到 SQLite');
@@ -2774,13 +2775,26 @@ function App() {
   const today = new Date();
   const isCurrentMonth = month.key === createMonthKey(today.getFullYear(), today.getMonth() + 1);
   const todayDay = isCurrentMonth ? today.getDate() : null;
-  const todayHidePrefix = todayDay ? `${month.key}-${todayDay}` : '';
-  const todayRows = todayDay ? rows.filter((row) => taskCheckDayForToday(row, todayDay) !== null) : [];
+  useEffect(() => {
+    setSelectedTodayDay(isCurrentMonth && todayDay ? todayDay : 1);
+  }, [month.id]);
+  const selectedCheckDay = Math.max(1, Math.min(month.days, Number(selectedTodayDay || todayDay || 1)));
+  const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const selectedCheckDate = new Date(month.year, month.month - 1, selectedCheckDay);
+  const isSelectedCheckFuture = selectedCheckDate > todayDateOnly;
+  const isSelectedCheckToday = isCurrentMonth && selectedCheckDay === todayDay;
+  const selectedCheckDayLabel = `${month.label} ${selectedCheckDay}日 · ${weekday(month.key, selectedCheckDay)}`;
+  const selectedCheckViewLabel = isSelectedCheckFuture ? '未来日程' : isSelectedCheckToday ? '今日打卡' : '历史打卡';
+  const changeTodayViewDay = (delta) => {
+    setSelectedTodayDay((current) => Math.max(1, Math.min(month.days, Number(current || selectedCheckDay) + delta)));
+  };
+  const todayHidePrefix = selectedCheckDay ? `${month.key}-${selectedCheckDay}` : '';
+  const todayRows = selectedCheckDay ? rows.filter((row) => taskCheckDayForToday(row, selectedCheckDay) !== null) : [];
   const isTodayRowCompleted = (row) => {
-    const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
+    const checkDay = stageCompletedDay(row, month, selectedCheckDay) || taskCheckDayForToday(row, selectedCheckDay);
     return checkDay !== null && getStatus(row.id, checkDay) !== 'empty';
   };
-  const todayCompletedCount = todayDay ? todayRows.filter((row) => {
+  const todayCompletedCount = selectedCheckDay ? todayRows.filter((row) => {
     return isTodayRowCompleted(row);
   }).length : 0;
   const isRequiredTodayTask = (row) => (
@@ -2789,15 +2803,15 @@ function App() {
     row.typeKey !== 'temporary' &&
     row.checkMode !== 'stage'
   );
-  const todayRequiredRows = todayDay ? todayRows.filter(isRequiredTodayTask) : [];
-  const todayRequiredCompletedCount = todayDay ? todayRequiredRows.filter((row) => {
-    const checkDay = taskCheckDayForToday(row, todayDay);
+  const todayRequiredRows = selectedCheckDay ? todayRows.filter(isRequiredTodayTask) : [];
+  const todayRequiredCompletedCount = selectedCheckDay ? todayRequiredRows.filter((row) => {
+    const checkDay = taskCheckDayForToday(row, selectedCheckDay);
     return checkDay !== null && getStatus(row.id, checkDay) !== 'empty';
   }).length : 0;
   const todayPendingCount = Math.max(0, todayRows.length - todayCompletedCount);
-  const todayRequiredPendingRows = todayDay ? todayRows.filter((row) => {
+  const todayRequiredPendingRows = selectedCheckDay ? todayRows.filter((row) => {
     if (!isRequiredTodayTask(row)) return false;
-    const checkDay = taskCheckDayForToday(row, todayDay);
+    const checkDay = taskCheckDayForToday(row, selectedCheckDay);
     return checkDay !== null && getStatus(row.id, checkDay) === 'empty';
   }) : [];
   const todayRequiredPendingCount = todayRequiredPendingRows.length;
@@ -2820,7 +2834,7 @@ function App() {
     completedCount: group.rows.filter(isTodayRowCompleted).length,
     requiredPendingCount: group.rows.filter((row) => {
       if (!isRequiredTodayTask(row)) return false;
-      const checkDay = taskCheckDayForToday(row, todayDay);
+      const checkDay = taskCheckDayForToday(row, selectedCheckDay);
       return checkDay !== null && getStatus(row.id, checkDay) === 'empty';
     }).length,
   }));
@@ -2862,8 +2876,8 @@ function App() {
     }, 0);
     window.setTimeout(() => setTodayFocusTaskId((current) => (current === target.id ? '' : current)), 1800);
   };
-  const todayPoints = todayDay ? todayRows.reduce((sum, row) => {
-    const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
+  const todayPoints = selectedCheckDay ? todayRows.reduce((sum, row) => {
+    const checkDay = stageCompletedDay(row, month, selectedCheckDay) || taskCheckDayForToday(row, selectedCheckDay);
     const status = getStatus(row.id, checkDay);
     const base = row.subject === '好习惯' && status !== 'empty' ? habitPoints(row.habitPoints, pointConfig) : statusPoints(status, pointConfig);
     return sum + base;
@@ -3241,11 +3255,11 @@ function App() {
     </article>
   );
   const renderTodayTaskCard = (row) => {
-    const day = taskCheckDayForToday(row, todayDay);
+    const day = taskCheckDayForToday(row, selectedCheckDay);
     const isStageRangeTask = row.typeKey === 'stage' || row.typeKey === 'reading';
     const isTemporaryTask = row.typeKey === 'temporary';
     const isStageCheckMode = row.checkMode === 'stage';
-    const completedStageDay = stageCompletedDay(row, month, todayDay);
+    const completedStageDay = stageCompletedDay(row, month, selectedCheckDay);
     const effectiveDay = completedStageDay || day;
     const noteDay = (row.typeKey === 'stage' || row.typeKey === 'reading') && row.checkMode === 'stage' ? Number(row.startDay || effectiveDay) : effectiveDay;
     const value = getStatus(row.id, effectiveDay);
@@ -3316,7 +3330,15 @@ function App() {
         </div>
 
         <div className="today-check-panel">
-          <button className={`today-status-button status-${visualStatus}`} onClick={() => cycleStatus(row.id, day, { allowActiveToday: true })} type="button">
+          <button
+            className={`today-status-button status-${visualStatus}`}
+            disabled={isSelectedCheckFuture}
+            onClick={() => {
+              if (!isSelectedCheckFuture) cycleStatus(row.id, day, { allowActiveToday: true });
+            }}
+            title={isSelectedCheckFuture ? '未来日期只能查看、添加临时任务和编辑备注，不能提前打卡' : undefined}
+            type="button"
+          >
             {!isHabit && value === 'done' && <Check size={26} strokeWidth={3.2} />}
             {!isHabit && value === 'excellent' && <Star size={28} fill="currentColor" strokeWidth={2.8} />}
             {((isHabit && visualStatus !== 'empty') || value === 'super') && <span className="rose-icon" aria-hidden="true">🌹</span>}
@@ -3378,7 +3400,7 @@ function App() {
   const renderTodayTaskGroup = (group) => {
     const isCollapsed = Boolean(collapsedTodaySubjects[group.subject]);
     const total = group.rows.length;
-    const draftKey = temporaryDraftKey(month.id, group.categoryId);
+    const draftKey = temporaryDraftKey(month.id, group.categoryId, selectedCheckDay);
     const temporaryDraft = temporaryTaskDrafts[draftKey];
     return (
       <section className={`today-task-group row-${group.color} ${isCollapsed ? 'collapsed' : ''}`} key={group.subject}>
@@ -3557,13 +3579,25 @@ function App() {
               </div>
             </div>
 
-            <div className="today-hero">
+            <div className={`today-hero ${isSelectedCheckFuture ? 'future-view' : ''}`}>
               <div>
-                <p>今日打卡</p>
-                <h2>{todayDay ? `${month.label} ${todayDay}日 · ${weekday(month.key, todayDay)}` : '当前月份不是今天所在月份'}</h2>
-                <span>把今天要做的事情一项项完成，备注也可以在这里直接写清楚。</span>
+                <p>{selectedCheckViewLabel}</p>
+                <h2>{selectedCheckDayLabel}</h2>
+                <span>{isSelectedCheckFuture ? '未来日期可以查看计划、添加临时任务和编辑备注，不能提前打卡。' : '把这一天要做的事情一项项完成，备注也可以在这里直接写清楚。'}</span>
               </div>
               <div className="today-hero-actions">
+                <div className="today-day-switch" aria-label="切换每日打卡日期">
+                  <button onClick={() => changeTodayViewDay(-1)} disabled={selectedCheckDay <= 1} aria-label="前一天" type="button">
+                    <ChevronLeft size={18} />
+                  </button>
+                  <strong>{selectedCheckDay}日</strong>
+                  <button onClick={() => changeTodayViewDay(1)} disabled={selectedCheckDay >= month.days} aria-label="后一天" type="button">
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+                {isCurrentMonth && todayDay && selectedCheckDay !== todayDay && (
+                  <button className="ghost" onClick={() => setSelectedTodayDay(todayDay)} type="button">回到今天</button>
+                )}
                 <button onClick={saveCurrentState}><Save size={18} />保存状态</button>
               </div>
             </div>
@@ -3602,7 +3636,7 @@ function App() {
             ) : (
               <div className="today-empty">
                 <CalendarDays size={46} />
-                <strong>今天没有可打卡任务</strong>
+                <strong>这一天没有可打卡任务</strong>
                 <p>如果需要查看或调整任务安排，可以进入全月表或设置中心。</p>
                 <div>
                   <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>

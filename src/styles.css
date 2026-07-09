@@ -1120,6 +1120,13 @@ button {
   gap: 24px;
 }
 
+.today-hero.future-view {
+  background:
+    radial-gradient(circle at 88% 16%, rgba(90, 147, 232, 0.22), transparent 18rem),
+    linear-gradient(135deg, #eef8ff, #fffefa 58%, #f3f0ff);
+  border-color: #d9e6f5;
+}
+
 .today-hero p {
   margin: 0 0 8px;
   color: #36a955;
@@ -1148,6 +1155,7 @@ button {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .today-hero-actions button,
@@ -1173,6 +1181,41 @@ button {
   color: #347bc6;
   background: #eef8ff;
   box-shadow: none;
+}
+
+.today-day-switch {
+  height: 44px;
+  border: 1px solid #dcebe2;
+  border-radius: 14px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.86);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 10px 22px rgba(42, 83, 68, 0.08);
+}
+
+.today-day-switch button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  padding: 0;
+  color: #2f7d55;
+  background: #eef8f0;
+  box-shadow: none;
+}
+
+.today-day-switch button:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.today-day-switch strong {
+  min-width: 42px;
+  color: #164148;
+  font-size: 15px;
+  font-weight: 950;
+  text-align: center;
 }
 
 .today-summary {
@@ -2215,6 +2258,15 @@ button {
   color: #173f46;
   background: #fff2f2;
   box-shadow: inset 0 0 0 1px #ffd7d7;
+}
+
+.today-status-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.08);
+}
+
+.today-status-button.status-empty:disabled {
+  opacity: 0.72;
 }
 
 .today-status-button .rose-icon {

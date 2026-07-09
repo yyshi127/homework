@@ -2956,9 +2956,19 @@ button {
   background: #fff0ee;
 }
 
-.library-book-card.unplanned {
-  border-color: #ffd9a8;
-  background: linear-gradient(180deg, #fff9ec, #fffefa);
+.library-book-card.status-finished {
+  border-color: #bdebcf;
+  background: linear-gradient(180deg, #effbf3, #ffffff);
+}
+
+.library-book-card.status-reading {
+  border-color: #bee8ef;
+  background: linear-gradient(180deg, #eefbfc, #ffffff);
+}
+
+.library-book-card.status-planned {
+  border-color: #ffe0a8;
+  background: linear-gradient(180deg, #fff8e8, #ffffff);
 }
 
 .library-book-card span {
@@ -3032,7 +3042,17 @@ button {
   font-weight: 950;
 }
 
-.library-book-card.unplanned em {
+.library-book-card.status-finished em {
+  color: #228a4c;
+  background: #dff6e7;
+}
+
+.library-book-card.status-reading em {
+  color: #187c91;
+  background: #dff7fb;
+}
+
+.library-book-card.status-planned em {
   color: #f08a20;
   background: #fff0dc;
 }
@@ -3064,9 +3084,19 @@ button {
   gap: 12px;
 }
 
-.library-book-row.unplanned {
-  border-color: #ffd9a8;
-  background: linear-gradient(180deg, #fff9ec, #fffefa);
+.library-book-row.status-finished {
+  border-color: #bdebcf;
+  background: linear-gradient(90deg, #effbf3, #ffffff);
+}
+
+.library-book-row.status-reading {
+  border-color: #bee8ef;
+  background: linear-gradient(90deg, #eefbfc, #ffffff);
+}
+
+.library-book-row.status-planned {
+  border-color: #ffe0a8;
+  background: linear-gradient(90deg, #fff8e8, #ffffff);
 }
 
 .library-book-row div {

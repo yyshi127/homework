@@ -2427,6 +2427,11 @@ function App() {
     if (plannedLibraryBookIds.has(book.id)) return '计划中';
     return '未安排';
   };
+  const libraryBookStatusClass = (status) => ({
+    已读完: 'status-finished',
+    正在读: 'status-reading',
+    计划中: 'status-planned',
+  }[status] || '');
   const libraryBookPlanLabel = (book) => {
     const plan = libraryPlanMap[book.id];
     if (!plan) return '';
@@ -2438,10 +2443,11 @@ function App() {
   };
   const renderLibraryBookCard = (book) => {
     const status = libraryBookStatus(book);
+    const statusClass = libraryBookStatusClass(status);
     const planLabel = libraryBookPlanLabel(book);
     const history = libraryHistoryMap[book.id] || [];
     return (
-      <article className={`library-book-card ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
+      <article className={`library-book-card ${statusClass}`} key={book.id}>
         <div className="library-card-actions">
           <button type="button" title="编辑书籍" aria-label="编辑书籍" onClick={() => openEditLibraryBookDialog(book)}><Pencil size={15} /></button>
           <button type="button" title="删除书籍" aria-label="删除书籍" onClick={() => deleteLibraryBook(book)}><Trash2 size={15} /></button>
@@ -2467,9 +2473,10 @@ function App() {
   };
   const renderLibraryBookRow = (book) => {
     const status = libraryBookStatus(book);
+    const statusClass = libraryBookStatusClass(status);
     const planLabel = libraryBookPlanLabel(book);
     return (
-      <article className={`library-book-row ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
+      <article className={`library-book-row ${statusClass}`} key={book.id}>
         <div>
           <span>类别</span>
           <strong>{book.type || '其它'}</strong>

@@ -3112,15 +3112,50 @@ button {
 .reading-plan {
   border: 1px solid #e4ebe9;
   border-radius: 16px;
-  padding: 12px;
+  padding: 10px 12px 12px;
   background: #fffefa;
 }
 
-.reading-plan > strong {
-  display: block;
-  margin-bottom: 8px;
+.reading-plan-toggle {
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0;
   color: #164148;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.reading-plan-toggle span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.reading-plan-toggle strong {
   font-size: 14px;
+  font-weight: 950;
+}
+
+.reading-plan-toggle em {
+  color: #7c898d;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.reading-plan-toggle b {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #347bc6;
+  background: #eef8ff;
+  font-size: 12px;
   font-weight: 950;
 }
 
@@ -3133,7 +3168,7 @@ button {
 }
 
 .reading-plan-head {
-  padding: 0 0 7px;
+  padding: 10px 0 7px;
   color: #7c898d;
   font-size: 12px;
   font-weight: 950;

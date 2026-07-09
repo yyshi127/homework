@@ -950,6 +950,7 @@ function App() {
   const [newBookDialog, setNewBookDialog] = useState(null);
   const [bookPagesDialog, setBookPagesDialog] = useState(null);
   const [newRewardDialog, setNewRewardDialog] = useState(null);
+  const [expandedReadingPlans, setExpandedReadingPlans] = useState({});
   const [learningTab, setLearningTab] = useState('grader');
   const [graderDraft, setGraderDraft] = useState(DEFAULT_GRADER_DRAFT);
   const [latestReview, setLatestReview] = useState(null);
@@ -2128,6 +2129,7 @@ function App() {
       };
     });
     const showReadingPlan = book.checkMode !== 'stage' && readingPlanRows.length > 0;
+    const isReadingPlanOpen = Boolean(expandedReadingPlans[book.id]);
 
     return (
     <article className={`reading-book-card ${stats.isComplete ? 'finished' : ''}`} key={book.id}>
@@ -2161,25 +2163,35 @@ function App() {
 
       {showReadingPlan && (
         <div className="reading-plan">
-          <strong>阅读计划</strong>
-          <div className="reading-plan-head">
-            <span>日期</span>
-            <span>状态</span>
-            <span>阅读范围</span>
-          </div>
-          <div className="reading-plan-list">
-            {readingPlanRows.map((record) => (
-              <div className="reading-plan-row" key={`${book.id}-plan-${record.day}`}>
-                <span>{record.day}日</span>
-                <i className={record.isCompleted ? 'record-done' : 'record-plan'}>{record.isCompleted ? '已读' : '计划'}</i>
-                <div className="reading-plan-pages">
-                  <input inputMode="numeric" value={record.startPage} placeholder="起始页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'startPage', event.target.value)} />
-                  <em>到</em>
-                  <input inputMode="numeric" value={record.endPage} placeholder="结束页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'endPage', event.target.value)} />
-                </div>
+          <button className="reading-plan-toggle" type="button" aria-expanded={isReadingPlanOpen} onClick={() => setExpandedReadingPlans((current) => ({ ...current, [book.id]: !current[book.id] }))}>
+            <span>
+              <strong>阅读计划</strong>
+              <em>{stats.startDay}日 - {stats.endDay}日 · {stats.totalDays} 天</em>
+            </span>
+            <b>{isReadingPlanOpen ? '收起' : '展开编辑'}</b>
+          </button>
+          {isReadingPlanOpen && (
+            <>
+              <div className="reading-plan-head">
+                <span>日期</span>
+                <span>状态</span>
+                <span>阅读范围</span>
               </div>
-            ))}
-          </div>
+              <div className="reading-plan-list">
+                {readingPlanRows.map((record) => (
+                  <div className="reading-plan-row" key={`${book.id}-plan-${record.day}`}>
+                    <span>{record.day}日</span>
+                    <i className={record.isCompleted ? 'record-done' : 'record-plan'}>{record.isCompleted ? '已读' : '计划'}</i>
+                    <div className="reading-plan-pages">
+                      <input inputMode="numeric" value={record.startPage} placeholder="起始页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'startPage', event.target.value)} />
+                      <em>到</em>
+                      <input inputMode="numeric" value={record.endPage} placeholder="结束页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'endPage', event.target.value)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 

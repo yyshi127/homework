@@ -2964,7 +2964,7 @@ function App() {
             <div className="reading-page-hero">
               <div>
                 <p>阅读书单</p>
-                <h2>把每一本书的进度都看得清清楚楚</h2>
+                <h2>对世界保持好奇，让书成为打开美好世界的伙伴</h2>
                 <span>{month.label} · 当前月份清单中的阅读计划</span>
               </div>
               <button onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>

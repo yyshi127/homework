@@ -3187,6 +3187,33 @@ button {
   position: relative;
 }
 
+.summary-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: relative;
+}
+
+.summary-icon-button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(28, 31, 45, 0.12);
+  cursor: pointer;
+}
+
+.summary-icon-button:hover {
+  background: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
 .month-reading-summary strong,
 .month-reading-summary .active strong,
 .month-reading-summary .done strong,
@@ -6322,21 +6349,34 @@ button {
 }
 
 .book-dialog-fields input,
-.book-dialog-fields select {
+.book-dialog-fields select,
+.book-dialog-fields textarea {
   width: 100%;
-  height: 44px;
   border: 1px solid #e0e6e3;
   border-radius: 14px;
   outline: 0;
-  padding: 0 13px;
   color: #26383e;
   background: #fff;
   font-size: 15px;
   font-weight: 850;
 }
 
+.book-dialog-fields input,
+.book-dialog-fields select {
+  height: 44px;
+  padding: 0 13px;
+}
+
+.book-dialog-fields textarea {
+  min-height: 190px;
+  padding: 12px 13px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
 .book-dialog-fields input:focus,
-.book-dialog-fields select:focus {
+.book-dialog-fields select:focus,
+.book-dialog-fields textarea:focus {
   border-color: #80b6ef;
   box-shadow: 0 0 0 4px rgba(95, 159, 228, 0.14);
 }

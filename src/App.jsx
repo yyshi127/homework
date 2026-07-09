@@ -182,7 +182,7 @@ const DEFAULT_SUBJECTS = [
 ];
 
 const DEFAULT_BOOKS = ['《尼尔斯骑鹅历险记》', '《一本看遍动物世界》', '《飞天奇翼龙》', '《抹香鲸的微笑（注音版）》'];
-const BOOK_TYPES = ['语文', '数学', '英语', '自然', '科学', '百科', '历史', '地理', '童话', '文学', '小说', '漫画', '文化', '品格', '艺术', '生活', '其它'];
+const DEFAULT_BOOK_TYPES = ['自然', '科学', '百科', '历史', '地理', '童话', '文学', '小说', '漫画', '文化', '品格', '艺术', '生活', '其它'];
 
 const DEFAULT_REWARDS = [
   { id: 'reward-notebook', points: '200', name: '精美笔记本' },
@@ -417,6 +417,20 @@ function normalizeLibraryBooks(books = []) {
     });
 }
 
+function normalizeBookTypes(types = DEFAULT_BOOK_TYPES) {
+  const seen = new Set();
+  const normalized = (Array.isArray(types) ? types : DEFAULT_BOOK_TYPES)
+    .map((type) => String(type || '').trim())
+    .filter(Boolean)
+    .filter((type) => {
+      if (seen.has(type)) return false;
+      seen.add(type);
+      return true;
+    });
+  if (!normalized.includes('其它')) normalized.push('其它');
+  return normalized;
+}
+
 function collectLibraryBooks(state) {
   const books = [];
   (state.months || []).forEach((month) => {
@@ -541,6 +555,7 @@ function sanitizeLoadedState(saved) {
   }
   next.months = next.months.map(normalizeMonth);
   next.libraryBooks = normalizeLibraryBooks(next.libraryBooks?.length ? next.libraryBooks : collectLibraryBooks(next));
+  next.bookTypes = normalizeBookTypes(next.bookTypes);
   next.learningTools = normalizeLearningTools(next.learningTools);
   next.snapshots = [];
   next.taskConfig?.forEach((subject) => {
@@ -557,6 +572,7 @@ function createLocalCacheState(current) {
   return {
     ...current,
     libraryBooks: normalizeLibraryBooks(current.libraryBooks || []),
+    bookTypes: normalizeBookTypes(current.bookTypes),
     snapshots: [],
   };
 }
@@ -801,6 +817,7 @@ function migrateLegacyState(saved) {
     activeMonthId: months[0]?.id,
     snapshots: [],
     libraryBooks: collectLibraryBooks({ ...saved, months }),
+    bookTypes: normalizeBookTypes(saved.bookTypes),
     learningTools: normalizeLearningTools(saved.learningTools),
   };
 }
@@ -813,6 +830,7 @@ function createSeedState() {
     activeMonthId: months[0]?.id,
     rewardConfig: DEFAULT_REWARDS,
     libraryBooks: normalizeLibraryBooks(DEFAULT_BOOKS.map((name, index) => ({ id: `library-default-${index}`, name, type: '其它' }))),
+    bookTypes: DEFAULT_BOOK_TYPES,
     books: DEFAULT_BOOKS,
     reminders: DEFAULT_REMINDERS,
     learningTools: { reviews: [], mistakes: [] },
@@ -1003,6 +1021,7 @@ function App() {
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('所有');
   const [libraryViewMode, setLibraryViewMode] = useState('card');
   const [newBookDialog, setNewBookDialog] = useState(null);
+  const [bookTypesDialog, setBookTypesDialog] = useState(null);
   const [bookPagesDialog, setBookPagesDialog] = useState(null);
   const [newRewardDialog, setNewRewardDialog] = useState(null);
   const [expandedReadingPlans, setExpandedReadingPlans] = useState({});
@@ -1030,6 +1049,7 @@ function App() {
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
   const learningTools = useMemo(() => normalizeLearningTools(state.learningTools), [state.learningTools]);
   const libraryBooks = useMemo(() => normalizeLibraryBooks(state.libraryBooks || collectLibraryBooks({ ...state, months })), [state.libraryBooks, months]);
+  const bookTypes = useMemo(() => normalizeBookTypes(state.bookTypes), [state.bookTypes]);
   const homeworkReviews = learningTools.reviews;
   const displayHomeworkReview = latestReview || (showPreviousReview ? homeworkReviews[0] : null);
   const mistakeItems = learningTools.mistakes;
@@ -1603,6 +1623,22 @@ function App() {
 
   const openNewBookDialog = () => {
     setNewBookDialog({ name: '', type: '其它', totalPages: '', rewardPoints: '10' });
+  };
+
+  const openBookTypesDialog = () => {
+    setBookTypesDialog(bookTypes.join('\n'));
+  };
+
+  const saveBookTypes = () => {
+    const nextTypes = normalizeBookTypes(String(bookTypesDialog || '').split(/\r?\n|[，,]/));
+    setState((current) => ({
+      ...(current || {}),
+      bookTypes: nextTypes,
+    }));
+    if (libraryTypeFilter !== '所有' && !nextTypes.includes(libraryTypeFilter)) {
+      setLibraryTypeFilter('所有');
+    }
+    setBookTypesDialog(null);
   };
 
   const openEditLibraryBookDialog = (book) => {
@@ -2267,13 +2303,9 @@ function App() {
       .map((book) => book.id)
   )));
   const currentMonthBookIds = new Set((month.readingBooks || []).map((book) => book.id));
-  const libraryTypeStats = BOOK_TYPES.map((type) => ({
-    type,
-    count: libraryBooks.filter((book) => (book.type || '其它') === type).length,
-  })).filter((item) => item.count > 0);
   const libraryCategoryTabs = [
     { type: '所有', count: libraryBooks.length },
-    ...BOOK_TYPES.map((type) => ({ type, count: libraryBooks.filter((book) => (book.type || '其它') === type).length })),
+    ...bookTypes.map((type) => ({ type, count: libraryBooks.filter((book) => (book.type || '其它') === type).length })),
   ];
   const filteredLibraryBooks = libraryBooks.filter((book) => libraryTypeFilter === '所有' || (book.type || '其它') === libraryTypeFilter);
   const libraryHistoryMap = months.reduce((map, targetMonth) => {
@@ -3225,22 +3257,23 @@ function App() {
                   <article>
                     <span>所有书单</span>
                     <strong>{libraryBooks.length}</strong>
-                    <em>本</em>
                   </article>
-                  <article className="active">
-                    <span>书籍种类</span>
-                    <strong>{libraryTypeStats.length}</strong>
-                    <em>类</em>
+                  <article className="active library-type-summary">
+                    <div className="summary-title-row">
+                      <span>书籍种类</span>
+                      <button type="button" className="summary-icon-button" onClick={openBookTypesDialog} aria-label="维护书籍分类">
+                        <Settings size={16} />
+                      </button>
+                    </div>
+                    <strong>{bookTypes.length}</strong>
                   </article>
                   <article className="done">
                     <span>已读书单</span>
                     <strong>{finishedLibraryBookIds.size}</strong>
-                    <em>本</em>
                   </article>
                   <article className="points">
                     <span>未读书单</span>
                     <strong>{Math.max(0, libraryBooks.length - finishedLibraryBookIds.size)}</strong>
-                    <em>本</em>
                   </article>
                 </div>
                 <div className="library-controls-row">
@@ -3945,7 +3978,7 @@ function App() {
                   value={newBookDialog.type}
                   onChange={(event) => setNewBookDialog((current) => ({ ...current, type: event.target.value }))}
                 >
-                  {BOOK_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                  {bookTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                 </select>
               </label>
               <label>
@@ -3969,6 +4002,33 @@ function App() {
             <footer>
               <button className="ghost" onClick={() => setNewBookDialog(null)}>取消</button>
               <button onClick={confirmNewBook}>{newBookDialog.id ? '保存修改' : '确认新建'}</button>
+            </footer>
+          </div>
+        </section>
+      )}
+
+      {bookTypesDialog !== null && (
+        <section className="settings-mask" role="dialog" aria-modal="true" aria-label="维护书籍分类">
+          <div className="book-dialog-panel book-types-dialog-panel">
+            <header>
+              <div>
+                <h2>维护书籍分类</h2>
+                <p>每行一个分类，保存后会同步到图书馆筛选栏和新建书单选项。</p>
+              </div>
+            </header>
+            <div className="book-dialog-fields">
+              <label>
+                <span>书籍分类</span>
+                <textarea
+                  className="book-types-editor"
+                  value={bookTypesDialog}
+                  onChange={(event) => setBookTypesDialog(event.target.value)}
+                />
+              </label>
+            </div>
+            <footer>
+              <button className="ghost" onClick={() => setBookTypesDialog(null)}>取消</button>
+              <button onClick={saveBookTypes}>保存分类</button>
             </footer>
           </div>
         </section>

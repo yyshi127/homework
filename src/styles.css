@@ -2965,7 +2965,8 @@ button {
   color: #ff7046;
 }
 
-.month-reading-summary article {
+.month-reading-summary article,
+.library-reading-summary article {
   position: relative;
   min-height: 118px;
   border: 0;
@@ -2976,7 +2977,8 @@ button {
   isolation: isolate;
 }
 
-.month-reading-summary article::before {
+.month-reading-summary article::before,
+.library-reading-summary article::before {
   content: "";
   position: absolute;
   right: -22px;
@@ -2988,7 +2990,8 @@ button {
   z-index: -1;
 }
 
-.month-reading-summary article::after {
+.month-reading-summary article::after,
+.library-reading-summary article::after {
   content: "";
   position: absolute;
   inset: -1px;
@@ -3012,8 +3015,26 @@ button {
   background: linear-gradient(145deg, #ff9a4a, #ef6b38);
 }
 
+.library-reading-summary article:nth-child(1) {
+  background: linear-gradient(145deg, #5cc7e5, #347bc6);
+}
+
+.library-reading-summary .active {
+  background: linear-gradient(145deg, #8b8af8, #6754d9);
+}
+
+.library-reading-summary .done {
+  background: linear-gradient(145deg, #42cd79, #1ea95b);
+}
+
+.library-reading-summary .points {
+  background: linear-gradient(145deg, #ff8a68, #e84d45);
+}
+
 .month-reading-summary span,
-.month-reading-summary em {
+.month-reading-summary em,
+.library-reading-summary span,
+.library-reading-summary em {
   color: rgba(255, 255, 255, 0.92);
   position: relative;
 }
@@ -3021,7 +3042,11 @@ button {
 .month-reading-summary strong,
 .month-reading-summary .active strong,
 .month-reading-summary .done strong,
-.month-reading-summary .points strong {
+.month-reading-summary .points strong,
+.library-reading-summary strong,
+.library-reading-summary .active strong,
+.library-reading-summary .done strong,
+.library-reading-summary .points strong {
   display: block;
   margin: 8px 0 4px;
   color: #fff;
@@ -3031,7 +3056,8 @@ button {
   position: relative;
 }
 
-.month-reading-summary .points strong {
+.month-reading-summary .points strong,
+.library-reading-summary .points strong {
   font-size: 34px;
 }
 
@@ -7050,7 +7076,8 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .month-reading-summary {
+  .month-reading-summary,
+  .library-reading-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

@@ -3103,7 +3103,7 @@ function App() {
                   </div>
                   <button className="new-book-button" onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
                 </div>
-                <div className="reading-summary library-summary">
+                <div className="reading-summary library-summary library-reading-summary">
                   <article>
                     <span>所有书单</span>
                     <strong>{libraryBooks.length}</strong>

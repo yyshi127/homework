@@ -40,6 +40,7 @@ const LEGACY_MONTHS = [
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const STORAGE_KEY = 'yan-yixin-summer-dashboard-v4';
 const VIEW_STORAGE_KEY = 'yan-yixin-active-view';
+const READING_SCOPE_STORAGE_KEY = 'yan-yixin-reading-scope';
 const API_STATE_URL = '/api/state';
 const API_GRADE_HOMEWORK_URL = '/api/grade-homework';
 const API_AI_CONFIG_URL = '/api/ai-config';
@@ -302,6 +303,10 @@ function initialActiveView() {
   const hashView = window.location.hash.replace(/^#/, '');
   if (VALID_VIEWS.includes(hashView)) return hashView;
   return defaultViewForDevice();
+}
+
+function initialReadingScope() {
+  return localStorage.getItem(READING_SCOPE_STORAGE_KEY) === 'library' ? 'library' : 'month';
 }
 
 function daysInMonth(year, month) {
@@ -1017,7 +1022,7 @@ function App() {
   const [readingPlanEditor, setReadingPlanEditor] = useState(null);
   const [rewardCelebration, setRewardCelebration] = useState(null);
   const [rewardExchangeCelebration, setRewardExchangeCelebration] = useState(null);
-  const [readingScope, setReadingScope] = useState('month');
+  const [readingScope, setReadingScope] = useState(initialReadingScope);
   const [readingTab, setReadingTab] = useState('reading');
   const [readingViewMode, setReadingViewMode] = useState('card');
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('所有');
@@ -1126,6 +1131,10 @@ function App() {
       window.history.replaceState(null, '', `#${nextView}`);
     }
   }, [activeView]);
+
+  useEffect(() => {
+    localStorage.setItem(READING_SCOPE_STORAGE_KEY, readingScope === 'library' ? 'library' : 'month');
+  }, [readingScope]);
 
   useEffect(() => {
     const syncViewFromHash = () => {

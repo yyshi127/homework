@@ -3048,7 +3048,7 @@ button {
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 8px 18px rgba(54, 67, 72, 0.06);
   display: grid;
-  grid-template-columns: 88px minmax(180px, 1.4fr) 88px 72px 82px minmax(180px, 1.2fr) 78px;
+  grid-template-columns: 88px minmax(180px, 1.4fr) 88px 72px minmax(220px, 1.2fr) 82px 78px;
   align-items: center;
   gap: 12px;
 }

@@ -2451,7 +2451,6 @@ function App() {
   const renderLibraryBookRow = (book) => {
     const status = libraryBookStatus(book);
     const planLabel = libraryBookPlanLabel(book);
-    const history = libraryHistoryMap[book.id] || [];
     return (
       <article className={`library-book-row ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
         <div>
@@ -2471,16 +2470,12 @@ function App() {
           <strong>+{book.rewardPoints || 10}</strong>
         </div>
         <div>
-          <span>状态</span>
-          <strong>{status}</strong>
-        </div>
-        <div>
           <span>计划时间</span>
           <strong>{planLabel || '未安排'}</strong>
         </div>
-        <div className="library-row-history">
-          <span>阅读历史</span>
-          <strong>{history[0] ? `${history[0].monthLabel} ${history[0].day}日${history[0].note ? ` · ${history[0].note}` : ''}` : '暂无'}</strong>
+        <div>
+          <span>状态</span>
+          <strong>{status}</strong>
         </div>
         <div className="library-row-actions">
           <button type="button" title="编辑书籍" aria-label="编辑书籍" onClick={() => openEditLibraryBookDialog(book)}><Pencil size={15} /></button>

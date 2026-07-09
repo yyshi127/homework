@@ -3731,27 +3731,42 @@ button {
 
 .reading-plan-toggle b {
   flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
-  padding: 6px 10px;
   color: #347bc6;
   background: #eef8ff;
-  font-size: 12px;
-  font-weight: 950;
+  display: grid;
+  place-items: center;
+  transition: transform .18s ease, background .18s ease;
+}
+
+.reading-plan-toggle.open b {
+  transform: rotate(180deg);
+  background: #e3f3ff;
 }
 
 .reading-plan-head,
 .reading-plan-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 62px;
+  grid-template-columns: minmax(72px, 0.9fr) minmax(130px, 1.25fr) minmax(78px, 0.85fr);
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 
 .reading-plan-head {
-  padding: 10px 0 7px;
+  padding: 12px 8px 8px;
   color: #7c898d;
   font-size: 12px;
   font-weight: 950;
+}
+
+.reading-plan-head span:nth-child(2) {
+  text-align: center;
+}
+
+.reading-plan-head span:last-child {
+  text-align: right;
 }
 
 .reading-plan-list {
@@ -3761,7 +3776,8 @@ button {
 
 .reading-plan-row {
   min-height: 36px;
-  padding: 6px 0;
+  padding: 8px;
+  border-radius: 12px;
   border-top: 1px dashed #e8eeeb;
 }
 
@@ -3784,6 +3800,7 @@ button {
 }
 
 .reading-plan-row > span {
+  min-width: 0;
   color: #347bc6;
   font-size: 13px;
   font-weight: 950;
@@ -3791,7 +3808,7 @@ button {
 
 .reading-plan-row > i {
   width: fit-content;
-  justify-self: start;
+  justify-self: end;
   border-radius: 999px;
   padding: 3px 7px;
   font-style: normal;
@@ -3815,8 +3832,12 @@ button {
 }
 
 .reading-plan-range {
+  justify-self: center;
   min-width: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
   color: #26383e;
+  background: rgba(255, 255, 255, 0.78);
   font-size: 13px;
   font-weight: 950;
   overflow: hidden;
@@ -3825,6 +3846,7 @@ button {
 }
 
 .reading-plan-unset {
+  justify-self: center;
   width: fit-content;
   height: 28px;
   border: 1px solid #cfe5f7;

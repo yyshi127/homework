@@ -2565,12 +2565,14 @@ function App() {
 
       {showReadingPlan && (
         <div className="reading-plan">
-          <button className="reading-plan-toggle" type="button" aria-expanded={isReadingPlanOpen} onClick={() => setExpandedReadingPlans((current) => ({ ...current, [book.id]: !current[book.id] }))}>
+          <button className={`reading-plan-toggle ${isReadingPlanOpen ? 'open' : ''}`} type="button" aria-expanded={isReadingPlanOpen} onClick={() => setExpandedReadingPlans((current) => ({ ...current, [book.id]: !current[book.id] }))}>
             <span>
               <strong>阅读计划</strong>
               <em>{stats.startDay}日 - {stats.endDay}日 · {stats.totalDays} 天</em>
             </span>
-            <b>{isReadingPlanOpen ? '收起' : '展开编辑'}</b>
+            <b aria-label={isReadingPlanOpen ? '收起阅读计划' : '展开阅读计划'}>
+              <ChevronDown size={18} />
+            </b>
           </button>
           {isReadingPlanOpen && (
             <>

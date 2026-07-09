@@ -77,20 +77,11 @@ button {
 
 .rail-sapling-card {
   position: absolute;
-  top: 22px;
-  left: 18px;
-  right: 18px;
-  min-height: 132px;
-  border: 1px solid rgba(213, 226, 219, 0.78);
-  border-radius: 25px;
-  padding: 12px 11px 13px;
-  background:
-    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.94), transparent 34%),
-    radial-gradient(circle at 76% 18%, rgba(255, 211, 105, 0.18), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 253, 248, 0.82));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 20px 42px rgba(55, 84, 70, 0.11);
+  top: 8px;
+  left: 14px;
+  right: 14px;
+  min-height: 126px;
+  padding: 4px 8px 9px;
   display: grid;
   place-items: center;
   align-content: center;
@@ -99,14 +90,7 @@ button {
 }
 
 .rail-sapling-card::before {
-  content: "";
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 9px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(91, 155, 112, 0.32), transparent);
-  z-index: -1;
+  content: none;
 }
 
 .sapling-scene {
@@ -174,7 +158,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 182px 18px 30px;
+  padding: 150px 18px 30px;
 }
 
 .rail-card button {
@@ -6269,16 +6253,15 @@ button {
 
 .rail-card nav {
   gap: clamp(10px, 0.72vw, 16px);
-  padding: clamp(158px, 10.2vw, 182px) clamp(10px, 0.85vw, 16px) clamp(18px, 1.35vw, 26px);
+  padding: clamp(132px, 8.5vw, 150px) clamp(10px, 0.85vw, 16px) clamp(18px, 1.35vw, 26px);
 }
 
 .rail-sapling-card {
-  top: clamp(16px, 1.2vw, 22px);
-  left: clamp(10px, 0.85vw, 18px);
-  right: clamp(10px, 0.85vw, 18px);
-  min-height: clamp(112px, 8.2vw, 132px);
-  border-radius: clamp(19px, 1.25vw, 25px);
-  padding: clamp(10px, 0.8vw, 12px) 8px 10px;
+  top: clamp(6px, 0.65vw, 8px);
+  left: clamp(8px, 0.85vw, 14px);
+  right: clamp(8px, 0.85vw, 14px);
+  min-height: clamp(108px, 7.8vw, 126px);
+  padding: clamp(3px, 0.45vw, 4px) 8px 9px;
 }
 
 .sapling-scene {
@@ -8598,7 +8581,7 @@ button {
   }
 
   .rail-card nav {
-    padding: 178px 12px 22px;
+    padding: 142px 12px 22px;
   }
 
   .rail-card button span {
@@ -8738,7 +8721,7 @@ button {
 
   .rail-card nav {
     gap: 8px;
-    padding: 172px 10px 18px;
+    padding: 138px 10px 18px;
   }
 
   .rail-card button {

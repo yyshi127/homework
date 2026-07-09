@@ -1216,10 +1216,30 @@ button {
 }
 
 .today-summary small b {
-  color: #df2f32;
   font-size: 18px;
   line-height: 1;
   font-weight: 950;
+}
+
+.today-summary .tasks small {
+  color: #196b94;
+}
+
+.today-summary .tasks small b {
+  color: #1375a8;
+}
+
+.today-summary .done small {
+  color: #167443;
+}
+
+.today-summary .done small b {
+  color: #128047;
+}
+
+.today-summary .pending small,
+.today-summary .pending small b {
+  color: #df2f32;
 }
 
 .today-task-list {

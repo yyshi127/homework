@@ -2025,6 +2025,11 @@ function App() {
     row.typeKey !== 'stage' &&
     row.checkMode !== 'stage'
   );
+  const todayRequiredRows = todayDay ? todayRows.filter(isRequiredTodayTask) : [];
+  const todayRequiredCompletedCount = todayDay ? todayRequiredRows.filter((row) => {
+    const checkDay = taskCheckDayForToday(row, todayDay);
+    return checkDay !== null && getStatus(row.id, checkDay) !== 'empty';
+  }).length : 0;
   const todayPendingCount = Math.max(0, todayRows.length - todayCompletedCount);
   const todayRequiredPendingRows = todayDay ? todayRows.filter((row) => {
     if (!isRequiredTodayTask(row)) return false;
@@ -2459,17 +2464,16 @@ function App() {
               <article className="points">
                 <span>今日积分</span>
                 <strong>{todayPoints}</strong>
-                <em>分</em>
               </article>
               <article className="tasks">
                 <span>今日任务</span>
                 <strong>{todayRows.length}</strong>
-                <em>项</em>
+                <small>含 <b>{todayRequiredRows.length}</b> 个必打卡</small>
               </article>
               <article className="done">
                 <span>已打卡</span>
                 <strong>{todayCompletedCount}</strong>
-                <em>项</em>
+                <small>已完成 <b>{todayRequiredCompletedCount}</b> 个必打卡</small>
               </article>
               <article className={`pending ${todayRequiredPendingCount > 0 ? 'clickable' : ''}`} role={todayRequiredPendingCount > 0 ? 'button' : undefined} tabIndex={todayRequiredPendingCount > 0 ? 0 : undefined} onClick={todayRequiredPendingCount > 0 ? jumpToFirstRequiredPendingTask : undefined} onKeyDown={todayRequiredPendingCount > 0 ? (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -2479,7 +2483,6 @@ function App() {
               } : undefined}>
                 <span>未打卡</span>
                 <strong>{todayPendingCount}</strong>
-                <em>项</em>
                 <small>含 <b>{todayRequiredPendingCount}</b> 个必打卡</small>
               </article>
             </div>

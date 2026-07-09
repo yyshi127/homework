@@ -574,6 +574,7 @@ function createLocalCacheState(current) {
     ...current,
     libraryBooks: normalizeLibraryBooks(current.libraryBooks || []),
     bookTypes: normalizeBookTypes(current.bookTypes),
+    learningTools: normalizeLearningTools(current.learningTools),
     snapshots: [],
   };
 }
@@ -595,7 +596,7 @@ function normalizeLearningTools(value = {}) {
       summary: review.summary || '',
       suggestions: normalizeReviewSuggestions(review.suggestions),
       imageAnnotations: normalizeReviewAnnotations(review.imageAnnotations),
-      annotatedImageUrl: review.annotatedImageUrl || '',
+      annotatedImageUrl: String(review.annotatedImageUrl || '').startsWith('data:') ? '' : (review.annotatedImageUrl || ''),
       mistakes: normalizeReviewMistakes(review.mistakes).map((mistake) => normalizeMistake(mistake, review.subject)),
       createdAt: review.createdAt || new Date().toISOString(),
     })),
@@ -1069,12 +1070,19 @@ function App() {
     stateRef.current = state;
     if (localSaveTimerRef.current) window.clearTimeout(localSaveTimerRef.current);
     localSaveTimerRef.current = window.setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(createLocalCacheState(stateRef.current)));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
+      const saveLocalCache = () => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(createLocalCacheState(stateRef.current)));
+        } catch {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      };
+      if (window.requestIdleCallback) {
+        window.requestIdleCallback(saveLocalCache, { timeout: 1400 });
+      } else {
+        saveLocalCache();
       }
-    }, 900);
+    }, 1500);
 
     if (!databaseReady || loadingFromDatabase.current) return undefined;
     if (manualSavePendingRef.current) {

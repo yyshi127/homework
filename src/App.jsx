@@ -678,6 +678,12 @@ function temporaryTaskRemarkFromNote(note) {
   return parts.length > 1 ? parts.slice(1).join('｜').trim() : '';
 }
 
+function temporaryTaskRemarkInputFromNote(note) {
+  if (typeof note !== 'string') return '';
+  const parts = note.split('｜');
+  return parts.length > 1 ? parts.slice(1).join('｜') : '';
+}
+
 function formatTemporaryTaskMonthNote(note) {
   const title = temporaryTaskTitleFromNote(note);
   const remark = temporaryTaskRemarkFromNote(note);
@@ -1629,7 +1635,7 @@ function App() {
 
   const updateTemporaryTaskRemark = (row, day, value) => {
     const title = temporaryTaskTitleFromNote(month.notes?.[row.id]?.[day]) || TEMPORARY_TASK_TITLE;
-    updateCellNote(row.id, day, formatTemporaryTaskNote(title, value));
+    updateCellNote(row.id, day, `${title}｜${value}`);
   };
 
   const updateReadingPageNote = (rowId, day, field, value) => {
@@ -3338,7 +3344,7 @@ function App() {
           ) : (
             <input
               className="today-note-input"
-              value={isTemporaryTask ? temporaryTaskRemarkFromNote(note) : typeof note === 'string' ? note : ''}
+              value={isTemporaryTask ? temporaryTaskRemarkInputFromNote(note) : typeof note === 'string' ? note : ''}
               placeholder="写下今天完成了什么、哪里需要改进..."
               onChange={(event) => {
                 if (isTemporaryTask) {

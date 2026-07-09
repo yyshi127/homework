@@ -2646,17 +2646,6 @@ function App() {
         {activeView === 'today' ? (
           <section className="today-page">
             <div className="content-tabbar">
-              <div className="check-view-tabs" aria-label="打卡视图切换">
-                <button className="active" onClick={() => setActiveView('today')} type="button">今日打卡</button>
-                <button onClick={() => setActiveView('home')} type="button">全月表</button>
-              </div>
-              <div className="content-goal-box">
-                <div className="goal-box">
-                  <Target size={24} />
-                  <span>本月目标：</span>
-                  <strong>{month.goal || '未设置'}</strong>
-                </div>
-              </div>
               <div className="month-switch tab-month-switch today-month-switch">
                 <button onClick={() => changeMonth(-1)} aria-label="上个月">
                   <ChevronLeft size={21} />
@@ -2668,6 +2657,17 @@ function App() {
                 <button onClick={() => changeMonth(1)} aria-label="下个月">
                   <ChevronRight size={21} />
                 </button>
+              </div>
+              <div className="content-goal-box">
+                <div className="goal-box">
+                  <Target size={24} />
+                  <span>本月目标：</span>
+                  <strong>{month.goal || '未设置'}</strong>
+                </div>
+              </div>
+              <div className="check-view-tabs" aria-label="打卡视图切换">
+                <button className="active" onClick={() => setActiveView('today')} type="button">今日打卡</button>
+                <button onClick={() => setActiveView('home')} type="button">全月表</button>
               </div>
             </div>
 
@@ -2728,17 +2728,6 @@ function App() {
         <>
         <section className="matrix-card">
           <div className="content-tabbar">
-            <div className="check-view-tabs" aria-label="打卡视图切换">
-              <button onClick={() => setActiveView('today')} type="button">今日打卡</button>
-              <button className="active" onClick={() => setActiveView('home')} type="button">全月表</button>
-            </div>
-            <div className="content-goal-box">
-              <div className="goal-box">
-                <Target size={24} />
-                <span>本月目标：</span>
-                <strong>{month.goal || '未设置'}</strong>
-              </div>
-            </div>
             <div className="month-switch tab-month-switch today-month-switch">
               <button onClick={() => changeMonth(-1)} aria-label="上个月">
                 <ChevronLeft size={21} />
@@ -2750,6 +2739,17 @@ function App() {
               <button onClick={() => changeMonth(1)} aria-label="下个月">
                 <ChevronRight size={21} />
               </button>
+            </div>
+            <div className="content-goal-box">
+              <div className="goal-box">
+                <Target size={24} />
+                <span>本月目标：</span>
+                <strong>{month.goal || '未设置'}</strong>
+              </div>
+            </div>
+            <div className="check-view-tabs" aria-label="打卡视图切换">
+              <button onClick={() => setActiveView('today')} type="button">今日打卡</button>
+              <button className="active" onClick={() => setActiveView('home')} type="button">全月表</button>
             </div>
           </div>
 

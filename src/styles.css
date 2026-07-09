@@ -3109,6 +3109,98 @@ button {
   font-weight: 900;
 }
 
+.reading-plan {
+  border: 1px solid #e4ebe9;
+  border-radius: 16px;
+  padding: 12px;
+  background: #fffefa;
+}
+
+.reading-plan > strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #164148;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.reading-plan-head,
+.reading-plan-row {
+  display: grid;
+  grid-template-columns: 52px 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.reading-plan-head {
+  padding: 0 0 7px;
+  color: #7c898d;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.reading-plan-list {
+  max-height: 230px;
+  overflow: auto;
+  display: grid;
+  gap: 7px;
+  padding-right: 2px;
+}
+
+.reading-plan-row {
+  min-height: 36px;
+  padding: 6px 0;
+  border-top: 1px dashed #e8eeeb;
+}
+
+.reading-plan-row > span {
+  color: #347bc6;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.reading-plan-row > i {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.reading-plan-pages {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.reading-plan-pages input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid #dce8e4;
+  border-radius: 10px;
+  outline: 0;
+  padding: 0 8px;
+  color: #26383e;
+  background: #fbfffd;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.reading-plan-pages input:focus {
+  border-color: #87b9ef;
+  box-shadow: 0 0 0 3px rgba(95, 159, 228, 0.14);
+}
+
+.reading-plan-pages em {
+  color: #7c898d;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .reading-records {
   min-height: 92px;
 }

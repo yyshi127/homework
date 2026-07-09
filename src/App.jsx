@@ -2115,7 +2115,21 @@ function App() {
   const changeMonth = (direction) => {
     setMonthIndex((current) => Math.max(0, Math.min(months.length - 1, current + direction)));
   };
-  const renderReadingBookCard = ({ book, stats }) => (
+  const renderReadingBookCard = ({ book, stats }) => {
+    const readingPlanRows = stats.rangeDays.map((day) => {
+      const status = normalizeStatus(month.checks?.[book.id]?.[day] || 'empty');
+      const note = month.notes?.[book.id]?.[day];
+      const pageNote = typeof note === 'object' && note ? note : {};
+      return {
+        day,
+        isCompleted: status !== 'empty',
+        startPage: pageNote.startPage || '',
+        endPage: pageNote.endPage || '',
+      };
+    });
+    const showReadingPlan = book.checkMode !== 'stage' && readingPlanRows.length > 0;
+
+    return (
     <article className={`reading-book-card ${stats.isComplete ? 'finished' : ''}`} key={book.id}>
       <div className="reading-book-head">
         <div>
@@ -2144,6 +2158,30 @@ function App() {
         <span><Check size={15} />{stats.checkedDays}/{stats.totalDays} 天打卡</span>
         <span><Gift size={15} />{stats.isClaimed ? '已领取奖励' : stats.isComplete ? '可领取奖励' : '读完后获得'}</span>
       </div>
+
+      {showReadingPlan && (
+        <div className="reading-plan">
+          <strong>阅读计划</strong>
+          <div className="reading-plan-head">
+            <span>日期</span>
+            <span>状态</span>
+            <span>阅读范围</span>
+          </div>
+          <div className="reading-plan-list">
+            {readingPlanRows.map((record) => (
+              <div className="reading-plan-row" key={`${book.id}-plan-${record.day}`}>
+                <span>{record.day}日</span>
+                <i className={record.isCompleted ? 'record-done' : 'record-plan'}>{record.isCompleted ? '已读' : '计划'}</i>
+                <div className="reading-plan-pages">
+                  <input inputMode="numeric" value={record.startPage} placeholder="起始页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'startPage', event.target.value)} />
+                  <em>到</em>
+                  <input inputMode="numeric" value={record.endPage} placeholder="结束页" onChange={(event) => updateReadingPageNote(book.id, record.day, 'endPage', event.target.value)} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="reading-records">
         <strong>最近阅读记录</strong>
@@ -2187,7 +2225,8 @@ function App() {
         <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>
       </div>
     </article>
-  );
+    );
+  };
   const renderReadingBookRow = ({ book, stats }) => (
     <article className={`reading-list-row ${stats.isComplete ? 'finished' : ''}`} key={book.id}>
       <div className="reading-list-book">

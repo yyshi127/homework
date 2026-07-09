@@ -58,6 +58,7 @@ const API_GRADE_HOMEWORK_URL = '/api/grade-homework';
 const API_AI_CONFIG_URL = '/api/ai-config';
 const STATUS_ORDER = ['empty', 'done', 'excellent', 'super'];
 const VALID_VIEWS = ['today', 'home', 'rewards', 'books', 'tools', 'settings'];
+const TEMPORARY_TASK_TITLE = '临时打卡任务';
 
 const STATUS = {
   empty: { label: '未打卡', points: 0 },
@@ -630,6 +631,46 @@ function readingCategoryFor(month) {
   return { id: 'cat-reading', name: '阅读', color: 'purple', badge: '阅', tasks: [] };
 }
 
+function taskDisplayType(task) {
+  if (task?.bookId) return 'reading';
+  return task?.type || 'daily';
+}
+
+function taskSortGroup(task) {
+  const type = taskDisplayType(task);
+  if (type === 'daily') return 0;
+  if (type === 'temporary') return 2;
+  return 1;
+}
+
+function temporaryTaskIndex(task, fallback = 0) {
+  return Math.max(1, Number(task?.temporaryIndex || fallback || 1));
+}
+
+function createTemporaryTask(slot, monthDays) {
+  return {
+    id: createId('temp-task'),
+    title: TEMPORARY_TASK_TITLE,
+    type: 'temporary',
+    temporaryIndex: slot,
+    startDay: 1,
+    endDay: monthDays,
+    checkMode: 'daily',
+    importance: 'normal',
+  };
+}
+
+function formatTemporaryTaskNote(content, remark) {
+  const title = String(content || '').trim();
+  const detail = String(remark || '').trim();
+  if (title && detail) return `${title}｜${detail}`;
+  return title || detail;
+}
+
+function temporaryDraftKey(monthId, categoryId) {
+  return `${monthId || 'month'}-${categoryId || 'category'}`;
+}
+
 function buildTaskRows(month) {
   const monthCategories = (month?.categories || []).map((category) => ({
     ...category,
@@ -646,12 +687,15 @@ function buildTaskRows(month) {
     const tasks = (subject.tasks || [])
       .map((task, index) => ({ task, index }))
       .sort((a, b) => {
-        const aType = a.task.bookId ? 'reading' : a.task.type;
-        const bType = b.task.bookId ? 'reading' : b.task.type;
-        const aIsDaily = aType === 'daily';
-        const bIsDaily = bType === 'daily';
-        if (aIsDaily !== bIsDaily) return aIsDaily ? -1 : 1;
-        if (!aIsDaily && !bIsDaily) {
+        const groupDiff = taskSortGroup(a.task) - taskSortGroup(b.task);
+        if (groupDiff !== 0) return groupDiff;
+        const aType = taskDisplayType(a.task);
+        const bType = taskDisplayType(b.task);
+        if (aType === 'temporary' && bType === 'temporary') {
+          const slotDiff = temporaryTaskIndex(a.task, a.index + 1) - temporaryTaskIndex(b.task, b.index + 1);
+          if (slotDiff !== 0) return slotDiff;
+        }
+        if (taskSortGroup(a.task) === 1 && taskSortGroup(b.task) === 1) {
           const startDiff = Number(a.task.startDay || 1) - Number(b.task.startDay || 1);
           if (startDiff !== 0) return startDiff;
         }
@@ -664,9 +708,10 @@ function buildTaskRows(month) {
     return tasks.map((task, itemIndex) => {
         const linkedBook = task.bookId ? month.readingBooks?.find((book) => book.id === task.bookId) : null;
         const effectiveType = linkedBook ? 'reading' : task.type;
-        const typeLabel = effectiveType === 'stage' || effectiveType === 'reading' ? '阶段' : '每日';
+        const typeLabel = effectiveType === 'temporary' ? '临时' : effectiveType === 'stage' || effectiveType === 'reading' ? '阶段' : '每日';
         const taskRow = {
           id: linkedBook?.id || task.id,
+          categoryId: subject.id,
           subject: subject.name,
           color: subject.color,
           badge: subject.badge,
@@ -676,7 +721,7 @@ function buildTaskRows(month) {
           typeKey: effectiveType,
           typeRowSpan: 1,
           firstTypeRow: true,
-          item: linkedBook ? `${linkedBook.name}（读完奖励 +${Number(linkedBook.rewardPoints || DEFAULT_READING_REWARD_POINTS)}分）` : task.title || '未命名任务',
+          item: linkedBook ? `${linkedBook.name}（读完奖励 +${Number(linkedBook.rewardPoints || DEFAULT_READING_REWARD_POINTS)}分）` : effectiveType === 'temporary' ? TEMPORARY_TASK_TITLE : task.title || '未命名任务',
           task,
           book: linkedBook,
           startDay: Number(task.startDay || 1),
@@ -952,15 +997,17 @@ function normalizeMonth(month) {
     badge: category.badge || category.name?.slice(0, 1) || '类',
     tasks: (category.tasks || []).map((task) => {
       const selectedBook = task.bookId ? normalized.readingBooks.find((book) => book.id === task.bookId) : null;
+      const normalizedType = selectedBook ? 'stage' : task.type === 'temporary' ? 'temporary' : task.type || 'daily';
       const normalizedTask = {
         id: task.id || createId('task'),
-        title: selectedBook?.name || task.title || '',
-        type: selectedBook ? 'stage' : task.type || 'daily',
+        title: normalizedType === 'temporary' ? TEMPORARY_TASK_TITLE : selectedBook?.name || task.title || '',
+        type: normalizedType,
         startDay: Math.max(1, Math.min(normalized.days, Number(task.startDay || 1))),
         endDay: Math.max(1, Math.min(normalized.days, Number(task.endDay || normalized.days))),
-        checkMode: task.type === 'stage' ? task.checkMode || 'daily' : 'daily',
+        checkMode: normalizedType === 'stage' ? task.checkMode || 'daily' : 'daily',
         importance: task.importance === 'important' ? 'important' : 'normal',
         ...(selectedBook ? { bookId: selectedBook.id, checkMode: task.checkMode || 'daily' } : {}),
+        ...(normalizedType === 'temporary' ? { temporaryIndex: temporaryTaskIndex(task) } : {}),
       };
       if (category.name === '好习惯') normalizedTask.habitPoints = habitPoints(task.habitPoints);
       return normalizedTask;
@@ -1079,7 +1126,7 @@ function StatusButton({ value, onClick, label, disabled = false }) {
 
 function isTaskActiveOnDay(row, day) {
   if (!row) return false;
-  if (row.typeKey === 'daily') return true;
+  if (row.typeKey === 'daily' || row.typeKey === 'temporary') return true;
   return day >= Number(row.startDay || 1) && day <= Number(row.endDay || 31);
 }
 
@@ -1241,6 +1288,7 @@ function App() {
   const [pointConfigDialog, setPointConfigDialog] = useState(null);
   const [rewardTypeFilter, setRewardTypeFilter] = useState('全部');
   const [expandedReadingPlans, setExpandedReadingPlans] = useState({});
+  const [temporaryTaskDrafts, setTemporaryTaskDrafts] = useState({});
   const [learningTab, setLearningTab] = useState('grader');
   const [graderDraft, setGraderDraft] = useState(DEFAULT_GRADER_DRAFT);
   const [latestReview, setLatestReview] = useState(null);
@@ -2516,6 +2564,81 @@ function App() {
     }
   };
 
+  const openTemporaryTaskDraft = (group) => {
+    const key = temporaryDraftKey(month.id, group.categoryId);
+    setTemporaryTaskDrafts((current) => ({
+      ...current,
+      [key]: { content: '', remark: '', status: 'done' },
+    }));
+  };
+
+  const updateTemporaryTaskDraft = (group, patch) => {
+    const key = temporaryDraftKey(month.id, group.categoryId);
+    setTemporaryTaskDrafts((current) => ({
+      ...current,
+      [key]: { content: '', remark: '', status: 'done', ...(current[key] || {}), ...patch },
+    }));
+  };
+
+  const cancelTemporaryTaskDraft = (group) => {
+    const key = temporaryDraftKey(month.id, group.categoryId);
+    setTemporaryTaskDrafts((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const saveTemporaryTaskDraft = async (group) => {
+    if (!todayDay) return;
+    const key = temporaryDraftKey(month.id, group.categoryId);
+    const draft = temporaryTaskDrafts[key] || {};
+    const content = String(draft.content || '').trim();
+    const remark = String(draft.remark || '').trim();
+    if (!content) {
+      window.alert('请先填写临时任务内容。');
+      return;
+    }
+    const next = structuredClone(stateRef.current || state || {});
+    const targetMonth = next.months.find((item) => item.id === month.id);
+    const category = targetMonth?.categories?.find((item) => item.id === group.categoryId || item.name === group.subject);
+    if (!targetMonth || !category) return;
+    category.tasks ||= [];
+    targetMonth.checks ||= {};
+    targetMonth.notes ||= {};
+    const temporaryTasks = category.tasks
+      .filter((task) => task.type === 'temporary')
+      .sort((a, b) => temporaryTaskIndex(a) - temporaryTaskIndex(b));
+    const usedSlots = new Set(temporaryTasks
+      .filter((task) => targetMonth.checks?.[task.id]?.[todayDay] || targetMonth.notes?.[task.id]?.[todayDay])
+      .map((task) => temporaryTaskIndex(task)));
+    let slot = 1;
+    while (usedSlots.has(slot)) slot += 1;
+    let task = temporaryTasks.find((item) => temporaryTaskIndex(item) === slot);
+    if (!task) {
+      task = createTemporaryTask(slot, targetMonth.days);
+      category.tasks.push(task);
+    }
+    task.title = TEMPORARY_TASK_TITLE;
+    task.type = 'temporary';
+    task.temporaryIndex = slot;
+    task.startDay = 1;
+    task.endDay = targetMonth.days;
+    task.checkMode = 'daily';
+    targetMonth.checks[task.id] ||= {};
+    targetMonth.notes[task.id] ||= {};
+    const nextStatus = normalizeStatus(draft.status || 'done');
+    if (nextStatus === 'empty') {
+      delete targetMonth.checks[task.id][todayDay];
+    } else {
+      targetMonth.checks[task.id][todayDay] = nextStatus;
+    }
+    targetMonth.notes[task.id][todayDay] = formatTemporaryTaskNote(content, remark);
+    setState(next);
+    cancelTemporaryTaskDraft(group);
+    await persistState(next, '临时任务已保存到 SQLite');
+  };
+
   const enableBackfillMode = () => {
     if (isBackfillMode) return;
     if (!window.confirm('开启补录后，可以修改本月今天以前的打卡记录。补录完成后必须点击保存才会写入数据库，确定开启吗？')) return;
@@ -2590,6 +2713,7 @@ function App() {
   const isRequiredTodayTask = (row) => (
     REQUIRED_TODAY_SUBJECTS.includes(row.subject) &&
     row.typeKey !== 'stage' &&
+    row.typeKey !== 'temporary' &&
     row.checkMode !== 'stage'
   );
   const todayRequiredRows = todayDay ? todayRows.filter(isRequiredTodayTask) : [];
@@ -2611,6 +2735,7 @@ function App() {
       return groups;
     }
     groups.push({
+      categoryId: row.categoryId,
       subject: row.subject,
       color: row.color,
       badge: row.badge,
@@ -3045,6 +3170,7 @@ function App() {
   const renderTodayTaskCard = (row) => {
     const day = taskCheckDayForToday(row, todayDay);
     const isStageRangeTask = row.typeKey === 'stage' || row.typeKey === 'reading';
+    const isTemporaryTask = row.typeKey === 'temporary';
     const isStageCheckMode = row.checkMode === 'stage';
     const completedStageDay = stageCompletedDay(row, month, todayDay);
     const effectiveDay = completedStageDay || day;
@@ -3058,8 +3184,8 @@ function App() {
     const readingNote = typeof note === 'object' && note ? note : {};
     const noteText = formatCellNote(note);
     const isHabit = row.subject === '好习惯';
-    const taskTypeLabel = isStageRangeTask ? '阶段' : '每日';
-    const checkModeLabel = isStageCheckMode ? '阶段打卡' : '每日打卡';
+    const taskTypeLabel = isTemporaryTask ? '临时' : isStageRangeTask ? '阶段' : '每日';
+    const checkModeLabel = isTemporaryTask ? '临时打卡' : isStageCheckMode ? '阶段打卡' : '每日打卡';
     const stageTaskKey = `${todayHidePrefix}-${row.id}`;
     const isCollapsed = isStageCheckMode && !expandedTodayStageTasks[stageTaskKey];
     const statusChips = isHabit
@@ -3100,11 +3226,11 @@ function App() {
               {row.item}
             </p>
             <div>
-              <span className={`task-type-pill ${isStageRangeTask ? 'stage-type' : 'daily-type'}`}>
-                {isStageRangeTask ? <CalendarDays size={13} strokeWidth={2.8} /> : <ClipboardCheck size={13} strokeWidth={2.8} />}
+              <span className={`task-type-pill ${isTemporaryTask ? 'temporary-type' : isStageRangeTask ? 'stage-type' : 'daily-type'}`}>
+                {isTemporaryTask ? <PlusCircle size={13} strokeWidth={2.8} /> : isStageRangeTask ? <CalendarDays size={13} strokeWidth={2.8} /> : <ClipboardCheck size={13} strokeWidth={2.8} />}
                 {taskTypeLabel}
               </span>
-              <span className={`check-mode-pill ${isStageCheckMode ? 'stage-mode' : 'daily-mode'}`}>{checkModeLabel}</span>
+              <span className={`check-mode-pill ${isTemporaryTask ? 'temporary-mode' : isStageCheckMode ? 'stage-mode' : 'daily-mode'}`}>{checkModeLabel}</span>
               {isStageRangeTask && <span className="task-date-range">{row.startDay}日 - {row.endDay}日</span>}
               <span className="score-chip-group">
                 {statusChips.map((chip) => (
@@ -3162,6 +3288,13 @@ function App() {
   const renderTodayTaskGroup = (group) => {
     const isCollapsed = Boolean(collapsedTodaySubjects[group.subject]);
     const total = group.rows.length;
+    const draftKey = temporaryDraftKey(month.id, group.categoryId);
+    const temporaryDraft = temporaryTaskDrafts[draftKey];
+    const temporaryStatusOptions = [
+      { key: 'done', label: '完成' },
+      { key: 'excellent', label: `优秀 +${pointConfig.excellent}` },
+      { key: 'super', label: `非常优秀 +${pointConfig.super}` },
+    ];
     return (
       <section className={`today-task-group row-${group.color} ${isCollapsed ? 'collapsed' : ''}`} key={group.subject}>
         <button
@@ -3185,6 +3318,48 @@ function App() {
         {!isCollapsed && (
           <div className="today-task-group-body">
             {group.rows.map(renderTodayTaskCard)}
+            {temporaryDraft && (
+              <div className="temporary-task-panel">
+                <div className="temporary-task-panel-head">
+                  <PlusCircle size={18} />
+                  <strong>添加临时任务</strong>
+                  <span>会同步到全月表的临时任务行</span>
+                </div>
+                <div className="temporary-task-fields">
+                  <label>
+                    <span>任务内容</span>
+                    <input value={temporaryDraft.content || ''} placeholder="例如：整理错题、背诵课文第3段" onChange={(event) => updateTemporaryTaskDraft(group, { content: event.target.value })} />
+                  </label>
+                  <label>
+                    <span>备注信息</span>
+                    <input value={temporaryDraft.remark || ''} placeholder="补充页码、要求或完成情况" onChange={(event) => updateTemporaryTaskDraft(group, { remark: event.target.value })} />
+                  </label>
+                </div>
+                <div className="temporary-task-actions">
+                  <div className="temporary-status-options" role="group" aria-label="临时任务打卡状态">
+                    {temporaryStatusOptions.map((option) => (
+                      <button
+                        key={option.key}
+                        className={temporaryDraft.status === option.key ? 'active' : ''}
+                        type="button"
+                        onClick={() => updateTemporaryTaskDraft(group, { status: option.key })}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="temporary-task-save-actions">
+                    <button className="ghost" type="button" onClick={() => cancelTemporaryTaskDraft(group)}>取消</button>
+                    <button className="primary" type="button" onClick={() => saveTemporaryTaskDraft(group)}>
+                      <Check size={16} />打卡保存
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <button className="temporary-task-add-button" type="button" onClick={() => openTemporaryTaskDraft(group)}>
+              <PlusCircle size={17} />添加临时任务
+            </button>
           </div>
         )}
       </section>
@@ -4358,7 +4533,7 @@ function App() {
                               {isHabit && <span>积分</span>}
                               <span>操作</span>
                             </div>
-                            {category.tasks.map((task) => (
+                            {category.tasks.filter((task) => task.type !== 'temporary').map((task) => (
                               <div className="task-config-row" key={task.id}>
                                 {isReading ? (
                                   <div className="reading-task-title">

@@ -1410,6 +1410,166 @@ button {
   gap: 14px;
 }
 
+.temporary-task-panel {
+  border: 1px dashed rgba(91, 126, 137, 0.28);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 96% 0%, rgba(255, 255, 255, 0.92), transparent 128px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(250, 253, 252, 0.94));
+  box-shadow: 0 10px 22px rgba(61, 79, 88, 0.055);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.temporary-task-panel-head,
+.temporary-task-actions,
+.temporary-task-save-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.temporary-task-panel-head {
+  color: #173f46;
+}
+
+.temporary-task-panel-head svg {
+  color: #35ad5f;
+}
+
+.temporary-task-panel-head strong {
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.temporary-task-panel-head span {
+  color: #6c7a7f;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.temporary-task-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.temporary-task-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.temporary-task-fields span {
+  color: #617176;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.temporary-task-fields input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #dde9e5;
+  border-radius: 14px;
+  padding: 0 13px;
+  color: #173f46;
+  background: rgba(255, 255, 255, 0.9);
+  font-weight: 850;
+  outline: none;
+}
+
+.temporary-task-fields input:focus {
+  border-color: rgba(61, 180, 97, 0.55);
+  box-shadow: 0 0 0 4px rgba(61, 180, 97, 0.12);
+}
+
+.temporary-task-actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.temporary-status-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.temporary-status-options button,
+.temporary-task-save-actions button,
+.temporary-task-add-button {
+  border: 0;
+  border-radius: 999px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.temporary-status-options button {
+  min-height: 36px;
+  padding: 0 13px;
+  color: #687579;
+  background: #eef4f2;
+}
+
+.temporary-status-options button.active {
+  color: white;
+  background: linear-gradient(180deg, #55bd70, #36a955);
+  box-shadow: 0 10px 18px rgba(54, 169, 85, 0.18);
+}
+
+.temporary-task-save-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.temporary-task-save-actions .ghost {
+  color: #687579;
+  background: #eef4f2;
+}
+
+.temporary-task-save-actions .primary,
+.temporary-task-add-button {
+  color: white;
+  background: linear-gradient(180deg, #48c96d, #2fae55);
+  box-shadow: 0 12px 22px rgba(47, 174, 85, 0.18);
+}
+
+.temporary-task-save-actions .primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.temporary-task-add-button {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.row-blue .temporary-task-panel-head svg { color: #347fd1; }
+.row-green .temporary-task-panel-head svg { color: #38a85a; }
+.row-red .temporary-task-panel-head svg { color: #f05a57; }
+.row-purple .temporary-task-panel-head svg { color: #825ee0; }
+.row-orange .temporary-task-panel-head svg { color: #f29325; }
+
+.row-blue .temporary-status-options button.active,
+.row-blue .temporary-task-save-actions .primary,
+.row-blue .temporary-task-add-button { background: linear-gradient(180deg, #62a9f4, #347fd1); box-shadow: 0 12px 22px rgba(52, 127, 209, 0.18); }
+.row-green .temporary-status-options button.active,
+.row-green .temporary-task-save-actions .primary,
+.row-green .temporary-task-add-button { background: linear-gradient(180deg, #63c978, #38a85a); box-shadow: 0 12px 22px rgba(56, 168, 90, 0.18); }
+.row-red .temporary-status-options button.active,
+.row-red .temporary-task-save-actions .primary,
+.row-red .temporary-task-add-button { background: linear-gradient(180deg, #ff8582, #f05a57); box-shadow: 0 12px 22px rgba(240, 90, 87, 0.18); }
+.row-purple .temporary-status-options button.active,
+.row-purple .temporary-task-save-actions .primary,
+.row-purple .temporary-task-add-button { background: linear-gradient(180deg, #b18cff, #825ee0); box-shadow: 0 12px 22px rgba(130, 94, 224, 0.18); }
+.row-orange .temporary-status-options button.active,
+.row-orange .temporary-task-save-actions .primary,
+.row-orange .temporary-task-add-button { background: linear-gradient(180deg, #ffc65a, #f29325); box-shadow: 0 12px 22px rgba(242, 147, 37, 0.18); }
+
 .row-blue .today-task-group-title > i { background: var(--blue); }
 .row-green .today-task-group-title > i { background: var(--green); }
 .row-red .today-task-group-title > i { background: var(--red); }
@@ -1662,28 +1822,37 @@ button {
   background: linear-gradient(180deg, #5ba9bd, #357f95);
 }
 
+.today-task-copy .temporary-type {
+  background: linear-gradient(180deg, #ffb75f, #f08a22);
+}
+
 .row-blue .today-task-copy .daily-type,
-.row-blue .today-task-copy .stage-type {
+.row-blue .today-task-copy .stage-type,
+.row-blue .today-task-copy .temporary-type {
   background: linear-gradient(180deg, #62a9f4, #347fd1);
 }
 
 .row-green .today-task-copy .daily-type,
-.row-green .today-task-copy .stage-type {
+.row-green .today-task-copy .stage-type,
+.row-green .today-task-copy .temporary-type {
   background: linear-gradient(180deg, #63c978, #38a85a);
 }
 
 .row-red .today-task-copy .daily-type,
-.row-red .today-task-copy .stage-type {
+.row-red .today-task-copy .stage-type,
+.row-red .today-task-copy .temporary-type {
   background: linear-gradient(180deg, #ff8582, #f05a57);
 }
 
 .row-purple .today-task-copy .daily-type,
-.row-purple .today-task-copy .stage-type {
+.row-purple .today-task-copy .stage-type,
+.row-purple .today-task-copy .temporary-type {
   background: linear-gradient(180deg, #b18cff, #825ee0);
 }
 
 .row-orange .today-task-copy .daily-type,
-.row-orange .today-task-copy .stage-type {
+.row-orange .today-task-copy .stage-type,
+.row-orange .today-task-copy .temporary-type {
   background: linear-gradient(180deg, #ffc65a, #f29325);
 }
 
@@ -1699,36 +1868,47 @@ button {
   border: 1px solid rgba(91, 169, 189, 0.28);
 }
 
+.today-task-copy .temporary-mode {
+  color: #c46a13;
+  background: #fff5dc;
+  border: 1px solid rgba(255, 184, 62, 0.28);
+}
+
 .row-blue .today-task-copy .daily-mode,
-.row-blue .today-task-copy .stage-mode {
+.row-blue .today-task-copy .stage-mode,
+.row-blue .today-task-copy .temporary-mode {
   color: #2874bd;
   background: #eaf5ff;
   border-color: rgba(74, 144, 226, 0.24);
 }
 
 .row-green .today-task-copy .daily-mode,
-.row-green .today-task-copy .stage-mode {
+.row-green .today-task-copy .stage-mode,
+.row-green .today-task-copy .temporary-mode {
   color: #2e964f;
   background: #eef9ea;
   border-color: rgba(76, 175, 80, 0.24);
 }
 
 .row-red .today-task-copy .daily-mode,
-.row-red .today-task-copy .stage-mode {
+.row-red .today-task-copy .stage-mode,
+.row-red .today-task-copy .temporary-mode {
   color: #d94d49;
   background: #fff0f0;
   border-color: rgba(255, 107, 107, 0.24);
 }
 
 .row-purple .today-task-copy .daily-mode,
-.row-purple .today-task-copy .stage-mode {
+.row-purple .today-task-copy .stage-mode,
+.row-purple .today-task-copy .temporary-mode {
   color: #7c58cf;
   background: #f5efff;
   border-color: rgba(155, 118, 255, 0.24);
 }
 
 .row-orange .today-task-copy .daily-mode,
-.row-orange .today-task-copy .stage-mode {
+.row-orange .today-task-copy .stage-mode,
+.row-orange .today-task-copy .temporary-mode {
   color: #c46a13;
   background: #fff5dc;
   border-color: rgba(255, 184, 62, 0.28);
@@ -2189,15 +2369,20 @@ button {
 .row-orange.task-daily .type-cell span { color: #c46a13; background: #fff5dc; border-color: rgba(255, 184, 62, 0.26); }
 
 .row-blue.task-stage .type-cell span,
-.row-blue.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #62a9f4, #347fd1); border-color: transparent; }
+.row-blue.task-reading .type-cell span,
+.row-blue.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #62a9f4, #347fd1); border-color: transparent; }
 .row-green.task-stage .type-cell span,
-.row-green.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #63c978, #38a85a); border-color: transparent; }
+.row-green.task-reading .type-cell span,
+.row-green.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #63c978, #38a85a); border-color: transparent; }
 .row-red.task-stage .type-cell span,
-.row-red.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #ff8582, #f05a57); border-color: transparent; }
+.row-red.task-reading .type-cell span,
+.row-red.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #ff8582, #f05a57); border-color: transparent; }
 .row-purple.task-stage .type-cell span,
-.row-purple.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #b18cff, #825ee0); border-color: transparent; }
+.row-purple.task-reading .type-cell span,
+.row-purple.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #b18cff, #825ee0); border-color: transparent; }
 .row-orange.task-stage .type-cell span,
-.row-orange.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #ffc65a, #f29325); border-color: transparent; }
+.row-orange.task-reading .type-cell span,
+.row-orange.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #ffc65a, #f29325); border-color: transparent; }
 
 .plan-cell {
   padding: 5px 9px;
@@ -2247,6 +2432,11 @@ button {
   background-color: rgba(255, 255, 255, 0.72);
 }
 
+.task-temporary .plan-cell,
+.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
+  background-color: rgba(255, 255, 255, 0.72);
+}
+
 .row-blue.task-daily .plan-cell,
 .row-blue.task-daily .mark-cell:not(.inactive-cell):not(.past-cell) {
   background-color: rgba(242, 249, 255, 0.88);
@@ -2274,36 +2464,46 @@ button {
 
 .row-blue.task-stage .plan-cell,
 .row-blue.task-reading .plan-cell,
+.row-blue.task-temporary .plan-cell,
 .row-blue.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
-.row-blue.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
+.row-blue.task-reading .mark-cell:not(.inactive-cell):not(.past-cell),
+.row-blue.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
   background-color: rgba(224, 241, 255, 0.95);
 }
 
 .row-green.task-stage .plan-cell,
 .row-green.task-reading .plan-cell,
+.row-green.task-temporary .plan-cell,
 .row-green.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
-.row-green.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
+.row-green.task-reading .mark-cell:not(.inactive-cell):not(.past-cell),
+.row-green.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
   background-color: rgba(226, 246, 219, 0.95);
 }
 
 .row-red.task-stage .plan-cell,
 .row-red.task-reading .plan-cell,
+.row-red.task-temporary .plan-cell,
 .row-red.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
-.row-red.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
+.row-red.task-reading .mark-cell:not(.inactive-cell):not(.past-cell),
+.row-red.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
   background-color: rgba(255, 231, 231, 0.95);
 }
 
 .row-purple.task-stage .plan-cell,
 .row-purple.task-reading .plan-cell,
+.row-purple.task-temporary .plan-cell,
 .row-purple.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
-.row-purple.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
+.row-purple.task-reading .mark-cell:not(.inactive-cell):not(.past-cell),
+.row-purple.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
   background-color: rgba(240, 232, 255, 0.95);
 }
 
 .row-orange.task-stage .plan-cell,
 .row-orange.task-reading .plan-cell,
+.row-orange.task-temporary .plan-cell,
 .row-orange.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
-.row-orange.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
+.row-orange.task-reading .mark-cell:not(.inactive-cell):not(.past-cell),
+.row-orange.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
   background-color: rgba(255, 238, 198, 0.96);
 }
 
@@ -8308,6 +8508,41 @@ button {
 
   .today-collapsed-task button {
     width: 100%;
+  }
+
+  .temporary-task-panel {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .temporary-task-panel-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .temporary-task-panel-head span {
+    width: 100%;
+  }
+
+  .temporary-task-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .temporary-task-actions,
+  .temporary-task-save-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .temporary-status-options {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .temporary-task-save-actions button,
+  .temporary-task-add-button {
+    width: 100%;
+    justify-content: center;
   }
 
   .today-status-button {

@@ -3576,9 +3576,11 @@ button {
 }
 
 .reward-redeemed-count {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  margin-bottom: 8px;
   border-radius: 999px;
   padding: 4px 8px;
   color: #2f8f4d;
@@ -3588,6 +3590,10 @@ button {
   font-style: normal;
   font-weight: 950;
   box-shadow: 0 8px 16px rgba(47, 143, 77, 0.08);
+}
+
+.reward-redeemed-count + button {
+  margin-top: 0;
 }
 
 .reward-type-badge {

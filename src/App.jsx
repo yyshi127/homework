@@ -4162,7 +4162,6 @@ function App() {
                             <Trash2 size={15} />
                           </button>
                         </div>
-                        {redeemedCount > 0 && <em className="reward-redeemed-count">已兑换 {redeemedCount} 次</em>}
                         <div className="reward-product-icon">
                           <RewardIcon size={38} strokeWidth={2.4} />
                         </div>
@@ -4170,6 +4169,7 @@ function App() {
                         <h3>{item.name || '未命名奖励'}</h3>
                         <strong>{item.points || '____'} 分</strong>
                         <p>{item.description || (canRedeem ? '可以兑换啦' : `还差 ${missingPoints} 分`)}</p>
+                        {redeemedCount > 0 && <em className="reward-redeemed-count">已兑奖 {redeemedCount} 次</em>}
                         <button className={canRedeem ? 'ready' : redeemedCount ? 'redeemed' : ''} disabled={!canRedeem} onClick={() => redeemReward(item, index)}>
                           {canRedeem ? '立即兑换' : '继续攒分'}
                         </button>

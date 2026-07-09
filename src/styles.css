@@ -1954,31 +1954,6 @@ button {
   box-shadow: 0 14px 24px rgba(54, 169, 85, 0.2);
 }
 
-.row-blue .today-status-button.status-done {
-  background: linear-gradient(180deg, #62a9f4, #347fd1);
-  box-shadow: 0 10px 18px rgba(52, 127, 209, 0.16);
-}
-
-.row-green .today-status-button.status-done {
-  background: linear-gradient(180deg, #63c978, #38a85a);
-  box-shadow: 0 10px 18px rgba(56, 168, 90, 0.16);
-}
-
-.row-red .today-status-button.status-done {
-  background: linear-gradient(180deg, #ff8582, #f05a57);
-  box-shadow: 0 10px 18px rgba(240, 90, 87, 0.16);
-}
-
-.row-purple .today-status-button.status-done {
-  background: linear-gradient(180deg, #b18cff, #825ee0);
-  box-shadow: 0 10px 18px rgba(130, 94, 224, 0.16);
-}
-
-.row-orange .today-status-button.status-done {
-  background: linear-gradient(180deg, #ffc65a, #f29325);
-  box-shadow: 0 10px 18px rgba(242, 147, 37, 0.16);
-}
-
 .today-status-button.status-done strong,
 .today-status-button.status-excellent strong,
 .today-status-button.status-super strong {
@@ -1999,70 +1974,10 @@ button {
   box-shadow: inset 0 0 0 1px #ffe6a0;
 }
 
-.row-blue .today-status-button.status-excellent {
-  color: #2874bd;
-  background: #eaf5ff;
-  box-shadow: inset 0 0 0 1px rgba(74, 144, 226, 0.22), 0 6px 14px rgba(74, 144, 226, 0.08);
-}
-
-.row-green .today-status-button.status-excellent {
-  color: #2e964f;
-  background: #eef9ea;
-  box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.22), 0 6px 14px rgba(76, 175, 80, 0.08);
-}
-
-.row-red .today-status-button.status-excellent {
-  color: #d94d49;
-  background: #fff0f0;
-  box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.22), 0 6px 14px rgba(255, 107, 107, 0.08);
-}
-
-.row-purple .today-status-button.status-excellent {
-  color: #7c58cf;
-  background: #f5efff;
-  box-shadow: inset 0 0 0 1px rgba(155, 118, 255, 0.22), 0 6px 14px rgba(155, 118, 255, 0.08);
-}
-
-.row-orange .today-status-button.status-excellent {
-  color: #c46a13;
-  background: #fff5dc;
-  box-shadow: inset 0 0 0 1px rgba(255, 184, 62, 0.26), 0 6px 14px rgba(255, 184, 62, 0.1);
-}
-
 .today-status-button.status-super {
   color: #173f46;
   background: #fff2f2;
   box-shadow: inset 0 0 0 1px #ffd7d7;
-}
-
-.row-blue .today-status-button.status-super {
-  color: #185a9e;
-  background: linear-gradient(180deg, #f4faff, #dff0ff);
-  box-shadow: inset 0 0 0 1px rgba(74, 144, 226, 0.24), 0 6px 14px rgba(74, 144, 226, 0.1);
-}
-
-.row-green .today-status-button.status-super {
-  color: #237e43;
-  background: linear-gradient(180deg, #f6fff2, #e1f7dc);
-  box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.24), 0 6px 14px rgba(76, 175, 80, 0.1);
-}
-
-.row-red .today-status-button.status-super {
-  color: #c6403d;
-  background: linear-gradient(180deg, #fff8f8, #ffe5e5);
-  box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.24), 0 6px 14px rgba(255, 107, 107, 0.1);
-}
-
-.row-purple .today-status-button.status-super {
-  color: #6847bd;
-  background: linear-gradient(180deg, #fbf8ff, #ece2ff);
-  box-shadow: inset 0 0 0 1px rgba(155, 118, 255, 0.24), 0 6px 14px rgba(155, 118, 255, 0.1);
-}
-
-.row-orange .today-status-button.status-super {
-  color: #ad5d10;
-  background: linear-gradient(180deg, #fffaf0, #ffedc2);
-  box-shadow: inset 0 0 0 1px rgba(255, 184, 62, 0.28), 0 6px 14px rgba(255, 184, 62, 0.12);
 }
 
 .today-status-button .rose-icon {

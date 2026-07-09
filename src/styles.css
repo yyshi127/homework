@@ -1851,73 +1851,100 @@ button {
 .today-check-panel {
   display: grid;
   place-items: center;
-  gap: 8px;
+  align-content: center;
+  gap: 7px;
 }
 
 .today-status-button {
   position: relative;
-  width: 132px;
-  min-height: 96px;
-  border: 1px solid #e0e9e5;
-  border-radius: 22px;
+  width: 136px;
+  min-height: 42px;
+  border: 1px solid rgba(224, 233, 229, 0.95);
+  border-radius: 999px;
   color: #52646a;
-  background:
-    radial-gradient(circle at 26% 18%, rgba(255, 255, 255, 0.9), transparent 34%),
-    linear-gradient(180deg, #ffffff, #f5f9f7);
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 6px;
-  font-size: 15px;
+  background: rgba(255, 255, 255, 0.78);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  font-size: 14px;
   font-weight: 950;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 8px 18px rgba(54, 67, 72, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 6px 14px rgba(54, 67, 72, 0.055);
   overflow: hidden;
 }
 
 .today-status-button strong {
   position: relative;
   z-index: 1;
-  border-radius: 999px;
-  padding: 4px 10px;
-  background: rgba(238, 243, 241, 0.86);
+  padding: 0;
+  background: transparent;
 }
 
 .today-status-button.status-empty {
   color: #35525b;
-  border-color: rgba(151, 181, 183, 0.5);
-  background:
-    radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.95), transparent 34%),
-    radial-gradient(circle at 86% 86%, rgba(136, 211, 193, 0.2), transparent 38%),
-    linear-gradient(180deg, #fbfffd, #eff7f4);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.88),
-    inset 0 0 0 5px rgba(255, 255, 255, 0.45),
-    0 10px 22px rgba(62, 101, 105, 0.09);
+  border-color: rgba(151, 181, 183, 0.42);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86), 0 6px 14px rgba(62, 101, 105, 0.055);
 }
 
 .today-status-button.status-empty::before {
   content: "";
-  width: 28px;
-  height: 6px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #8bd9c2, #6aa7f2);
-  box-shadow: 0 6px 14px rgba(106, 167, 242, 0.18);
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #9fb4b7;
+  box-shadow: 0 0 0 4px rgba(159, 180, 183, 0.14);
 }
 
 .today-status-button.status-empty::after {
-  content: "";
-  position: absolute;
-  inset: 9px;
-  border: 1px solid rgba(126, 165, 169, 0.22);
-  border-radius: 16px;
-  pointer-events: none;
+  content: none;
 }
 
 .today-status-button.status-empty strong {
   color: #2f4d56;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(126, 165, 169, 0.18);
 }
+
+.row-blue .today-status-button.status-empty {
+  color: #2874bd;
+  border-color: rgba(74, 144, 226, 0.24);
+  background: #eef7ff;
+}
+
+.row-blue .today-status-button.status-empty::before { background: #4a90e2; box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.14); }
+
+.row-green .today-status-button.status-empty {
+  color: #2e964f;
+  border-color: rgba(76, 175, 80, 0.24);
+  background: #f0faec;
+}
+
+.row-green .today-status-button.status-empty::before { background: #4caf50; box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.14); }
+
+.row-red .today-status-button.status-empty {
+  color: #d94d49;
+  border-color: rgba(255, 107, 107, 0.24);
+  background: #fff2f2;
+}
+
+.row-red .today-status-button.status-empty::before { background: #ff6b6b; box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.14); }
+
+.row-purple .today-status-button.status-empty {
+  color: #7c58cf;
+  border-color: rgba(155, 118, 255, 0.24);
+  background: #f6f0ff;
+}
+
+.row-purple .today-status-button.status-empty::before { background: #9b76ff; box-shadow: 0 0 0 4px rgba(155, 118, 255, 0.14); }
+
+.row-orange .today-status-button.status-empty {
+  color: #c46a13;
+  border-color: rgba(255, 184, 62, 0.3);
+  background: #fff6df;
+}
+
+.row-orange .today-status-button.status-empty::before { background: #ffb83e; box-shadow: 0 0 0 4px rgba(255, 184, 62, 0.16); }
 
 .today-status-button.status-done {
   color: white;
@@ -1925,6 +1952,31 @@ button {
     radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.3), transparent 34%),
     linear-gradient(180deg, #55bd70, #36a955);
   box-shadow: 0 14px 24px rgba(54, 169, 85, 0.2);
+}
+
+.row-blue .today-status-button.status-done {
+  background: linear-gradient(180deg, #62a9f4, #347fd1);
+  box-shadow: 0 10px 18px rgba(52, 127, 209, 0.16);
+}
+
+.row-green .today-status-button.status-done {
+  background: linear-gradient(180deg, #63c978, #38a85a);
+  box-shadow: 0 10px 18px rgba(56, 168, 90, 0.16);
+}
+
+.row-red .today-status-button.status-done {
+  background: linear-gradient(180deg, #ff8582, #f05a57);
+  box-shadow: 0 10px 18px rgba(240, 90, 87, 0.16);
+}
+
+.row-purple .today-status-button.status-done {
+  background: linear-gradient(180deg, #b18cff, #825ee0);
+  box-shadow: 0 10px 18px rgba(130, 94, 224, 0.16);
+}
+
+.row-orange .today-status-button.status-done {
+  background: linear-gradient(180deg, #ffc65a, #f29325);
+  box-shadow: 0 10px 18px rgba(242, 147, 37, 0.16);
 }
 
 .today-status-button.status-done strong,
@@ -1947,19 +1999,80 @@ button {
   box-shadow: inset 0 0 0 1px #ffe6a0;
 }
 
+.row-blue .today-status-button.status-excellent {
+  color: #2874bd;
+  background: #eaf5ff;
+  box-shadow: inset 0 0 0 1px rgba(74, 144, 226, 0.22), 0 6px 14px rgba(74, 144, 226, 0.08);
+}
+
+.row-green .today-status-button.status-excellent {
+  color: #2e964f;
+  background: #eef9ea;
+  box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.22), 0 6px 14px rgba(76, 175, 80, 0.08);
+}
+
+.row-red .today-status-button.status-excellent {
+  color: #d94d49;
+  background: #fff0f0;
+  box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.22), 0 6px 14px rgba(255, 107, 107, 0.08);
+}
+
+.row-purple .today-status-button.status-excellent {
+  color: #7c58cf;
+  background: #f5efff;
+  box-shadow: inset 0 0 0 1px rgba(155, 118, 255, 0.22), 0 6px 14px rgba(155, 118, 255, 0.08);
+}
+
+.row-orange .today-status-button.status-excellent {
+  color: #c46a13;
+  background: #fff5dc;
+  box-shadow: inset 0 0 0 1px rgba(255, 184, 62, 0.26), 0 6px 14px rgba(255, 184, 62, 0.1);
+}
+
 .today-status-button.status-super {
   color: #173f46;
   background: #fff2f2;
   box-shadow: inset 0 0 0 1px #ffd7d7;
 }
 
+.row-blue .today-status-button.status-super {
+  color: #185a9e;
+  background: linear-gradient(180deg, #f4faff, #dff0ff);
+  box-shadow: inset 0 0 0 1px rgba(74, 144, 226, 0.24), 0 6px 14px rgba(74, 144, 226, 0.1);
+}
+
+.row-green .today-status-button.status-super {
+  color: #237e43;
+  background: linear-gradient(180deg, #f6fff2, #e1f7dc);
+  box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.24), 0 6px 14px rgba(76, 175, 80, 0.1);
+}
+
+.row-red .today-status-button.status-super {
+  color: #c6403d;
+  background: linear-gradient(180deg, #fff8f8, #ffe5e5);
+  box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.24), 0 6px 14px rgba(255, 107, 107, 0.1);
+}
+
+.row-purple .today-status-button.status-super {
+  color: #6847bd;
+  background: linear-gradient(180deg, #fbf8ff, #ece2ff);
+  box-shadow: inset 0 0 0 1px rgba(155, 118, 255, 0.24), 0 6px 14px rgba(155, 118, 255, 0.1);
+}
+
+.row-orange .today-status-button.status-super {
+  color: #ad5d10;
+  background: linear-gradient(180deg, #fffaf0, #ffedc2);
+  box-shadow: inset 0 0 0 1px rgba(255, 184, 62, 0.28), 0 6px 14px rgba(255, 184, 62, 0.12);
+}
+
 .today-status-button .rose-icon {
-  font-size: 34px;
+  font-size: 21px;
+  line-height: 1;
 }
 
 .today-skip-button {
-  min-width: 132px;
-  height: 34px;
+  min-width: 136px;
+  height: 30px;
   border: 1px solid #e2e9e6;
   border-radius: 999px;
   color: #687579;

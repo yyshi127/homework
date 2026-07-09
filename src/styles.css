@@ -958,7 +958,15 @@ button {
   font-weight: 700;
 }
 
-.check-table thead th.weekend,
+.check-table thead th.weekend {
+  color: #a95513;
+  background: linear-gradient(180deg, #ffe5b4, #ffc86f);
+}
+
+.check-table thead th.weekend small {
+  color: #b76718;
+}
+
 .check-table td:nth-child(7n + 5),
 .check-table td:nth-child(7n + 6) {
   background-color: rgba(255, 245, 232, 0.65);
@@ -2141,6 +2149,23 @@ button {
   border: 1px solid #e4ebe9;
 }
 
+.row-blue.task-daily .type-cell span { color: #2874bd; background: #eaf5ff; border-color: rgba(74, 144, 226, 0.22); }
+.row-green.task-daily .type-cell span { color: #2e964f; background: #eef9ea; border-color: rgba(76, 175, 80, 0.22); }
+.row-red.task-daily .type-cell span { color: #d94d49; background: #fff0f0; border-color: rgba(255, 107, 107, 0.22); }
+.row-purple.task-daily .type-cell span { color: #7c58cf; background: #f5efff; border-color: rgba(155, 118, 255, 0.22); }
+.row-orange.task-daily .type-cell span { color: #c46a13; background: #fff5dc; border-color: rgba(255, 184, 62, 0.26); }
+
+.row-blue.task-stage .type-cell span,
+.row-blue.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #62a9f4, #347fd1); border-color: transparent; }
+.row-green.task-stage .type-cell span,
+.row-green.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #63c978, #38a85a); border-color: transparent; }
+.row-red.task-stage .type-cell span,
+.row-red.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #ff8582, #f05a57); border-color: transparent; }
+.row-purple.task-stage .type-cell span,
+.row-purple.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #b18cff, #825ee0); border-color: transparent; }
+.row-orange.task-stage .type-cell span,
+.row-orange.task-reading .type-cell span { color: #fff; background: linear-gradient(180deg, #ffc65a, #f29325); border-color: transparent; }
+
 .plan-cell {
   padding: 5px 9px;
   background: #fff;
@@ -2218,35 +2243,35 @@ button {
 .row-blue.task-reading .plan-cell,
 .row-blue.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-blue.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background-color: rgba(242, 249, 255, 0.92);
+  background-color: rgba(224, 241, 255, 0.95);
 }
 
 .row-green.task-stage .plan-cell,
 .row-green.task-reading .plan-cell,
 .row-green.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-green.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background-color: rgba(242, 251, 239, 0.92);
+  background-color: rgba(226, 246, 219, 0.95);
 }
 
 .row-red.task-stage .plan-cell,
 .row-red.task-reading .plan-cell,
 .row-red.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-red.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background-color: rgba(255, 245, 245, 0.92);
+  background-color: rgba(255, 231, 231, 0.95);
 }
 
 .row-purple.task-stage .plan-cell,
 .row-purple.task-reading .plan-cell,
 .row-purple.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-purple.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background-color: rgba(250, 246, 255, 0.92);
+  background-color: rgba(240, 232, 255, 0.95);
 }
 
 .row-orange.task-stage .plan-cell,
 .row-orange.task-reading .plan-cell,
 .row-orange.task-stage .mark-cell:not(.inactive-cell):not(.past-cell),
 .row-orange.task-reading .mark-cell:not(.inactive-cell):not(.past-cell) {
-  background-color: rgba(255, 248, 232, 0.94);
+  background-color: rgba(255, 238, 198, 0.96);
 }
 
 .mark-cell {

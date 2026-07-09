@@ -1459,12 +1459,52 @@ button {
 }
 
 .today-task-card.today-stage-task {
-  border-color: rgba(120, 151, 166, 0.42);
+  border-color: rgba(226, 235, 231, 0.9);
   background:
-    repeating-linear-gradient(135deg, rgba(101, 135, 148, 0.055) 0 8px, transparent 8px 18px),
-    radial-gradient(circle at 94% 12%, rgba(150, 196, 202, 0.17), transparent 12rem),
-    linear-gradient(180deg, #f8fcfb, #fffefa);
+    repeating-linear-gradient(135deg, rgba(101, 135, 148, 0.035) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 94% 12%, rgba(255, 255, 255, 0.82), transparent 12rem),
+    linear-gradient(180deg, #ffffff, #fbfdfb);
   box-shadow: 0 12px 26px rgba(62, 101, 114, 0.08);
+}
+
+.row-blue.today-task-card.today-stage-task {
+  border-color: #cfe7fb;
+  background:
+    repeating-linear-gradient(135deg, rgba(74, 144, 226, 0.055) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 94% 12%, rgba(74, 144, 226, 0.14), transparent 12rem),
+    linear-gradient(180deg, #f2f9ff, #ffffff);
+}
+
+.row-green.today-task-card.today-stage-task {
+  border-color: #d5efcf;
+  background:
+    repeating-linear-gradient(135deg, rgba(76, 175, 80, 0.055) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 94% 12%, rgba(76, 175, 80, 0.13), transparent 12rem),
+    linear-gradient(180deg, #f2fbef, #ffffff);
+}
+
+.row-red.today-task-card.today-stage-task {
+  border-color: #ffd8d6;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 107, 107, 0.055) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 94% 12%, rgba(255, 107, 107, 0.14), transparent 12rem),
+    linear-gradient(180deg, #fff5f5, #ffffff);
+}
+
+.row-purple.today-task-card.today-stage-task {
+  border-color: #e4d7ff;
+  background:
+    repeating-linear-gradient(135deg, rgba(155, 118, 255, 0.055) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 94% 12%, rgba(155, 118, 255, 0.14), transparent 12rem),
+    linear-gradient(180deg, #faf6ff, #ffffff);
+}
+
+.row-orange.today-task-card.today-stage-task {
+  border-color: #ffe3a3;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 184, 62, 0.07) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 94% 12%, rgba(255, 184, 62, 0.17), transparent 12rem),
+    linear-gradient(180deg, #fff8e8, #ffffff);
 }
 
 .today-task-card.today-stage-task::after {
@@ -1475,6 +1515,12 @@ button {
   border-radius: 16px;
   pointer-events: none;
 }
+
+.row-blue.today-task-card.today-stage-task::after { border-color: rgba(74, 144, 226, 0.32); }
+.row-green.today-task-card.today-stage-task::after { border-color: rgba(76, 175, 80, 0.3); }
+.row-red.today-task-card.today-stage-task::after { border-color: rgba(255, 107, 107, 0.3); }
+.row-purple.today-task-card.today-stage-task::after { border-color: rgba(155, 118, 255, 0.3); }
+.row-orange.today-task-card.today-stage-task::after { border-color: rgba(255, 184, 62, 0.34); }
 
 .today-task-main {
   min-width: 0;
@@ -1566,6 +1612,31 @@ button {
   background: linear-gradient(180deg, #5ba9bd, #357f95);
 }
 
+.row-blue .today-task-copy .daily-type,
+.row-blue .today-task-copy .stage-type {
+  background: linear-gradient(180deg, #62a9f4, #347fd1);
+}
+
+.row-green .today-task-copy .daily-type,
+.row-green .today-task-copy .stage-type {
+  background: linear-gradient(180deg, #63c978, #38a85a);
+}
+
+.row-red .today-task-copy .daily-type,
+.row-red .today-task-copy .stage-type {
+  background: linear-gradient(180deg, #ff8582, #f05a57);
+}
+
+.row-purple .today-task-copy .daily-type,
+.row-purple .today-task-copy .stage-type {
+  background: linear-gradient(180deg, #b18cff, #825ee0);
+}
+
+.row-orange .today-task-copy .daily-type,
+.row-orange .today-task-copy .stage-type {
+  background: linear-gradient(180deg, #ffc65a, #f29325);
+}
+
 .today-task-copy .daily-mode {
   color: #24954d;
   background: #edf9ee;
@@ -1576,6 +1647,41 @@ button {
   color: #2f7387;
   background: #edf8fb;
   border: 1px solid rgba(91, 169, 189, 0.28);
+}
+
+.row-blue .today-task-copy .daily-mode,
+.row-blue .today-task-copy .stage-mode {
+  color: #2874bd;
+  background: #eaf5ff;
+  border-color: rgba(74, 144, 226, 0.24);
+}
+
+.row-green .today-task-copy .daily-mode,
+.row-green .today-task-copy .stage-mode {
+  color: #2e964f;
+  background: #eef9ea;
+  border-color: rgba(76, 175, 80, 0.24);
+}
+
+.row-red .today-task-copy .daily-mode,
+.row-red .today-task-copy .stage-mode {
+  color: #d94d49;
+  background: #fff0f0;
+  border-color: rgba(255, 107, 107, 0.24);
+}
+
+.row-purple .today-task-copy .daily-mode,
+.row-purple .today-task-copy .stage-mode {
+  color: #7c58cf;
+  background: #f5efff;
+  border-color: rgba(155, 118, 255, 0.24);
+}
+
+.row-orange .today-task-copy .daily-mode,
+.row-orange .today-task-copy .stage-mode {
+  color: #c46a13;
+  background: #fff5dc;
+  border-color: rgba(255, 184, 62, 0.28);
 }
 
 .today-task-copy .task-date-range {

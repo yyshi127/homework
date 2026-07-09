@@ -1,0 +1,47 @@
+node_modules/
+dist/
+
+# Local database and runtime data
+data/
+data-test*/
+*.sqlite
+*.sqlite-*
+
+# Local build/deploy archives
+*.tar.gz
+*.zip
+pnpm-lock.yaml
+
+# Planning/export helper files kept outside the app source
+/*.md
+!/README.md
+/*.py
+
+# Local screenshots, generated drafts, and working files
+.chrome-shot/
+imagegen*/
+*每周打卡图片*/
+*.xlsx
+*.docx
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+!src/assets/
+!src/assets/*.png
+!src/assets/*.jpg
+!src/assets/*.jpeg
+!src/assets/*.webp
+!src/assets/*.gif
+~$*
+
+# Environment and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

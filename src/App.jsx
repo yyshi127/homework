@@ -1000,6 +1000,8 @@ function App() {
   const [readingScope, setReadingScope] = useState('month');
   const [readingTab, setReadingTab] = useState('reading');
   const [readingViewMode, setReadingViewMode] = useState('card');
+  const [libraryTypeFilter, setLibraryTypeFilter] = useState('所有');
+  const [libraryViewMode, setLibraryViewMode] = useState('card');
   const [newBookDialog, setNewBookDialog] = useState(null);
   const [bookPagesDialog, setBookPagesDialog] = useState(null);
   const [newRewardDialog, setNewRewardDialog] = useState(null);
@@ -1603,6 +1605,25 @@ function App() {
     setNewBookDialog({ name: '', type: '其它', totalPages: '', rewardPoints: '10' });
   };
 
+  const openEditLibraryBookDialog = (book) => {
+    setNewBookDialog({
+      id: book.id,
+      name: book.name || '',
+      type: book.type || '其它',
+      totalPages: book.totalPages === '' || book.totalPages === undefined ? '' : String(book.totalPages),
+      rewardPoints: String(book.rewardPoints || 10),
+    });
+  };
+
+  const deleteLibraryBook = (book) => {
+    if (!window.confirm(`确定从“我的图书馆”移出“${book.name || '未命名书目'}”吗？已安排月份和阅读历史会保留。`)) return;
+    setState((current) => {
+      const next = structuredClone(current || {});
+      next.libraryBooks = normalizeLibraryBooks(next.libraryBooks || []).filter((item) => item.id !== book.id);
+      return next;
+    });
+  };
+
   const openBookPagesDialog = (book) => {
     setBookPagesDialog({
       bookId: book.id,
@@ -1635,12 +1656,34 @@ function App() {
       window.alert('请先填写书名');
       return;
     }
-    addLibraryBook({
+    const bookPatch = {
       name,
       type: newBookDialog.type || '其它',
       totalPages: newBookDialog.totalPages === '' ? '' : Math.max(0, Number(newBookDialog.totalPages || 0)),
       rewardPoints: Math.max(0, Number(newBookDialog.rewardPoints || 10)),
-    });
+    };
+    if (newBookDialog.id) {
+      setState((current) => {
+        const next = structuredClone(current || {});
+        next.libraryBooks = normalizeLibraryBooks(next.libraryBooks || []).map((book) => (
+          book.id === newBookDialog.id ? { ...book, ...bookPatch } : book
+        ));
+        (next.months || []).forEach((targetMonth) => {
+          (targetMonth.readingBooks || []).forEach((book) => {
+            if (book.id !== newBookDialog.id) return;
+            Object.assign(book, bookPatch);
+          });
+          (targetMonth.categories || []).forEach((category) => {
+            (category.tasks || []).forEach((task) => {
+              if (task.bookId === newBookDialog.id) task.title = name;
+            });
+          });
+        });
+        return next;
+      });
+    } else {
+      addLibraryBook(bookPatch);
+    }
     setNewBookDialog(null);
   };
 
@@ -2228,6 +2271,32 @@ function App() {
     type,
     count: libraryBooks.filter((book) => (book.type || '其它') === type).length,
   })).filter((item) => item.count > 0);
+  const libraryCategoryTabs = [
+    { type: '所有', count: libraryBooks.length },
+    ...BOOK_TYPES.map((type) => ({ type, count: libraryBooks.filter((book) => (book.type || '其它') === type).length })),
+  ].filter((item) => item.type === '所有' || item.count > 0);
+  const filteredLibraryBooks = libraryBooks.filter((book) => libraryTypeFilter === '所有' || (book.type || '其它') === libraryTypeFilter);
+  const libraryHistoryMap = months.reduce((map, targetMonth) => {
+    (targetMonth.readingBooks || []).forEach((book) => {
+      const startDay = Math.max(1, Math.min(targetMonth.days, Number(book.startDay || 1)));
+      const endDay = Math.max(startDay, Math.min(targetMonth.days, Number(book.endDay || targetMonth.days)));
+      for (let day = startDay; day <= endDay; day += 1) {
+        const status = normalizeStatus(targetMonth.checks?.[book.id]?.[day] || 'empty');
+        if (status === 'empty') continue;
+        const record = {
+          key: `${targetMonth.key}-${day}`,
+          monthLabel: targetMonth.label,
+          day,
+          note: formatCellNote(targetMonth.notes?.[book.id]?.[day]),
+          scoreLabel: STATUS[status]?.label || '已读',
+        };
+        map[book.id] ||= [];
+        map[book.id].push(record);
+      }
+    });
+    return map;
+  }, {});
+  Object.values(libraryHistoryMap).forEach((records) => records.sort((a, b) => b.key.localeCompare(a.key)));
   const readingGroups = {
     reading: readingBooksWithStats.filter((item) => item.stats.statusGroup === 'reading'),
     finished: readingBooksWithStats.filter((item) => item.stats.statusGroup === 'finished'),
@@ -2280,15 +2349,64 @@ function App() {
   };
   const renderLibraryBookCard = (book) => {
     const status = libraryBookStatus(book);
+    const history = libraryHistoryMap[book.id] || [];
     return (
       <article className={`library-book-card ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
+        <div className="library-card-actions">
+          <button type="button" title="编辑书籍" aria-label="编辑书籍" onClick={() => openEditLibraryBookDialog(book)}><Pencil size={15} /></button>
+          <button type="button" title="删除书籍" aria-label="删除书籍" onClick={() => deleteLibraryBook(book)}><Trash2 size={15} /></button>
+        </div>
         <div>
           <span>{book.type || '其它'}</span>
           <strong>{book.name || '未命名书目'}</strong>
-          <p>{book.totalPages ? `共 ${book.totalPages} 页` : '总页数未设置'}</p>
+          <p>{book.totalPages ? `共 ${book.totalPages} 页` : '总页数未设置'} · 读完奖励 +{book.rewardPoints || 10}</p>
         </div>
         <em>{status}</em>
+        {history.length > 0 && (
+          <div className="library-book-history">
+            <b>阅读历史</b>
+            {history.slice(0, 3).map((record) => (
+              <span key={record.key}>{record.monthLabel} {record.day}日{record.note ? ` · ${record.note}` : ''}</span>
+            ))}
+          </div>
+        )}
         {status === '未安排' && <button type="button" onClick={jumpToReadingSettings}>去安排阅读任务</button>}
+      </article>
+    );
+  };
+  const renderLibraryBookRow = (book) => {
+    const status = libraryBookStatus(book);
+    const history = libraryHistoryMap[book.id] || [];
+    return (
+      <article className={`library-book-row ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
+        <div>
+          <span>类别</span>
+          <strong>{book.type || '其它'}</strong>
+        </div>
+        <div className="library-row-title">
+          <span>书名</span>
+          <strong>{book.name || '未命名书目'}</strong>
+        </div>
+        <div>
+          <span>页数</span>
+          <strong>{book.totalPages ? `${book.totalPages} 页` : '未设置'}</strong>
+        </div>
+        <div>
+          <span>积分</span>
+          <strong>+{book.rewardPoints || 10}</strong>
+        </div>
+        <div>
+          <span>状态</span>
+          <strong>{status}</strong>
+        </div>
+        <div className="library-row-history">
+          <span>阅读历史</span>
+          <strong>{history[0] ? `${history[0].monthLabel} ${history[0].day}日${history[0].note ? ` · ${history[0].note}` : ''}` : '暂无'}</strong>
+        </div>
+        <div className="library-row-actions">
+          <button type="button" title="编辑书籍" aria-label="编辑书籍" onClick={() => openEditLibraryBookDialog(book)}><Pencil size={15} /></button>
+          <button type="button" title="删除书籍" aria-label="删除书籍" onClick={() => deleteLibraryBook(book)}><Trash2 size={15} /></button>
+        </div>
       </article>
     );
   };
@@ -3125,20 +3243,34 @@ function App() {
                     <em>本</em>
                   </article>
                 </div>
-                {libraryTypeStats.length > 0 && (
-                  <div className="library-type-strip">
-                    {libraryTypeStats.map((item) => <span key={item.type}>{item.type} {item.count}</span>)}
+                <div className="library-controls-row">
+                  <div className="library-type-tabs" aria-label="书籍分类">
+                    {libraryCategoryTabs.map((item) => (
+                      <button className={libraryTypeFilter === item.type ? 'active' : ''} type="button" key={item.type} onClick={() => setLibraryTypeFilter(item.type)}>
+                        {item.type}<span>{item.count}</span>
+                      </button>
+                    ))}
                   </div>
-                )}
-                {libraryBooks.length ? (
-                  <div className="library-book-grid">
-                    {libraryBooks.map(renderLibraryBookCard)}
+                  <div className="reading-view-switch" aria-label="我的图书馆显示方式">
+                    <button className={libraryViewMode === 'card' ? 'active' : ''} onClick={() => setLibraryViewMode('card')} type="button">卡片显示</button>
+                    <button className={libraryViewMode === 'list' ? 'active' : ''} onClick={() => setLibraryViewMode('list')} type="button">列表显示</button>
                   </div>
+                </div>
+                {filteredLibraryBooks.length ? (
+                  libraryViewMode === 'card' ? (
+                    <div className="library-book-grid">
+                      {filteredLibraryBooks.map(renderLibraryBookCard)}
+                    </div>
+                  ) : (
+                    <div className="library-list-view">
+                      {filteredLibraryBooks.map(renderLibraryBookRow)}
+                    </div>
+                  )
                 ) : (
                   <div className="reading-empty">
                     <BookOpen size={48} />
-                    <strong>全局书单还是空的</strong>
-                    <p>以后给小朋友买了新书，就先添加到这里，再安排到具体月份阅读。</p>
+                    <strong>{libraryBooks.length ? '这个分类还没有书' : '全局书单还是空的'}</strong>
+                    <p>{libraryBooks.length ? '换一个分类看看，或者新增一本这个类别的书。' : '以后给小朋友买了新书，就先添加到这里，再安排到具体月份阅读。'}</p>
                     <button onClick={openNewBookDialog}>新建书单</button>
                   </div>
                 )}
@@ -3793,7 +3925,7 @@ function App() {
           <div className="book-dialog-panel">
             <header>
               <div>
-                <h2>新建书单</h2>
+                <h2>{newBookDialog.id ? '编辑书籍' : '新建书单'}</h2>
                 <p>这里只设置书本信息，阅读时间和打卡方式在“新建阅读任务”里设置。</p>
               </div>
             </header>
@@ -3836,7 +3968,7 @@ function App() {
             </div>
             <footer>
               <button className="ghost" onClick={() => setNewBookDialog(null)}>取消</button>
-              <button onClick={confirmNewBook}>确认新建</button>
+              <button onClick={confirmNewBook}>{newBookDialog.id ? '保存修改' : '确认新建'}</button>
             </footer>
           </div>
         </section>

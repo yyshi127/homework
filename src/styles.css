@@ -2849,24 +2849,28 @@ button {
   display: flex;
   flex-wrap: nowrap;
   gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .library-type-tabs button {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 34px;
   border: 1px solid #dce8e9;
   border-radius: 999px;
-  padding: 0 11px;
+  padding: 0 8px;
   color: #5d6d72;
   background: #fffefa;
   font-size: 13px;
   font-weight: 950;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+}
+
+.library-type-select {
+  display: none;
 }
 
 .library-type-tabs button.active {
@@ -7335,14 +7339,30 @@ button {
   }
 
   .library-type-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
+    display: none;
   }
 
-  .library-type-tabs button {
-    flex: 0 0 auto;
+  .library-type-select {
+    display: grid;
+    gap: 7px;
+  }
+
+  .library-type-select span {
+    color: #4d5a5e;
+    font-size: 13px;
+    font-weight: 950;
+  }
+
+  .library-type-select select {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #dce8e9;
+    border-radius: 14px;
+    padding: 0 12px;
+    color: #26383e;
+    background: #fffefa;
+    font-size: 14px;
+    font-weight: 900;
   }
 
   .library-card-actions {

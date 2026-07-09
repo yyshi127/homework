@@ -182,7 +182,7 @@ const DEFAULT_SUBJECTS = [
 ];
 
 const DEFAULT_BOOKS = ['《尼尔斯骑鹅历险记》', '《一本看遍动物世界》', '《飞天奇翼龙》', '《抹香鲸的微笑（注音版）》'];
-const BOOK_TYPES = ['语文阅读', '数学思维', '英语读物', '科学探索', '百科知识', '历史文化', '地理世界', '童话寓言', '儿童文学', '小说故事', '漫画绘本', '传统文化', '成长品格', '艺术美育', '生活常识', '其它'];
+const BOOK_TYPES = ['语文', '数学', '英语', '科学', '百科', '历史', '地理', '童话', '文学', '小说', '漫画', '文化', '品格', '艺术', '生活', '其它'];
 
 const DEFAULT_REWARDS = [
   { id: 'reward-notebook', points: '200', name: '精美笔记本' },
@@ -3251,6 +3251,12 @@ function App() {
                       </button>
                     ))}
                   </div>
+                  <label className="library-type-select">
+                    <span>分类</span>
+                    <select value={libraryTypeFilter} onChange={(event) => setLibraryTypeFilter(event.target.value)}>
+                      {libraryCategoryTabs.map((item) => <option key={item.type} value={item.type}>{item.type}（{item.count}）</option>)}
+                    </select>
+                  </label>
                   <div className="reading-view-switch" aria-label="我的图书馆显示方式">
                     <button className={libraryViewMode === 'card' ? 'active' : ''} onClick={() => setLibraryViewMode('card')} type="button">卡片显示</button>
                     <button className={libraryViewMode === 'list' ? 'active' : ''} onClick={() => setLibraryViewMode('list')} type="button">列表显示</button>

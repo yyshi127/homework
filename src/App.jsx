@@ -2967,7 +2967,21 @@ function App() {
                 <h2>对世界保持好奇，让书成为打开美好世界的伙伴</h2>
                 <span>{month.label} · 当前月份清单中的阅读计划</span>
               </div>
-              <button onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
+              <div className="reading-hero-actions">
+                <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
+                  <button onClick={() => changeMonth(-1)} aria-label="上个月">
+                    <ChevronLeft size={21} />
+                  </button>
+                  <div>
+                    <CalendarDays size={20} />
+                    <strong>{month.label}</strong>
+                  </div>
+                  <button onClick={() => changeMonth(1)} aria-label="下个月">
+                    <ChevronRight size={21} />
+                  </button>
+                </div>
+                <button className="new-book-button" onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
+              </div>
             </div>
 
             <div className="reading-summary">

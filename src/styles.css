@@ -2701,7 +2701,19 @@ button {
   font-weight: 850;
 }
 
-.reading-page-hero button {
+.reading-hero-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.reading-month-switch {
+  flex: 0 0 auto;
+}
+
+.reading-page-hero .new-book-button {
   flex: 0 0 auto;
   height: 50px;
   border: 0;
@@ -6836,7 +6848,22 @@ button {
     font-size: 25px;
   }
 
-  .reading-page-hero button {
+  .reading-hero-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reading-month-switch {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .reading-month-switch > div {
+    flex: 1 1 auto;
+  }
+
+  .reading-page-hero .new-book-button {
     width: 100%;
     justify-content: center;
   }

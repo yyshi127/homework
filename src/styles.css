@@ -1185,25 +1185,25 @@ button {
 
 .today-day-switch {
   height: 48px;
-  border: 1px solid rgba(73, 143, 228, 0.26);
-  border-radius: 17px;
+  border: 0;
+  border-radius: 0;
   padding: 0;
-  background: rgba(255, 255, 255, 0.9);
+  background: transparent;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 14px 28px rgba(54, 109, 190, 0.15);
-  overflow: hidden;
+  gap: 8px;
+  box-shadow: none;
 }
 
 .today-day-switch button {
-  width: 46px;
+  width: 48px;
   height: 48px;
-  border-radius: 0;
+  border: 1px solid rgba(73, 143, 228, 0.22);
+  border-radius: 15px;
   padding: 0;
   color: #2f7dd7;
   background: linear-gradient(180deg, #f7fbff, #eaf4ff);
-  box-shadow: none;
+  box-shadow: 0 10px 20px rgba(54, 109, 190, 0.12);
 }
 
 .today-day-switch button:disabled {
@@ -1215,6 +1215,7 @@ button {
 .today-day-switch strong {
   min-width: 78px;
   height: 48px;
+  border-radius: 15px;
   color: #fff;
   background:
     radial-gradient(circle at 72% 28%, rgba(255, 255, 255, 0.35), transparent 32%),
@@ -1226,7 +1227,7 @@ button {
   font-weight: 950;
   text-align: center;
   text-shadow: 0 3px 8px rgba(36, 70, 134, 0.22);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 14px 28px rgba(54, 109, 190, 0.18);
 }
 
 .today-summary {

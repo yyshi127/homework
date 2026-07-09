@@ -2178,6 +2178,8 @@ function App() {
     });
     const showReadingPlan = book.checkMode !== 'stage' && readingPlanRows.length > 0;
     const isReadingPlanOpen = Boolean(expandedReadingPlans[book.id]);
+    const showReadingCheckinAction = !stats.isComplete && stats.statusGroup !== 'upcoming';
+    const showReadingSettingsAction = !stats.isComplete && stats.statusGroup === 'upcoming';
 
     return (
     <article className={`reading-book-card ${stats.isComplete ? 'finished' : ''}`} key={book.id}>
@@ -2264,10 +2266,12 @@ function App() {
         )}
       </div>
 
-      <div className="reading-book-actions">
-        <button onClick={() => setActiveView('today')}>去打卡</button>
-        <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>
-      </div>
+      {(showReadingCheckinAction || showReadingSettingsAction) && (
+        <div className="reading-book-actions">
+          {showReadingCheckinAction && <button onClick={() => setActiveView('today')}>去打卡</button>}
+          {showReadingSettingsAction && <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>}
+        </div>
+      )}
     </article>
     );
   };
@@ -2304,6 +2308,8 @@ function App() {
       <div className="reading-list-actions">
         {stats.isComplete && !stats.isClaimed ? (
           <button className="mini-claim" onClick={() => claimReadingReward(book, stats)}>兑换积分</button>
+        ) : stats.isComplete ? null : stats.statusGroup === 'upcoming' ? (
+          <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>
         ) : (
           <button onClick={() => setActiveView('today')}>去打卡</button>
         )}

@@ -45,6 +45,12 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import mascotImage from './assets/yanyixin-mascot.png';
+import growthSeedImage from './assets/growth-tree/seed.png';
+import growthSproutImage from './assets/growth-tree/sprout.png';
+import growthSeedlingImage from './assets/growth-tree/seedling.png';
+import growthYoungTreeImage from './assets/growth-tree/young-tree.png';
+import growthBloomingTreeImage from './assets/growth-tree/blooming-tree.png';
+import growthMatureTreeImage from './assets/growth-tree/mature-tree.png';
 
 const LEGACY_MONTHS = [
   { key: '2026-07', label: '2026年7月', short: '7月', days: 31 },
@@ -61,6 +67,14 @@ const API_AI_CONFIG_URL = '/api/ai-config';
 const STATUS_ORDER = ['empty', 'done', 'excellent', 'super'];
 const VALID_VIEWS = ['today', 'home', 'rewards', 'books', 'tools', 'settings'];
 const TEMPORARY_TASK_TITLE = '临时打卡任务';
+const GROWTH_TREE_IMAGES = [
+  growthSeedImage,
+  growthSproutImage,
+  growthSeedlingImage,
+  growthYoungTreeImage,
+  growthBloomingTreeImage,
+  growthMatureTreeImage,
+];
 
 const STATUS = {
   empty: { label: '未打卡', points: 0 },
@@ -3041,7 +3055,8 @@ function App() {
     return sum + base;
   }, 0) : 0;
   const todayCompletionPercent = todayRows.length ? Math.round((todayCompletedCount / todayRows.length) * 100) : 0;
-  const todayEnergyOffset = 100 - todayCompletionPercent;
+  const growthStageIndex = todayCompletionPercent <= 0 ? 0 : Math.min(GROWTH_TREE_IMAGES.length - 1, Math.ceil(todayCompletionPercent / 20));
+  const growthTreeImage = GROWTH_TREE_IMAGES[growthStageIndex] || GROWTH_TREE_IMAGES[0];
   const streakEndDay = isCurrentMonth && todayDay ? todayDay : Math.min(selectedCheckDay, month.days);
   const dayHasCheckin = (day) => rows.some((row) => {
     if (!isTaskCheckableOnDay(row, day)) return false;
@@ -3636,19 +3651,16 @@ function App() {
     <main className="premium-app">
       <aside className="side-rail">
         <div className="rail-card">
-          <div className="rail-energy-card" aria-label="成长能量">
-            <div className="energy-ring" style={{ '--energy-offset': todayEnergyOffset }}>
-              <svg viewBox="0 0 44 44" aria-hidden="true">
-                <circle className="energy-ring-track" cx="22" cy="22" r="17" />
-                <circle className="energy-ring-value" cx="22" cy="22" r="17" pathLength="100" />
-              </svg>
-              <Sparkles size={18} />
+          <div className="rail-sapling-card" aria-label="今日成长树">
+            <div className="sapling-scene">
+              <img src={growthTreeImage} alt="" />
             </div>
-            <div>
-              <strong>{todayCompletionPercent}%</strong>
-              <span>今日能量</span>
+            <strong>成长中</strong>
+            <span>{todayCompletedCount}/{todayRows.length || 0} 今日打卡</span>
+            <div className="sapling-progress" style={{ '--growth-percent': `${todayCompletionPercent}%` }}>
+              <i />
             </div>
-            <em>连续 {currentStreak} 天</em>
+            <em>连续 {currentStreak} 天浇水</em>
           </div>
           <nav>
             {NAV_ITEMS.map(({ label, icon: Icon }, index) => (
@@ -3782,6 +3794,15 @@ function App() {
                   <button className="ghost" onClick={() => setSelectedTodayDay(todayDay)} type="button">回到今天</button>
                 )}
                 <button onClick={saveCurrentState}><Save size={18} />保存状态</button>
+              </div>
+            </div>
+
+            <div className="mobile-growth-card" aria-label="今日成长树">
+              <img src={growthTreeImage} alt="" />
+              <div>
+                <strong>今日成长</strong>
+                <span>{todayCompletedCount}/{todayRows.length || 0} 已完成 · 连续 {currentStreak} 天</span>
+                <i style={{ '--growth-percent': `${todayCompletionPercent}%` }} />
               </div>
             </div>
 

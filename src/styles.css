@@ -75,107 +75,98 @@ button {
   overflow: hidden;
 }
 
-.rail-energy-card {
+.rail-sapling-card {
   position: absolute;
   top: 22px;
   left: 18px;
   right: 18px;
-  min-height: 128px;
-  border: 1px solid rgba(210, 225, 219, 0.76);
-  border-radius: 24px;
-  padding: 14px 10px 12px;
+  min-height: 132px;
+  border: 1px solid rgba(213, 226, 219, 0.78);
+  border-radius: 25px;
+  padding: 12px 11px 13px;
   background:
-    radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.96), transparent 34%),
-    radial-gradient(circle at 82% 8%, rgba(111, 173, 255, 0.22), transparent 42%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(245, 255, 249, 0.78));
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.94), transparent 34%),
+    radial-gradient(circle at 76% 18%, rgba(255, 211, 105, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 253, 248, 0.82));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    0 18px 38px rgba(46, 78, 85, 0.11);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 20px 42px rgba(55, 84, 70, 0.11);
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 8px;
+  gap: 5px;
   isolation: isolate;
 }
 
-.rail-energy-card::before {
+.rail-sapling-card::before {
   content: "";
   position: absolute;
-  inset: auto 12px 8px;
+  left: 18px;
+  right: 18px;
+  bottom: 9px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(83, 147, 226, 0.38), transparent);
+  background: linear-gradient(90deg, transparent, rgba(91, 155, 112, 0.32), transparent);
   z-index: -1;
 }
 
-.energy-ring {
+.sapling-scene {
   position: relative;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  width: 88px;
+  height: 70px;
   display: grid;
   place-items: center;
-  color: #fff;
-  background:
-    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.62), transparent 32%),
-    linear-gradient(145deg, #74c989, #5795ef);
-  box-shadow: 0 14px 24px rgba(77, 137, 206, 0.2);
 }
 
-.energy-ring svg {
-  position: absolute;
-  inset: 0;
+.sapling-scene img {
   width: 100%;
   height: 100%;
-  transform: rotate(-90deg);
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 18px rgba(54, 86, 56, 0.12));
 }
 
-.energy-ring-track,
-.energy-ring-value {
-  fill: none;
-  stroke-width: 4;
-}
-
-.energy-ring-track {
-  stroke: rgba(255, 255, 255, 0.34);
-}
-
-.energy-ring-value {
-  stroke: #fff;
-  stroke-linecap: round;
-  stroke-dasharray: 100;
-  stroke-dashoffset: var(--energy-offset);
-  filter: drop-shadow(0 2px 4px rgba(60, 114, 176, 0.25));
-}
-
-.rail-energy-card div:not(.energy-ring) {
-  display: grid;
-  place-items: center;
-  gap: 2px;
-}
-
-.rail-energy-card strong {
+.rail-sapling-card strong {
   color: #143f47;
-  font-size: 25px;
+  font-size: 16px;
   line-height: 1;
   font-weight: 950;
-  letter-spacing: 0;
 }
 
-.rail-energy-card span {
-  color: #718083;
-  font-size: 12px;
+.rail-sapling-card span {
+  color: #6d7e80;
+  font-size: 11px;
   font-weight: 950;
 }
 
-.rail-energy-card em {
-  min-height: 24px;
+.sapling-progress {
+  width: 76%;
+  height: 4px;
   border-radius: 999px;
-  padding: 5px 10px;
-  color: #3470c6;
-  background: rgba(236, 245, 255, 0.92);
-  font-size: 12px;
+  background: rgba(219, 230, 224, 0.86);
+  overflow: hidden;
+}
+
+.sapling-progress i {
+  width: var(--growth-percent);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #79d878, #5d9df0);
+  display: block;
+}
+
+.rail-sapling-card em {
+  min-height: 21px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #3e7b63;
+  background: rgba(235, 247, 239, 0.92);
+  font-size: 11px;
   font-style: normal;
   font-weight: 950;
+}
+
+.mobile-growth-card {
+  display: none;
 }
 
 .rail-card nav {
@@ -6281,22 +6272,22 @@ button {
   padding: clamp(158px, 10.2vw, 182px) clamp(10px, 0.85vw, 16px) clamp(18px, 1.35vw, 26px);
 }
 
-.rail-energy-card {
+.rail-sapling-card {
   top: clamp(16px, 1.2vw, 22px);
   left: clamp(10px, 0.85vw, 18px);
   right: clamp(10px, 0.85vw, 18px);
-  min-height: clamp(112px, 8.2vw, 128px);
-  border-radius: clamp(19px, 1.25vw, 24px);
-  padding: clamp(11px, 0.85vw, 14px) 8px 10px;
+  min-height: clamp(112px, 8.2vw, 132px);
+  border-radius: clamp(19px, 1.25vw, 25px);
+  padding: clamp(10px, 0.8vw, 12px) 8px 10px;
 }
 
-.energy-ring {
-  width: clamp(48px, 3.7vw, 56px);
-  height: clamp(48px, 3.7vw, 56px);
+.sapling-scene {
+  width: clamp(70px, 5vw, 88px);
+  height: clamp(58px, 4.4vw, 70px);
 }
 
-.rail-energy-card strong {
-  font-size: clamp(21px, 1.55vw, 25px);
+.rail-sapling-card strong {
+  font-size: clamp(14px, 1vw, 16px);
 }
 
 .rail-card button {
@@ -8637,6 +8628,56 @@ button {
 }
 
 @media (max-width: 760px) {
+  .mobile-growth-card {
+    margin-top: 14px;
+    border: 1px solid rgba(213, 226, 219, 0.82);
+    border-radius: 22px;
+    padding: 12px 14px;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.9), transparent 8rem),
+      linear-gradient(135deg, rgba(246, 255, 249, 0.96), rgba(240, 248, 255, 0.92));
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 14px 30px rgba(55, 84, 70, 0.1);
+  }
+
+  .mobile-growth-card img {
+    width: 78px;
+    height: 78px;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 16px rgba(54, 86, 56, 0.12));
+  }
+
+  .mobile-growth-card div {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .mobile-growth-card strong {
+    color: #143f47;
+    font-size: 16px;
+    font-weight: 950;
+  }
+
+  .mobile-growth-card span {
+    color: #62777b;
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .mobile-growth-card i {
+    width: 100%;
+    height: 5px;
+    border-radius: 999px;
+    background:
+      linear-gradient(90deg, #79d878, #5d9df0) 0 / var(--growth-percent) 100% no-repeat,
+      rgba(219, 230, 224, 0.88);
+  }
+
   .profile-dialog-body {
     grid-template-columns: 1fr;
     padding: 18px;

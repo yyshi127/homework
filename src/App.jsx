@@ -478,7 +478,21 @@ function buildTaskRows(month) {
   }
 
   return monthCategories.flatMap((subject) => {
-    const tasks = subject.tasks || [];
+    const tasks = (subject.tasks || [])
+      .map((task, index) => ({ task, index }))
+      .sort((a, b) => {
+        const aType = a.task.bookId ? 'reading' : a.task.type;
+        const bType = b.task.bookId ? 'reading' : b.task.type;
+        const aIsDaily = aType === 'daily';
+        const bIsDaily = bType === 'daily';
+        if (aIsDaily !== bIsDaily) return aIsDaily ? -1 : 1;
+        if (!aIsDaily && !bIsDaily) {
+          const startDiff = Number(a.task.startDay || 1) - Number(b.task.startDay || 1);
+          if (startDiff !== 0) return startDiff;
+        }
+        return a.index - b.index;
+      })
+      .map(({ task }) => task);
     const subjectRowSpan = Math.max(1, tasks.length);
     let isFirstSubjectRow = true;
 

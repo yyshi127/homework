@@ -2312,7 +2312,6 @@ function App() {
       .filter((book) => readingBookStats(item, book).isComplete)
       .map((book) => book.id)
   )));
-  const currentMonthBookIds = new Set((month.readingBooks || []).map((book) => book.id));
   const libraryCategoryTabs = [
     { type: '所有', count: libraryBooks.length },
     ...bookTypes.map((type) => ({ type, count: libraryBooks.filter((book) => (book.type || '其它') === type).length })),
@@ -2383,8 +2382,14 @@ function App() {
     return '未记录';
   };
   const libraryBookStatus = (book) => {
-    if (currentMonthBookIds.has(book.id)) return '本月计划';
-    if (plannedLibraryBookIds.has(book.id)) return '已安排';
+    if (finishedLibraryBookIds.has(book.id)) return '已读完';
+    const currentMonthBook = (month.readingBooks || []).find((item) => item.id === book.id);
+    if (currentMonthBook) {
+      const stats = readingBookStats(month, currentMonthBook);
+      if (stats.statusGroup === 'reading' || stats.statusGroup === 'unfinished') return '正在读';
+      return '计划中';
+    }
+    if (plannedLibraryBookIds.has(book.id)) return '计划中';
     return '未安排';
   };
   const changeMonth = (direction) => {

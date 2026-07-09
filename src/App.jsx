@@ -1484,7 +1484,7 @@ function App() {
     if (!databaseReady || loadingFromDatabase.current) return undefined;
     if (manualSavePendingRef.current) {
       setHasUnsavedChanges(true);
-      setDatabaseStatus('全月表有未保存修改，请点击保存');
+      setDatabaseStatus('本月打卡有未保存修改，请点击保存');
       if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
       return () => {
         if (localSaveTimerRef.current) window.clearTimeout(localSaveTimerRef.current);
@@ -2770,7 +2770,7 @@ function App() {
 
   const deleteTemporaryTaskEntry = async (row, day) => {
     if (!row || row.typeKey !== 'temporary' || !day) return;
-    if (!await showAppConfirm('确定删除这条临时任务吗？删除后会同步清除全月表对应日期的状态和备注。', {
+    if (!await showAppConfirm('确定删除这条临时任务吗？删除后会同步清除本月打卡对应日期的状态和备注。', {
       title: '删除临时任务',
       confirmText: '删除',
       tone: 'danger',
@@ -3530,7 +3530,7 @@ function App() {
                 <div className="temporary-task-panel-head">
                   <PlusCircle size={18} />
                   <strong>添加临时任务</strong>
-                  <span>会同步到全月表的临时任务行</span>
+                  <span>会同步到本月打卡的临时任务行</span>
                 </div>
                 <div className="temporary-task-fields">
                   <label>
@@ -3675,7 +3675,7 @@ function App() {
               </div>
               <div className="check-view-tabs" aria-label="打卡视图切换">
                 <button className="active" onClick={() => setActiveView('today')} type="button">今日打卡</button>
-                <button onClick={() => setActiveView('home')} type="button">全月表</button>
+                <button onClick={() => setActiveView('home')} type="button">本月打卡</button>
               </div>
             </div>
 
@@ -3737,7 +3737,7 @@ function App() {
               <div className="today-empty">
                 <CalendarDays size={46} />
                 <strong>这一天没有可打卡任务</strong>
-                <p>如果需要查看或调整任务安排，可以进入全月表或设置中心。</p>
+                <p>如果需要查看或调整任务安排，可以进入本月打卡或设置中心。</p>
                 <div>
                   <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>
                 </div>
@@ -3769,7 +3769,7 @@ function App() {
             </div>
             <div className="check-view-tabs" aria-label="打卡视图切换">
               <button onClick={() => setActiveView('today')} type="button">今日打卡</button>
-              <button className="active" onClick={() => setActiveView('home')} type="button">全月表</button>
+              <button className="active" onClick={() => setActiveView('home')} type="button">本月打卡</button>
             </div>
           </div>
 

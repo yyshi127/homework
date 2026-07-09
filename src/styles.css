@@ -76,6 +76,7 @@ button {
 }
 
 .rail-card nav {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -86,10 +87,13 @@ button {
   border: 0;
   background: transparent;
   color: #6e787c;
-  min-height: 74px;
+  width: 100%;
+  min-height: auto;
+  aspect-ratio: 1 / 1;
   border-radius: 20px;
   display: grid;
   place-items: center;
+  align-content: center;
   gap: 7px;
   font-size: 15px;
   font-weight: 700;
@@ -110,6 +114,10 @@ button {
 .rail-card button.active span,
 .rail-card button.active svg {
   color: #fff;
+}
+
+.rail-card button:last-child {
+  margin-top: auto;
 }
 
 .rail-art {
@@ -6172,7 +6180,7 @@ button {
 }
 
 .rail-card button {
-  min-height: clamp(56px, 3.7vw, 68px);
+  min-height: auto;
   border-radius: clamp(15px, 0.95vw, 19px);
   font-size: clamp(12px, 0.76vw, 14px);
 }
@@ -8362,7 +8370,7 @@ button {
   }
 
   .rail-card button {
-    min-height: 54px;
+    min-height: auto;
   }
 }
 

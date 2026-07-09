@@ -1185,47 +1185,48 @@ button {
 
 .today-day-switch {
   height: 48px;
-  border: 0;
-  border-radius: 18px;
-  padding: 0 9px;
-  background:
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.44), transparent 32%),
-    linear-gradient(135deg, #43d184, #35aee8 58%, #6b8cff);
+  border: 1px solid rgba(73, 143, 228, 0.26);
+  border-radius: 17px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.9);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 16px 30px rgba(56, 135, 202, 0.24);
+  gap: 10px;
+  box-shadow: 0 14px 28px rgba(54, 109, 190, 0.15);
+  overflow: hidden;
 }
 
 .today-day-switch button {
-  width: 36px;
-  height: 36px;
-  border-radius: 13px;
+  width: 46px;
+  height: 48px;
+  border-radius: 0;
   padding: 0;
-  color: #167552;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 16px rgba(29, 71, 91, 0.14);
+  color: #2f7dd7;
+  background: linear-gradient(180deg, #f7fbff, #eaf4ff);
+  box-shadow: none;
 }
 
 .today-day-switch button:disabled {
-  opacity: 0.42;
+  opacity: 0.38;
   cursor: not-allowed;
   box-shadow: none;
 }
 
 .today-day-switch strong {
-  min-width: 54px;
-  height: 34px;
-  border-radius: 12px;
-  color: #164148;
-  background: rgba(255, 255, 255, 0.94);
+  min-width: 78px;
+  height: 48px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 72% 28%, rgba(255, 255, 255, 0.35), transparent 32%),
+    linear-gradient(135deg, #51b9ff, #5d86f2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   font-weight: 950;
   text-align: center;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 8px 16px rgba(29, 71, 91, 0.12);
+  text-shadow: 0 3px 8px rgba(36, 70, 134, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .today-summary {
@@ -7882,6 +7883,127 @@ button {
 .book-dialog-panel footer button.ghost {
   color: #657174;
   background: #eef2f1;
+}
+
+.app-dialog-mask {
+  z-index: 120;
+  padding: 18px;
+}
+
+.app-dialog-panel {
+  width: min(460px, calc(100vw - 34px));
+  border: 1px solid rgba(222, 232, 225, 0.95);
+  border-radius: 24px;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 86% 12%, rgba(105, 197, 127, 0.16), transparent 11rem),
+    linear-gradient(145deg, #ffffff, #fbfffc);
+  box-shadow: 0 28px 70px rgba(39, 63, 58, 0.22);
+}
+
+.app-dialog-panel header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.app-dialog-panel header > span {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(145deg, #59c977, #34a956);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 14px 26px rgba(52, 169, 86, 0.2);
+}
+
+.app-dialog-panel.tone-warning header > span {
+  background: linear-gradient(145deg, #ffbd58, #ff814d);
+  box-shadow: 0 14px 26px rgba(255, 129, 77, 0.2);
+}
+
+.app-dialog-panel.tone-danger header > span {
+  background: linear-gradient(145deg, #ff746a, #e63d42);
+  box-shadow: 0 14px 26px rgba(230, 61, 66, 0.2);
+}
+
+.app-dialog-panel h2 {
+  margin: 0;
+  color: #143f47;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.app-dialog-panel p {
+  margin: 8px 0 0;
+  color: #52676d;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.app-dialog-input {
+  margin-top: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.app-dialog-input span {
+  color: #54686d;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.app-dialog-input input {
+  height: 46px;
+  border: 1px solid #dce8e2;
+  border-radius: 15px;
+  padding: 0 14px;
+  color: #143f47;
+  background: #fbfefc;
+  font-size: 15px;
+  font-weight: 850;
+  outline: none;
+}
+
+.app-dialog-input input:focus {
+  border-color: #57bd73;
+  box-shadow: 0 0 0 4px rgba(87, 189, 115, 0.12);
+}
+
+.app-dialog-panel footer {
+  margin-top: 22px;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.app-dialog-panel footer button {
+  min-width: 92px;
+  height: 42px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 18px;
+  color: #fff;
+  background: linear-gradient(180deg, #55bd70, #36a955);
+  font-size: 15px;
+  font-weight: 950;
+  box-shadow: 0 12px 24px rgba(54, 169, 85, 0.16);
+}
+
+.app-dialog-panel footer button.ghost {
+  color: #53686d;
+  background: #eef5f2;
+  box-shadow: none;
+}
+
+.app-dialog-panel footer button.danger {
+  background: linear-gradient(180deg, #ff7169, #e63d42);
+  box-shadow: 0 12px 24px rgba(230, 61, 66, 0.18);
 }
 
 .settings-list {

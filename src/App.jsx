@@ -1351,6 +1351,8 @@ function App() {
   const [todayFocusTaskId, setTodayFocusTaskId] = useState('');
   const [settingsFocusCategory, setSettingsFocusCategory] = useState('');
   const [isBackfillMode, setIsBackfillMode] = useState(false);
+  const [appDialog, setAppDialog] = useState(null);
+  const appDialogResolverRef = useRef(null);
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
   const profile = state.profile || {};
@@ -1383,6 +1385,60 @@ function App() {
     POINT_RULE_DETAILS[3],
     POINT_RULE_DETAILS[4],
   ], [pointConfig]);
+
+  const openAppDialog = (config) => new Promise((resolve) => {
+    appDialogResolverRef.current = resolve;
+    setAppDialog({
+      variant: 'alert',
+      tone: 'primary',
+      title: '提示',
+      message: '',
+      confirmText: '知道了',
+      cancelText: '取消',
+      inputValue: '',
+      ...config,
+    });
+  });
+
+  const showAppAlert = (message, options = {}) => openAppDialog({
+    variant: 'alert',
+    title: '提示',
+    confirmText: '知道了',
+    message,
+    ...options,
+  });
+
+  const showAppConfirm = (message, options = {}) => openAppDialog({
+    variant: 'confirm',
+    title: '确认操作',
+    confirmText: '确定',
+    cancelText: '取消',
+    message,
+    ...options,
+  });
+
+  const showAppPrompt = (message, defaultValue = '', options = {}) => openAppDialog({
+    variant: 'prompt',
+    title: '填写信息',
+    confirmText: '确定',
+    cancelText: '取消',
+    message,
+    inputValue: defaultValue,
+    ...options,
+  });
+
+  const closeAppDialog = (confirmed) => {
+    const dialog = appDialog;
+    const resolver = appDialogResolverRef.current;
+    appDialogResolverRef.current = null;
+    setAppDialog(null);
+    if (!resolver || !dialog) return;
+    if (dialog.variant === 'prompt') {
+      resolver(confirmed ? dialog.inputValue : null);
+      return;
+    }
+    resolver(Boolean(confirmed));
+  };
   const rewardTypeCounts = useMemo(() => rewardConfig.reduce((counts, item) => {
     counts[item.type] = (counts[item.type] || 0) + 1;
     return counts;
@@ -1577,7 +1633,7 @@ function App() {
     });
   };
 
-  const editCellNote = (rowId, day) => {
+  const editCellNote = async (rowId, day) => {
     const row = rows.find((candidate) => candidate.id === rowId);
     if (!row || !isTaskCheckableOnDay(row, day)) return;
     const currentNote = month.notes?.[rowId]?.[day] || '';
@@ -1592,7 +1648,11 @@ function App() {
       });
       return;
     }
-    const note = window.prompt('填写这项任务当天的具体内容，例如：完成第3页', currentNote);
+    const note = await showAppPrompt('填写这项任务当天的具体内容，例如：完成第3页', currentNote, {
+      title: '填写备注',
+      inputLabel: '备注内容',
+      placeholder: '例如：完成第3页',
+    });
     if (note === null) return;
     setState((current) => {
       const next = structuredClone(current || {});
@@ -1712,13 +1772,17 @@ function App() {
     });
   };
 
-  const addMonth = () => {
+  const addMonth = async () => {
     const now = new Date();
-    const input = window.prompt('请输入新月份，例如：2026-09', createMonthKey(now.getFullYear(), now.getMonth() + 1));
+    const input = await showAppPrompt('请输入新月份，例如：2026-09', createMonthKey(now.getFullYear(), now.getMonth() + 1), {
+      title: '新增月份清单',
+      inputLabel: '月份',
+      placeholder: 'YYYY-MM',
+    });
     if (!input) return;
     const match = input.match(/^(\d{4})-(\d{1,2})$/);
     if (!match) {
-      window.alert('月份格式请填写为 YYYY-MM，例如 2026-09');
+      showAppAlert('月份格式请填写为 YYYY-MM，例如 2026-09', { tone: 'warning' });
       return;
     }
     const year = Number(match[1]);
@@ -1752,21 +1816,31 @@ function App() {
     return targetMonth?.key === createMonthKey(now.getFullYear(), now.getMonth() + 1);
   };
 
-  const deleteMonth = (targetMonth, targetIndex) => {
+  const deleteMonth = async (targetMonth, targetIndex) => {
     if (!targetMonth) return;
     if (months.length <= 1) {
-      window.alert('至少需要保留一个月份清单，不能删除最后一个月份。');
+      showAppAlert('至少需要保留一个月份清单，不能删除最后一个月份。', { tone: 'warning' });
       return;
     }
     if (isCurrentCalendarMonth(targetMonth)) {
-      window.alert('不能删除当前自然月份的清单。');
+      showAppAlert('不能删除当前自然月份的清单。', { tone: 'warning' });
       return;
     }
-    const confirmed = window.confirm(`即将删除“${targetMonth.label}”月份清单。该月份下的任务、打卡、阅读和兑换记录都会一起删除。确定继续吗？`);
+    const confirmed = await showAppConfirm(`即将删除“${targetMonth.label}”月份清单。该月份下的任务、打卡、阅读和兑换记录都会一起删除。确定继续吗？`, {
+      title: '删除月份清单',
+      confirmText: '继续删除',
+      tone: 'danger',
+    });
     if (!confirmed) return;
-    const typed = window.prompt(`这是高风险操作。请输入完整月份名称“${targetMonth.label}”确认删除：`);
+    const typed = await showAppPrompt(`这是高风险操作。请输入完整月份名称“${targetMonth.label}”确认删除：`, '', {
+      title: '严格确认',
+      inputLabel: '完整月份名称',
+      placeholder: targetMonth.label,
+      confirmText: '确认删除',
+      tone: 'danger',
+    });
     if (typed !== targetMonth.label) {
-      window.alert('月份名称输入不一致，已取消删除。');
+      showAppAlert('月份名称输入不一致，已取消删除。', { tone: 'warning' });
       return;
     }
     const nextIndex = Math.max(0, Math.min(monthIndex >= targetIndex ? monthIndex - 1 : monthIndex, months.length - 2));
@@ -1779,13 +1853,15 @@ function App() {
     setMonthIndex(nextIndex);
   };
 
-  const addCategory = () => {
+  const addCategory = async () => {
     const fixed = FIXED_CATEGORIES.find((item) => item.name === categoryDraft);
-    const customName = categoryDraft === 'custom' ? window.prompt('请输入自定义分类名称')?.trim() : '';
+    const customName = categoryDraft === 'custom'
+      ? (await showAppPrompt('请输入自定义分类名称', '', { title: '新增自定义分类', inputLabel: '分类名称' }))?.trim()
+      : '';
     const name = fixed?.name || customName;
     if (!name) return;
     if (month.categories.some((item) => item.name === name)) {
-      window.alert(`${name} 分类已经存在`);
+      showAppAlert(`${name} 分类已经存在`, { tone: 'warning' });
       return;
     }
     setState((current) => {
@@ -1812,8 +1888,12 @@ function App() {
     });
   };
 
-  const deleteCategory = (categoryId) => {
-    if (!window.confirm('确定删除这个分类和下面所有任务吗？')) return;
+  const deleteCategory = async (categoryId) => {
+    if (!await showAppConfirm('确定删除这个分类和下面所有任务吗？', {
+      title: '删除分类',
+      confirmText: '删除',
+      tone: 'danger',
+    })) return;
     setState((current) => {
       const next = structuredClone(current || {});
       const target = next.months.find((item) => item.id === month.id);
@@ -1987,7 +2067,11 @@ function App() {
   };
 
   const deleteReward = async (item) => {
-    if (!window.confirm(`确定删除奖励“${item.name || '未命名奖励'}”吗？已兑换记录会保留。`)) return;
+    if (!await showAppConfirm(`确定删除奖励“${item.name || '未命名奖励'}”吗？已兑换记录会保留。`, {
+      title: '删除奖励',
+      confirmText: '删除',
+      tone: 'danger',
+    })) return;
     const next = structuredClone(stateRef.current || state || {});
     next.rewardConfig = normalizeRewardConfig(next.rewardConfig || DEFAULT_REWARDS).filter((reward) => reward.id !== item.id);
     if (!next.rewardConfig.length) next.rewardConfig = DEFAULT_REWARDS;
@@ -2064,8 +2148,12 @@ function App() {
     });
   };
 
-  const deleteLibraryBook = (book) => {
-    if (!window.confirm(`确定从“我的图书馆”移出“${book.name || '未命名书目'}”吗？已安排月份和阅读历史会保留。`)) return;
+  const deleteLibraryBook = async (book) => {
+    if (!await showAppConfirm(`确定从“我的图书馆”移出“${book.name || '未命名书目'}”吗？已安排月份和阅读历史会保留。`, {
+      title: '移出书籍',
+      confirmText: '移出',
+      tone: 'danger',
+    })) return;
     setState((current) => {
       const next = structuredClone(current || {});
       next.libraryBooks = normalizeLibraryBooks(next.libraryBooks || []).filter((item) => item.id !== book.id);
@@ -2085,7 +2173,7 @@ function App() {
     if (!bookPagesDialog?.bookId) return;
     const totalPages = Number(bookPagesDialog.totalPages || 0);
     if (!Number.isFinite(totalPages) || totalPages <= 0) {
-      window.alert('请填写大于 0 的总页数');
+      showAppAlert('请填写大于 0 的总页数', { tone: 'warning' });
       return;
     }
     setState((current) => {
@@ -2102,7 +2190,7 @@ function App() {
     if (!newBookDialog) return;
     const name = newBookDialog.name.trim();
     if (!name) {
-      window.alert('请先填写书名');
+      showAppAlert('请先填写书名', { tone: 'warning' });
       return;
     }
     const bookPatch = {
@@ -2279,7 +2367,7 @@ function App() {
       setState(next);
       await persistState(next, '头像已保存到 SQLite');
     } catch (error) {
-      window.alert(error?.message || '头像更换失败，请重试');
+      showAppAlert(error?.message || '头像更换失败，请重试', { tone: 'warning' });
     } finally {
       event.target.value = '';
     }
@@ -2311,11 +2399,11 @@ function App() {
   const generateHomeworkReview = async () => {
     const currentImageData = homeworkImageRef.current || graderDraft.imageData;
     if (isPreparingHomeworkImage) {
-      window.alert('图片还在处理中，请等预览出现后再批改');
+      showAppAlert('图片还在处理中，请等预览出现后再批改', { tone: 'warning' });
       return;
     }
     if (!currentImageData) {
-      window.alert('请先拍照或上传一张作业照片');
+      showAppAlert('请先拍照或上传一张作业照片', { tone: 'warning' });
       return;
     }
     if (isGradingHomework) return;
@@ -2399,7 +2487,7 @@ function App() {
       .map((mistake) => normalizeMistake({ ...mistake, term: review.term, reviewId: review.id, sourceTitle: review.title }, review.subject))
       .filter((mistake) => !existingKeys.has(`${mistake.reviewId || ''}-${mistake.question}-${mistake.correctAnswer}`));
     if (!nextMistakes.length) {
-      window.alert('这次批改没有可收录的错题');
+      showAppAlert('这次批改没有可收录的错题', { tone: 'warning' });
       return;
     }
     next.learningTools.mistakes = [...nextMistakes, ...next.learningTools.mistakes];
@@ -2413,7 +2501,7 @@ function App() {
     const fallbackAnnotations = annotations.length ? annotations : buildFallbackAnnotations(review?.mistakes);
     const imageUrl = review?.annotatedImageUrl || (review?.id === latestReview?.id ? homeworkImageRef.current || graderDraft.imageData : '');
     if (!imageUrl || !fallbackAnnotations.length) {
-      window.alert('当前批改结果还没有可生成图片的作业原图');
+      showAppAlert('当前批改结果还没有可生成图片的作业原图', { tone: 'warning' });
       return;
     }
     const image = new Image();
@@ -2476,7 +2564,7 @@ function App() {
       link.href = canvas.toDataURL('image/jpeg', 0.92);
       link.click();
     } catch {
-      window.alert('批改图片生成失败，请重新上传后再试');
+      showAppAlert('批改图片生成失败，请重新上传后再试', { tone: 'warning' });
     }
   };
 
@@ -2520,12 +2608,12 @@ function App() {
   const printMistakePaper = (subject = mistakeSubjectFilter, term = mistakeTermFilter) => {
     const selected = mistakeItems.filter((item) => (term === '全部学期' || item.term === term) && (subject === '全部' || item.subject === subject) && !item.mastered);
     if (!selected.length) {
-      window.alert('当前筛选下没有可生成试卷的未掌握错题');
+      showAppAlert('当前筛选下没有可生成试卷的未掌握错题', { tone: 'warning' });
       return;
     }
     const paperWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!paperWindow) {
-      window.alert('浏览器拦截了打印窗口，请允许弹窗后再试');
+      showAppAlert('浏览器拦截了打印窗口，请允许弹窗后再试', { tone: 'warning' });
       return;
     }
     const rowsHtml = selected.map((item, index) => `
@@ -2599,7 +2687,7 @@ function App() {
 
   const saveConfiguration = async () => {
     const ok = await persistState(stateRef.current, '配置已保存到 SQLite');
-    if (ok) window.alert('月份清单配置已保存');
+    if (ok) showAppAlert('月份清单配置已保存', { title: '保存成功' });
   };
 
   const saveCurrentState = async () => {
@@ -2642,7 +2730,7 @@ function App() {
     const content = String(draft.content || '').trim();
     const remark = String(draft.remark || '').trim();
     if (!content) {
-      window.alert('请先填写临时任务内容。');
+      showAppAlert('请先填写临时任务内容。', { tone: 'warning' });
       return;
     }
     const next = structuredClone(stateRef.current || state || {});
@@ -2682,7 +2770,11 @@ function App() {
 
   const deleteTemporaryTaskEntry = async (row, day) => {
     if (!row || row.typeKey !== 'temporary' || !day) return;
-    if (!window.confirm('确定删除这条临时任务吗？删除后会同步清除全月表对应日期的状态和备注。')) return;
+    if (!await showAppConfirm('确定删除这条临时任务吗？删除后会同步清除全月表对应日期的状态和备注。', {
+      title: '删除临时任务',
+      confirmText: '删除',
+      tone: 'danger',
+    })) return;
     const next = structuredClone(stateRef.current || state || {});
     const targetMonth = next.months.find((item) => item.id === month.id);
     const category = targetMonth?.categories?.find((item) => item.id === row.categoryId || item.name === row.subject);
@@ -2710,9 +2802,13 @@ function App() {
     await persistState(next, '临时任务已删除并保存到 SQLite');
   };
 
-  const enableBackfillMode = () => {
+  const enableBackfillMode = async () => {
     if (isBackfillMode) return;
-    if (!window.confirm('开启补录后，可以修改本月今天以前的打卡记录。补录完成后必须点击保存才会写入数据库，确定开启吗？')) return;
+    if (!await showAppConfirm('开启补录后，可以修改本月今天以前的打卡记录。补录完成后必须点击保存才会写入数据库，确定开启吗？', {
+      title: '开启补录模式',
+      confirmText: '开启补录',
+      tone: 'warning',
+    })) return;
     setIsBackfillMode(true);
   };
 
@@ -2738,11 +2834,15 @@ function App() {
     }
     setState(nextState);
     const ok = await persistState(nextState, '当前状态已保存到 SQLite');
-    if (ok) window.alert(`已保存当前状态：${label}`);
+    if (ok) showAppAlert(`已保存当前状态：${label}`, { title: '保存成功' });
   };
 
-  const restoreSnapshot = (snapshot) => {
-    if (!window.confirm(`确定恢复到保存点「${snapshot.label}」吗？当前未保存的修改会被覆盖。`)) return;
+  const restoreSnapshot = async (snapshot) => {
+    if (!await showAppConfirm(`确定恢复到保存点「${snapshot.label}」吗？当前未保存的修改会被覆盖。`, {
+      title: '恢复保存点',
+      confirmText: '恢复',
+      tone: 'warning',
+    })) return;
     setState((current) => ({
       ...structuredClone(snapshot.data),
       snapshots: (current || {}).snapshots || [],
@@ -5133,6 +5233,43 @@ function App() {
               <button className="ghost" onClick={() => setAiConfigDialogOpen(false)}>取消</button>
               <button className="ghost" onClick={() => confirmAiConfig(false)}>只保存配置</button>
               <button onClick={() => confirmAiConfig(true)}>保存并启用{selectedAiProvider === 'baidu' ? '百度' : '阿里'}</button>
+            </footer>
+          </div>
+        </section>
+      )}
+
+      {appDialog && (
+        <section className="settings-mask app-dialog-mask" role="dialog" aria-modal="true" aria-label={appDialog.title}>
+          <div className={`app-dialog-panel tone-${appDialog.tone || 'primary'}`}>
+            <header>
+              <span>{appDialog.tone === 'danger' ? <Trash2 size={24} /> : appDialog.tone === 'warning' ? <Flag size={24} /> : <Check size={24} />}</span>
+              <div>
+                <h2>{appDialog.title}</h2>
+                <p>{appDialog.message}</p>
+              </div>
+            </header>
+            {appDialog.variant === 'prompt' && (
+              <label className="app-dialog-input">
+                <span>{appDialog.inputLabel || '输入内容'}</span>
+                <input
+                  autoFocus
+                  value={appDialog.inputValue || ''}
+                  placeholder={appDialog.placeholder || ''}
+                  onChange={(event) => setAppDialog((current) => ({ ...current, inputValue: event.target.value }))}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') closeAppDialog(true);
+                    if (event.key === 'Escape') closeAppDialog(false);
+                  }}
+                />
+              </label>
+            )}
+            <footer>
+              {appDialog.variant !== 'alert' && (
+                <button className="ghost" type="button" onClick={() => closeAppDialog(false)}>{appDialog.cancelText || '取消'}</button>
+              )}
+              <button className={appDialog.tone === 'danger' ? 'danger' : ''} type="button" onClick={() => closeAppDialog(true)}>
+                {appDialog.confirmText || '确定'}
+              </button>
             </footer>
           </div>
         </section>

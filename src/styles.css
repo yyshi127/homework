@@ -2253,7 +2253,18 @@ button {
   padding: 0;
   justify-self: end;
   align-self: start;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(4px);
   box-shadow: 0 8px 18px rgba(240, 90, 87, 0.08);
+  transition: opacity .16s ease, visibility .16s ease, transform .16s ease, background .16s ease, color .16s ease;
+}
+
+.task-temporary .today-note-panel:hover .today-temporary-delete,
+.today-temporary-delete:focus-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
 }
 
 .today-temporary-delete:hover {
@@ -8686,6 +8697,12 @@ button {
 
   .today-note-panel.mobile-note-expanded {
     gap: 10px;
+  }
+
+  .today-temporary-delete {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
   }
 
   .today-reading-note {

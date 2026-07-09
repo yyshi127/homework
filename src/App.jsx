@@ -181,7 +181,8 @@ const DEFAULT_SUBJECTS = [
   },
 ];
 
-const DEFAULT_BOOKS = ['《尼尔斯骑鹅历险记》', '《一本看遍动物世界》', '《飞天奇翼龙》', '《抹香鲸的微笑（注音版）》', '《小纸马（注音版）》'];
+const DEFAULT_BOOKS = ['《尼尔斯骑鹅历险记》', '《一本看遍动物世界》', '《飞天奇翼龙》', '《抹香鲸的微笑（注音版）》'];
+const BOOK_TYPES = ['学科类', '科学', '小说', '做人', '历史', '物理', '漫画', '童话', '百科', '文学', '英语', '数学', '其它'];
 
 const DEFAULT_REWARDS = [
   { id: 'reward-notebook', points: '200', name: '精美笔记本' },
@@ -395,6 +396,49 @@ function createSummerTemplate(months = createDefaultMonths()) {
   };
 }
 
+function normalizeLibraryBooks(books = []) {
+  const seen = new Set();
+  return books
+    .map((book, index) => (typeof book === 'string' ? { name: book, id: `library-${index}` } : book))
+    .filter((book) => book?.name)
+    .map((book) => ({
+      id: book.id || createId('library-book'),
+      name: book.name || '新的书目',
+      type: book.type || '其它',
+      totalPages: book.totalPages ?? '',
+      rewardPoints: Number(book.rewardPoints || 10),
+      addedAt: book.addedAt || new Date().toISOString(),
+    }))
+    .filter((book) => {
+      const key = book.name.trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function collectLibraryBooks(state) {
+  const books = [];
+  (state.months || []).forEach((month) => {
+    (month.readingBooks || []).forEach((book) => {
+      books.push({
+        id: book.id,
+        name: book.name,
+        type: book.type || '其它',
+        totalPages: book.totalPages ?? '',
+        rewardPoints: Number(book.rewardPoints || 10),
+        addedAt: book.addedAt || `${month.key || month.id}-01`,
+      });
+    });
+  });
+  if (!books.length) {
+    (state.books || DEFAULT_BOOKS).forEach((name, index) => {
+      books.push({ id: `library-default-${index}`, name, type: '其它', totalPages: '', rewardPoints: 10 });
+    });
+  }
+  return normalizeLibraryBooks(books);
+}
+
 function readingCategoryFor(month) {
   const existing = month.categories.find((category) => category.name === '阅读');
   if (existing) return existing;
@@ -496,6 +540,7 @@ function sanitizeLoadedState(saved) {
     return migrateLegacyState(next);
   }
   next.months = next.months.map(normalizeMonth);
+  next.libraryBooks = normalizeLibraryBooks(next.libraryBooks?.length ? next.libraryBooks : collectLibraryBooks(next));
   next.learningTools = normalizeLearningTools(next.learningTools);
   next.snapshots = [];
   next.taskConfig?.forEach((subject) => {
@@ -511,6 +556,7 @@ function createLocalCacheState(current) {
   if (!current || typeof current !== 'object') return current;
   return {
     ...current,
+    libraryBooks: normalizeLibraryBooks(current.libraryBooks || []),
     snapshots: [],
   };
 }
@@ -702,8 +748,10 @@ function normalizeMonth(month) {
     startDay: Math.max(1, Math.min(normalized.days, Number(book.startDay || 1))),
     endDay: Math.max(1, Math.min(normalized.days, Number(book.endDay || normalized.days))),
     checkMode: book.checkMode === 'stage' ? 'stage' : 'daily',
+    type: book.type || '其它',
     totalPages: book.totalPages ?? '',
     rewardPoints: Number(book.rewardPoints || 10),
+    addedAt: book.addedAt || '',
   }));
   normalized.redeemedRewards = normalized.redeemedRewards.map((record) => ({
     id: record.id || createId('redeem'),
@@ -752,6 +800,7 @@ function migrateLegacyState(saved) {
     templates: saved.templates?.length ? saved.templates : [createSummerTemplate(months)],
     activeMonthId: months[0]?.id,
     snapshots: [],
+    libraryBooks: collectLibraryBooks({ ...saved, months }),
     learningTools: normalizeLearningTools(saved.learningTools),
   };
 }
@@ -763,6 +812,7 @@ function createSeedState() {
     templates: [createSummerTemplate(months)],
     activeMonthId: months[0]?.id,
     rewardConfig: DEFAULT_REWARDS,
+    libraryBooks: normalizeLibraryBooks(DEFAULT_BOOKS.map((name, index) => ({ id: `library-default-${index}`, name, type: '其它' }))),
     books: DEFAULT_BOOKS,
     reminders: DEFAULT_REMINDERS,
     learningTools: { reviews: [], mistakes: [] },
@@ -947,6 +997,7 @@ function App() {
   const [readingPlanEditor, setReadingPlanEditor] = useState(null);
   const [rewardCelebration, setRewardCelebration] = useState(null);
   const [rewardExchangeCelebration, setRewardExchangeCelebration] = useState(null);
+  const [readingScope, setReadingScope] = useState('month');
   const [readingTab, setReadingTab] = useState('reading');
   const [readingViewMode, setReadingViewMode] = useState('card');
   const [newBookDialog, setNewBookDialog] = useState(null);
@@ -976,6 +1027,7 @@ function App() {
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
   const learningTools = useMemo(() => normalizeLearningTools(state.learningTools), [state.learningTools]);
+  const libraryBooks = useMemo(() => normalizeLibraryBooks(state.libraryBooks || collectLibraryBooks({ ...state, months })), [state.libraryBooks, months]);
   const homeworkReviews = learningTools.reviews;
   const displayHomeworkReview = latestReview || (showPreviousReview ? homeworkReviews[0] : null);
   const mistakeItems = learningTools.mistakes;
@@ -1383,7 +1435,24 @@ function App() {
       const task = category.tasks.find((item) => item.id === taskId);
       Object.assign(task, patch);
       if (patch.bookId) {
-        const book = target.readingBooks?.find((item) => item.id === patch.bookId);
+        target.readingBooks ||= [];
+        const sourceBook = (next.libraryBooks || []).find((item) => item.id === patch.bookId);
+        let book = target.readingBooks.find((item) => item.id === patch.bookId);
+        if (!book && sourceBook) {
+          const range = defaultReadingRange(target);
+          book = {
+            id: sourceBook.id,
+            name: sourceBook.name,
+            type: sourceBook.type || '其它',
+            totalPages: sourceBook.totalPages ?? '',
+            rewardPoints: Number(sourceBook.rewardPoints || 10),
+            startDay: Number(task.startDay || range.startDay),
+            endDay: Number(task.endDay || range.endDay),
+            checkMode: task.checkMode || 'daily',
+            addedAt: sourceBook.addedAt || new Date().toISOString(),
+          };
+          target.readingBooks.push(book);
+        }
         if (book) {
           task.title = book.name;
           task.type = 'stage';
@@ -1518,20 +1587,20 @@ function App() {
     }));
   };
 
-  const addReadingBook = (bookPatch = {}) => {
+  const addLibraryBook = (bookPatch = {}) => {
     setState((current) => {
       const next = structuredClone(current || {});
-      const target = next.months.find((item) => item.id === month.id);
-      const range = defaultReadingRange(target);
-      target.readingBooks ||= [];
-      target.readingBooks.push({ id: createId('book'), name: '', startDay: range.startDay, endDay: range.endDay, checkMode: 'daily', totalPages: '', rewardPoints: 10, ...bookPatch });
+      next.libraryBooks = normalizeLibraryBooks([
+        ...(next.libraryBooks || []),
+        { id: createId('book'), type: '其它', totalPages: '', rewardPoints: 10, addedAt: new Date().toISOString(), ...bookPatch },
+      ]);
       return next;
     });
-    setReadingTab('other');
+    setReadingScope('library');
   };
 
   const openNewBookDialog = () => {
-    setNewBookDialog({ name: '', totalPages: '', rewardPoints: '10' });
+    setNewBookDialog({ name: '', type: '其它', totalPages: '', rewardPoints: '10' });
   };
 
   const openBookPagesDialog = (book) => {
@@ -1566,8 +1635,9 @@ function App() {
       window.alert('请先填写书名');
       return;
     }
-    addReadingBook({
+    addLibraryBook({
       name,
+      type: newBookDialog.type || '其它',
       totalPages: newBookDialog.totalPages === '' ? '' : Math.max(0, Number(newBookDialog.totalPages || 0)),
       rewardPoints: Math.max(0, Number(newBookDialog.rewardPoints || 10)),
     });
@@ -2147,6 +2217,13 @@ function App() {
   const redeemedRewardPoints = redeemedRewards.reduce((sum, item) => sum + Number(item.points || 0), 0);
   const availableRewardPoints = Math.max(0, monthPoints - redeemedRewardPoints);
   const readingBooksWithStats = (month.readingBooks || []).map((book) => ({ book, stats: readingBookStats(month, book) }));
+  const plannedLibraryBookIds = new Set(months.flatMap((item) => item.readingBooks || []).map((book) => book.id));
+  const currentMonthBookIds = new Set((month.readingBooks || []).map((book) => book.id));
+  const unplannedLibraryBooks = libraryBooks.filter((book) => !plannedLibraryBookIds.has(book.id));
+  const libraryTypeStats = BOOK_TYPES.map((type) => ({
+    type,
+    count: libraryBooks.filter((book) => (book.type || '其它') === type).length,
+  })).filter((item) => item.count > 0);
   const readingGroups = {
     reading: readingBooksWithStats.filter((item) => item.stats.statusGroup === 'reading'),
     finished: readingBooksWithStats.filter((item) => item.stats.statusGroup === 'finished'),
@@ -2187,8 +2264,27 @@ function App() {
     if (stats.progress !== null) return `${stats.progress}%`;
     return '未记录';
   };
+  const libraryBookStatus = (book) => {
+    if (currentMonthBookIds.has(book.id)) return '本月计划';
+    if (plannedLibraryBookIds.has(book.id)) return '已安排';
+    return '未安排';
+  };
   const changeMonth = (direction) => {
     setMonthIndex((current) => Math.max(0, Math.min(months.length - 1, current + direction)));
+  };
+  const renderLibraryBookCard = (book) => {
+    const status = libraryBookStatus(book);
+    return (
+      <article className={`library-book-card ${status === '未安排' ? 'unplanned' : ''}`} key={book.id}>
+        <div>
+          <span>{book.type || '其它'}</span>
+          <strong>{book.name || '未命名书目'}</strong>
+          <p>{book.totalPages ? `共 ${book.totalPages} 页` : '总页数未设置'}</p>
+        </div>
+        <em>{status}</em>
+        {status === '未安排' && <button type="button" onClick={jumpToReadingSettings}>去安排阅读任务</button>}
+      </article>
+    );
   };
   const renderReadingBookCard = ({ book, stats }) => {
     const readingPlanRows = stats.rangeDays.map((day) => {
@@ -2984,37 +3080,86 @@ function App() {
               </div>
             </div>
 
-            <div className="reading-summary">
-              <article>
-                <span>本月书籍</span>
-                <strong>{readingBooksWithStats.length}</strong>
-                <em>本</em>
-              </article>
-              <article className="active">
-                <span>正在读</span>
-                <strong>{readingGroups.reading.length}</strong>
-                <em>本</em>
-              </article>
-              <article className="done">
-                <span>已经读完</span>
-                <strong>{readingGroups.finished.length}</strong>
-                <em>{claimableReadingCount ? `${claimableReadingCount} 个待兑换` : '本'}</em>
-              </article>
-              <article className="points">
-                <span>已兑换奖励</span>
-                <strong>{readingRewardPoints}</strong>
-                <em>分 / 可获 {readingRewardAvailable} 分</em>
-              </article>
+            <div className="reading-scope-tabs" role="tablist" aria-label="阅读书单范围">
+              <button className={readingScope === 'month' ? 'active' : ''} onClick={() => setReadingScope('month')} type="button">本月计划</button>
+              <button className={readingScope === 'library' ? 'active' : ''} onClick={() => setReadingScope('library')} type="button">全局书单</button>
             </div>
 
-            {readingBooksWithStats.length === 0 ? (
+            {readingScope === 'library' ? (
+              <section className="library-section">
+                <div className="reading-summary library-summary">
+                  <article>
+                    <span>全年书单</span>
+                    <strong>{libraryBooks.length}</strong>
+                    <em>本</em>
+                  </article>
+                  <article className="active">
+                    <span>未安排阅读任务</span>
+                    <strong>{unplannedLibraryBooks.length}</strong>
+                    <em>本</em>
+                  </article>
+                  <article className="done">
+                    <span>已安排阅读任务</span>
+                    <strong>{Math.max(0, libraryBooks.length - unplannedLibraryBooks.length)}</strong>
+                    <em>本</em>
+                  </article>
+                  <article className="points">
+                    <span>书籍类型</span>
+                    <strong>{libraryTypeStats.length}</strong>
+                    <em>类</em>
+                  </article>
+                </div>
+                {libraryTypeStats.length > 0 && (
+                  <div className="library-type-strip">
+                    {libraryTypeStats.map((item) => <span key={item.type}>{item.type} {item.count}</span>)}
+                  </div>
+                )}
+                {libraryBooks.length ? (
+                  <div className="library-book-grid">
+                    {libraryBooks.map(renderLibraryBookCard)}
+                  </div>
+                ) : (
+                  <div className="reading-empty">
+                    <BookOpen size={48} />
+                    <strong>全局书单还是空的</strong>
+                    <p>以后给小朋友买了新书，就先添加到这里，再安排到具体月份阅读。</p>
+                    <button onClick={openNewBookDialog}>新建书单</button>
+                  </div>
+                )}
+              </section>
+            ) : (
+              <>
+              <div className="reading-summary">
+                <article>
+                  <span>本月书籍</span>
+                  <strong>{readingBooksWithStats.length}</strong>
+                  <em>本</em>
+                </article>
+                <article className="active">
+                  <span>正在读</span>
+                  <strong>{readingGroups.reading.length}</strong>
+                  <em>本</em>
+                </article>
+                <article className="done">
+                  <span>已经读完</span>
+                  <strong>{readingGroups.finished.length}</strong>
+                  <em>{claimableReadingCount ? `${claimableReadingCount} 个待兑换` : '本'}</em>
+                </article>
+                <article className="points">
+                  <span>已兑换奖励</span>
+                  <strong>{readingRewardPoints}</strong>
+                  <em>分 / 可获 {readingRewardAvailable} 分</em>
+                </article>
+              </div>
+
+              {readingBooksWithStats.length === 0 ? (
               <div className="reading-empty">
                 <BookOpen size={48} />
                 <strong>这个月份还没有阅读书单</strong>
-                <p>点击“新建书单”，给当前月份添加书名、阅读日期和读完奖励积分。</p>
+                <p>先在全局书单添加书，再到设置页为这本书安排阅读任务。</p>
                 <button onClick={openNewBookDialog}>新建书单</button>
               </div>
-            ) : (
+              ) : (
               <div className="reading-sections">
                 <div className="reading-controls-row">
                   <div className="reading-tabbar" role="tablist" aria-label="阅读书单分类">
@@ -3048,6 +3193,8 @@ function App() {
                   )}
                 </section>
               </div>
+              )}
+              </>
             )}
           </section>
         ) : activeView === 'tools' ? (
@@ -3394,6 +3541,7 @@ function App() {
                     {month.categories.map((category) => {
                       const isHabit = category.name === '好习惯';
                       const isReading = category.name === '阅读';
+                      const readingBookOptions = isReading ? normalizeLibraryBooks([...(libraryBooks || []), ...(month.readingBooks || [])]) : [];
                       return (
                         <article className={`category-config-card category-${category.color} ${settingsFocusCategory === category.name ? 'settings-category-focus' : ''}`} data-setting-category-name={category.name} key={category.id}>
                           <div className="category-config-head">
@@ -3428,8 +3576,8 @@ function App() {
                                   <div className="reading-task-title">
                                     <select value={task.bookId || ''} onChange={(event) => updateTask(category.id, task.id, { bookId: event.target.value })}>
                                       <option value="">手动输入任务</option>
-                                      {month.readingBooks.map((book) => (
-                                        <option key={book.id} value={book.id}>{book.name || '未命名书目'}</option>
+                                      {readingBookOptions.map((book) => (
+                                        <option key={book.id} value={book.id}>{book.name || '未命名书目'} · {book.type || '其它'}</option>
                                       ))}
                                     </select>
                                     {!task.bookId && <input value={task.title} placeholder="输入阅读任务名称" onChange={(event) => updateTask(category.id, task.id, { title: event.target.value })} />}
@@ -3646,6 +3794,15 @@ function App() {
                   placeholder="例如：《尼尔斯骑鹅旅行记》"
                   onChange={(event) => setNewBookDialog((current) => ({ ...current, name: event.target.value }))}
                 />
+              </label>
+              <label>
+                <span>书的类型</span>
+                <select
+                  value={newBookDialog.type}
+                  onChange={(event) => setNewBookDialog((current) => ({ ...current, type: event.target.value }))}
+                >
+                  {BOOK_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
               </label>
               <label>
                 <span>总页数</span>

@@ -2968,6 +2968,7 @@ function App() {
                 <span>{month.label} · 当前月份清单中的阅读计划</span>
               </div>
               <div className="reading-hero-actions">
+                <button className="new-book-button" onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
                 <div className="month-switch tab-month-switch today-month-switch reading-month-switch">
                   <button onClick={() => changeMonth(-1)} aria-label="上个月">
                     <ChevronLeft size={21} />
@@ -2980,7 +2981,6 @@ function App() {
                     <ChevronRight size={21} />
                   </button>
                 </div>
-                <button className="new-book-button" onClick={openNewBookDialog}><BookOpen size={20} />新建书单</button>
               </div>
             </div>
 

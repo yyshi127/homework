@@ -970,6 +970,7 @@ function App() {
   const [mistakeSubjectFilter, setMistakeSubjectFilter] = useState('全部');
   const [hiddenTodayStageTasks, setHiddenTodayStageTasks] = useState({});
   const [todayFocusTaskId, setTodayFocusTaskId] = useState('');
+  const [settingsFocusCategory, setSettingsFocusCategory] = useState('');
   const [isBackfillMode, setIsBackfillMode] = useState(false);
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
@@ -2092,6 +2093,36 @@ function App() {
     }, 0);
     window.setTimeout(() => setTodayFocusTaskId((current) => (current === target.id ? '' : current)), 1600);
   };
+  const jumpToReadingSettings = () => {
+    setActiveView('settings');
+    setSettingsFocusCategory('阅读');
+    window.setTimeout(() => {
+      const addButton = document.querySelector('[data-setting-add-category="阅读"]');
+      const categoryCard = document.querySelector('[data-setting-category-name="阅读"]');
+      (addButton || categoryCard)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      addButton?.focus?.();
+    }, 0);
+    window.setTimeout(() => setSettingsFocusCategory((current) => (current === '阅读' ? '' : current)), 1800);
+  };
+  const jumpToReadingTask = (book) => {
+    const target = todayRows.find((row) => row.typeKey === 'reading' && row.book?.id === book.id);
+    if (!target) {
+      jumpToReadingSettings();
+      return;
+    }
+    setActiveView('today');
+    setTodayFocusTaskId(target.id);
+    setHiddenTodayStageTasks((current) => {
+      const next = { ...current };
+      delete next[`${todayHidePrefix}-${target.id}`];
+      return next;
+    });
+    window.setTimeout(() => {
+      const element = document.querySelector(`[data-today-task-id="${target.id}"]`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+    window.setTimeout(() => setTodayFocusTaskId((current) => (current === target.id ? '' : current)), 1800);
+  };
   const todayPoints = todayDay ? todayRows.reduce((sum, row) => {
     const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
     const status = getStatus(row.id, checkDay);
@@ -2268,8 +2299,8 @@ function App() {
 
       {(showReadingCheckinAction || showReadingSettingsAction) && (
         <div className="reading-book-actions">
-          {showReadingCheckinAction && <button onClick={() => setActiveView('today')}>去打卡</button>}
-          {showReadingSettingsAction && <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>}
+          {showReadingCheckinAction && <button onClick={() => jumpToReadingTask(book)}>去打卡</button>}
+          {showReadingSettingsAction && <button className="ghost" onClick={jumpToReadingSettings}>去设置</button>}
         </div>
       )}
     </article>
@@ -2309,9 +2340,9 @@ function App() {
         {stats.isComplete && !stats.isClaimed ? (
           <button className="mini-claim" onClick={() => claimReadingReward(book, stats)}>兑换积分</button>
         ) : stats.isComplete ? null : stats.statusGroup === 'upcoming' ? (
-          <button className="ghost" onClick={() => setActiveView('settings')}>去设置</button>
+          <button className="ghost" onClick={jumpToReadingSettings}>去设置</button>
         ) : (
-          <button onClick={() => setActiveView('today')}>去打卡</button>
+          <button onClick={() => jumpToReadingTask(book)}>去打卡</button>
         )}
       </div>
     </article>
@@ -3350,7 +3381,7 @@ function App() {
                       const isHabit = category.name === '好习惯';
                       const isReading = category.name === '阅读';
                       return (
-                        <article className={`category-config-card category-${category.color}`} key={category.id}>
+                        <article className={`category-config-card category-${category.color} ${settingsFocusCategory === category.name ? 'settings-category-focus' : ''}`} data-setting-category-name={category.name} key={category.id}>
                           <div className="category-config-head">
                             <div className="category-title">
                               <i>{category.badge}</i>
@@ -3423,7 +3454,7 @@ function App() {
                             ))}
                           </div>
                           <div className="config-row-actions">
-                            <button className="add-inline" onClick={() => addTask(category.id)}>+ 添加任务项</button>
+                            <button className="add-inline" data-setting-add-category={category.name} onClick={() => addTask(category.id)}>+ 添加任务项</button>
                             <button className="quick-save" onClick={saveConfiguration}><Save size={14} />快速保存</button>
                           </div>
                         </article>

@@ -3200,11 +3200,8 @@ button {
 }
 
 .reading-plan-list {
-  max-height: 230px;
-  overflow: auto;
   display: grid;
   gap: 7px;
-  padding-right: 2px;
 }
 
 .reading-plan-row {
@@ -4157,6 +4154,11 @@ button {
   overflow: hidden;
   background: white;
   box-shadow: none;
+}
+
+.category-config-card.settings-category-focus {
+  box-shadow: 0 0 0 5px rgba(255, 184, 62, 0.18), 0 18px 34px rgba(201, 132, 28, 0.14);
+  animation: todayTaskFocusPulse 1.8s ease;
 }
 
 .category-config-card::before {

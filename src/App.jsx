@@ -3132,7 +3132,7 @@ function App() {
                       return (
                         <>
                           {Array.from({ length: startDay - 1 }, (_, index) => (
-                            <td key={`before-${index}`} className="mark-cell inactive-cell" />
+                            <td key={`before-${index}`} className={`mark-cell inactive-cell stage-outside-cell before-stage ${index === 0 ? 'outside-start' : ''} ${index === startDay - 2 ? 'outside-end' : ''}`} />
                           ))}
                           <td
                             colSpan={endDay - startDay + 1}
@@ -3146,7 +3146,7 @@ function App() {
                             {note && <span className="note-corner" aria-hidden="true" />}
                           </td>
                           {Array.from({ length: month.days - endDay }, (_, index) => (
-                            <td key={`after-${index}`} className="mark-cell inactive-cell" />
+                            <td key={`after-${index}`} className={`mark-cell inactive-cell stage-outside-cell after-stage ${index === 0 ? 'outside-start' : ''} ${index === month.days - endDay - 1 ? 'outside-end' : ''}`} />
                           ))}
                         </>
                       );

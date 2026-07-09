@@ -2265,17 +2265,38 @@ button {
   background: rgba(248, 251, 250, 0.76) !important;
 }
 
+.stage-outside-cell {
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+}
+
+.stage-outside-cell.outside-start {
+  border-left-color: var(--soft-line) !important;
+}
+
+.stage-outside-cell.outside-end {
+  border-right-color: var(--soft-line) !important;
+}
+
 .task-stage .inactive-cell::after,
 .task-reading .inactive-cell::after {
   content: "";
   position: absolute;
-  left: -1px;
-  right: -1px;
+  left: 0;
+  right: 0;
   top: 50%;
   height: 2px;
   border-radius: 999px;
   background: rgba(73, 86, 91, 0.34);
   transform: translateY(-50%);
+}
+
+.stage-outside-cell.outside-start::after {
+  left: 14%;
+}
+
+.stage-outside-cell.outside-end::after {
+  right: 14%;
 }
 
 .row-blue.task-stage .inactive-cell,

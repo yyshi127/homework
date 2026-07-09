@@ -52,6 +52,8 @@ const STATUS = {
   super: { label: '非常优秀', points: 2 },
 };
 
+const REQUIRED_TODAY_SUBJECTS = ['语文', '数学', '英语', '阅读'];
+
 const NAV_ITEMS = [
   { label: '今日打卡', icon: Home },
   { label: '积分奖励', icon: Trophy },
@@ -963,6 +965,7 @@ function App() {
   const [mistakeTermFilter, setMistakeTermFilter] = useState('二年级上学期');
   const [mistakeSubjectFilter, setMistakeSubjectFilter] = useState('全部');
   const [hiddenTodayStageTasks, setHiddenTodayStageTasks] = useState({});
+  const [todayFocusTaskId, setTodayFocusTaskId] = useState('');
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
@@ -2017,6 +2020,28 @@ function App() {
     const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
     return getStatus(row.id, checkDay) !== 'empty';
   }).length : 0;
+  const isRequiredTodayTask = (row) => (
+    REQUIRED_TODAY_SUBJECTS.includes(row.subject) &&
+    row.typeKey !== 'stage' &&
+    row.checkMode !== 'stage'
+  );
+  const todayPendingCount = Math.max(0, todayRows.length - todayCompletedCount);
+  const todayRequiredPendingRows = todayDay ? todayRows.filter((row) => {
+    if (!isRequiredTodayTask(row)) return false;
+    const checkDay = taskCheckDayForToday(row, todayDay);
+    return checkDay !== null && getStatus(row.id, checkDay) === 'empty';
+  }) : [];
+  const todayRequiredPendingCount = todayRequiredPendingRows.length;
+  const jumpToFirstRequiredPendingTask = () => {
+    const target = todayRequiredPendingRows[0];
+    if (!target) return;
+    setTodayFocusTaskId(target.id);
+    window.setTimeout(() => {
+      const element = document.querySelector(`[data-today-task-id="${target.id}"]`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+    window.setTimeout(() => setTodayFocusTaskId((current) => (current === target.id ? '' : current)), 1600);
+  };
   const todayPoints = todayDay ? todayRows.reduce((sum, row) => {
     const checkDay = stageCompletedDay(row, month, todayDay) || taskCheckDayForToday(row, todayDay);
     const status = getStatus(row.id, checkDay);
@@ -2239,7 +2264,7 @@ function App() {
     }
 
     return (
-      <article className={`today-task-card row-${row.color} task-${row.typeKey} ${isStageRangeTask ? 'today-stage-task' : 'today-daily-task'}`} key={row.id}>
+      <article className={`today-task-card row-${row.color} task-${row.typeKey} ${isStageRangeTask ? 'today-stage-task' : 'today-daily-task'} ${todayFocusTaskId === row.id ? 'today-task-focus' : ''}`} data-today-task-id={row.id} key={row.id}>
         <div className="today-task-main">
           <div className="today-task-badge">
             <i>{row.badge}</i>
@@ -2431,7 +2456,7 @@ function App() {
             </div>
 
             <div className="today-summary">
-              <article>
+              <article className="tasks">
                 <span>今日任务</span>
                 <strong>{todayRows.length}</strong>
                 <em>项</em>
@@ -2441,14 +2466,20 @@ function App() {
                 <strong>{todayCompletedCount}</strong>
                 <em>项</em>
               </article>
+              <article className={`pending ${todayRequiredPendingCount > 0 ? 'clickable' : ''}`} role={todayRequiredPendingCount > 0 ? 'button' : undefined} tabIndex={todayRequiredPendingCount > 0 ? 0 : undefined} onClick={todayRequiredPendingCount > 0 ? jumpToFirstRequiredPendingTask : undefined} onKeyDown={todayRequiredPendingCount > 0 ? (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  jumpToFirstRequiredPendingTask();
+                }
+              } : undefined}>
+                <span>未打卡</span>
+                <strong>{todayPendingCount}</strong>
+                <em>项</em>
+                <small>含 {todayRequiredPendingCount} 个必打卡</small>
+              </article>
               <article className="points">
                 <span>今日积分</span>
                 <strong>{todayPoints}</strong>
-                <em>分</em>
-              </article>
-              <article>
-                <span>本月可用</span>
-                <strong>{availableRewardPoints}</strong>
                 <em>分</em>
               </article>
             </div>

@@ -2260,6 +2260,35 @@ button {
   background: repeating-linear-gradient(135deg, #f4f6f5, #f4f6f5 6px, #edf0ef 6px, #edf0ef 12px) !important;
 }
 
+.task-stage .inactive-cell,
+.task-reading .inactive-cell {
+  background: rgba(248, 251, 250, 0.76) !important;
+}
+
+.task-stage .inactive-cell::after,
+.task-reading .inactive-cell::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(73, 86, 91, 0.34);
+  transform: translateY(-50%);
+}
+
+.row-blue.task-stage .inactive-cell,
+.row-blue.task-reading .inactive-cell { background: rgba(242, 249, 255, 0.62) !important; }
+.row-green.task-stage .inactive-cell,
+.row-green.task-reading .inactive-cell { background: rgba(242, 251, 239, 0.62) !important; }
+.row-red.task-stage .inactive-cell,
+.row-red.task-reading .inactive-cell { background: rgba(255, 245, 245, 0.62) !important; }
+.row-purple.task-stage .inactive-cell,
+.row-purple.task-reading .inactive-cell { background: rgba(250, 246, 255, 0.62) !important; }
+.row-orange.task-stage .inactive-cell,
+.row-orange.task-reading .inactive-cell { background: rgba(255, 248, 232, 0.66) !important; }
+
 .range-cell {
   background: #fff8e9 !important;
 }

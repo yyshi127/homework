@@ -2706,13 +2706,12 @@ function App() {
     const effectiveDay = completedStageDay || day;
     const noteDay = (row.typeKey === 'stage' || row.typeKey === 'reading') && row.checkMode === 'stage' ? Number(row.startDay || effectiveDay) : effectiveDay;
     const value = getStatus(row.id, effectiveDay);
-    const visualStatus = completedStageDay ? 'done' : value;
+    const visualStatus = value;
     const note = month.notes?.[row.id]?.[noteDay];
     const isReading = row.typeKey === 'reading';
     const readingNote = typeof note === 'object' && note ? note : {};
     const noteText = formatCellNote(note);
     const isHabit = row.subject === '好习惯';
-    const statusLabel = isHabit && visualStatus !== 'empty' ? '完成' : completedStageDay ? '已完成' : value === 'empty' ? '未打卡' : STATUS[value].label;
     const taskTypeLabel = isStageRangeTask ? '阶段' : '每日';
     const checkModeLabel = isStageCheckMode ? '阶段打卡' : '每日打卡';
     const isCollapsed = isStageCheckMode && !completedStageDay && hiddenTodayStageTasks[`${todayHidePrefix}-${row.id}`];
@@ -2723,6 +2722,8 @@ function App() {
         { key: 'excellent', label: '优秀 +1 分', active: visualStatus === 'excellent' },
         { key: 'super', label: '玫瑰 +2 分', active: visualStatus === 'super' },
       ];
+
+    const todayStatusLabel = isHabit && visualStatus !== 'empty' ? '完成' : value === 'empty' ? '未打卡' : STATUS[value].label;
 
     if (isCollapsed) {
       return (
@@ -2769,11 +2770,11 @@ function App() {
         </div>
 
         <div className="today-check-panel">
-          <button className={`today-status-button status-${visualStatus}`} onClick={() => cycleStatus(row.id, day, { allowActiveToday: true })} type="button" disabled={Boolean(completedStageDay)}>
-            {!isHabit && (value === 'done' || completedStageDay) && <Check size={26} strokeWidth={3.2} />}
+          <button className={`today-status-button status-${visualStatus}`} onClick={() => cycleStatus(row.id, day, { allowActiveToday: true })} type="button">
+            {!isHabit && value === 'done' && <Check size={26} strokeWidth={3.2} />}
             {!isHabit && value === 'excellent' && <Star size={28} fill="currentColor" strokeWidth={2.8} />}
             {((isHabit && visualStatus !== 'empty') || value === 'super') && <span className="rose-icon" aria-hidden="true">🌹</span>}
-            <strong>{statusLabel}</strong>
+            <strong>{todayStatusLabel}</strong>
           </button>
           {isStageCheckMode && !completedStageDay && (
             <button className="today-skip-button" onClick={() => setHiddenTodayStageTasks((current) => ({ ...current, [`${todayHidePrefix}-${row.id}`]: true }))} type="button">

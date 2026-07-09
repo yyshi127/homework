@@ -2922,9 +2922,41 @@ button {
   font-weight: 950;
 }
 
+.reward-type-filter {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 8px;
+  border: 1px solid rgba(229, 237, 240, 0.9);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffefa, #f7fbf8);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.reward-type-filter button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #526166;
+  background: rgba(244, 248, 246, 0.88);
+  font-size: 13px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.reward-type-filter button.active {
+  color: #fff;
+  background: linear-gradient(135deg, #ff9f45, #ff6f61);
+  border-color: rgba(255, 137, 68, 0.42);
+  box-shadow: 0 10px 20px rgba(255, 118, 73, 0.2);
+}
+
 .reward-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
   gap: 14px;
 }
 
@@ -2948,21 +2980,21 @@ button {
 }
 
 .reward-product-icon {
-  width: 74px;
-  height: 74px;
-  border-radius: 22px;
+  width: 76px;
+  height: 76px;
+  border-radius: 24px;
   display: grid;
   place-items: center;
   color: #f08a24;
-  background: #fff2c8;
+  background: linear-gradient(145deg, #fff7d8, #ffedb4);
   border: 1px solid #ffe199;
-  box-shadow: inset 0 0 0 6px rgba(255,255,255,0.55), 0 12px 20px rgba(240, 138, 36, 0.14);
+  box-shadow: inset 0 0 0 6px rgba(255,255,255,0.58), 0 12px 20px rgba(240, 138, 36, 0.14);
   font-size: 40px;
   line-height: 1;
 }
 
-.reward-product-icon > span {
-  font-size: 42px;
+.reward-product-icon svg {
+  filter: drop-shadow(0 4px 6px rgba(240, 138, 36, 0.14));
 }
 
 .reward-shop-card.can-redeem {
@@ -3033,13 +3065,24 @@ button {
   box-shadow: 0 8px 16px rgba(47, 143, 77, 0.08);
 }
 
-.reward-shop-card > span {
-  display: none;
+.reward-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  margin-top: 10px;
+  border-radius: 999px;
+  padding: 0 9px;
+  color: #b26413;
+  background: #fff4d8;
+  border: 1px solid rgba(255, 213, 128, 0.7);
+  font-size: 11px;
+  font-weight: 950;
 }
 
 .reward-shop-card h3 {
-  min-height: 44px;
-  margin: 12px 0 6px;
+  min-height: 42px;
+  margin: 9px 0 6px;
   color: #164148;
   font-size: 17px;
   line-height: 1.25;
@@ -7017,6 +7060,45 @@ button {
 
 .reward-icon-picker small {
   font-size: 11px;
+}
+
+.reward-type-preview {
+  min-height: 72px;
+  border: 1px solid #ffe0a6;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #fff8df, #fffefa);
+  display: grid;
+  grid-template-columns: auto 46px auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.reward-type-preview span {
+  color: #4f5d62;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.reward-type-preview b {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  color: #f08a24;
+  background: #fff0bf;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 5px rgba(255,255,255,0.58);
+}
+
+.reward-type-preview small {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #b26413;
+  background: #fff4d8;
+  font-size: 12px;
+  font-weight: 950;
 }
 
 .reading-page-range label {

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   BookOpen,
+  BadgePlus,
   CalendarDays,
   Camera,
   Check,
@@ -9,13 +10,23 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  Cookie,
+  Crown,
   Download,
+  Dumbbell,
   FileText,
   Flag,
+  Gamepad2,
   Gift,
+  HeartHandshake,
   Home,
+  MapPinned,
   Medal,
+  PackageOpen,
+  Palette,
   Pencil,
+  PenLine,
+  PiggyBank,
   PlusCircle,
   Printer,
   Settings,
@@ -23,6 +34,7 @@ import {
   Star,
   Target,
   Trophy,
+  Trees,
   Upload,
   Wrench,
   RotateCcw,
@@ -186,12 +198,6 @@ const DEFAULT_SUBJECTS = [
 const DEFAULT_BOOKS = ['《尼尔斯骑鹅历险记》', '《一本看遍动物世界》', '《飞天奇翼龙》', '《抹香鲸的微笑（注音版）》'];
 const DEFAULT_BOOK_TYPES = ['自然', '科学', '百科', '历史', '地理', '童话', '文学', '小说', '漫画', '文化', '品格', '艺术', '生活', '其它'];
 
-const DEFAULT_REWARDS = [
-  { id: 'reward-notebook', points: '200', name: '精美笔记本' },
-  { id: 'reward-bookmark', points: '120', name: '可爱书签' },
-  { id: 'reward-medal', points: '300', name: '荣誉勋章' },
-];
-
 const DEFAULT_REMINDERS = [
   '每天安排固定的学习和休息时间，劳逸结合哦！',
   '记得每天阅读20分钟，积累知识。',
@@ -237,17 +243,122 @@ const POINT_RULE_DETAILS = [
   },
 ];
 
-const REWARD_ICON_OPTIONS = [
-  { value: 'gift', label: '礼盒', symbol: '🎁' },
-  { value: 'star', label: '星星', symbol: '⭐' },
-  { value: 'medal', label: '勋章', symbol: '🏅' },
-  { value: 'trophy', label: '奖杯', symbol: '🏆' },
-  { value: 'book', label: '图书', symbol: '📚' },
-  { value: 'pencil', label: '文具', symbol: '✏️' },
-  { value: 'toy', label: '玩具', symbol: '🧸' },
-  { value: 'car', label: '小车', symbol: '🚗' },
-  { value: 'puzzle', label: '积木', symbol: '🧩' },
+const REWARD_TYPES = [
+  { type: '文具用品', icon: 'PenLine' },
+  { type: '图书阅读', icon: 'BookOpen' },
+  { type: '玩具礼物', icon: 'Gift' },
+  { type: '美食零食', icon: 'Cookie' },
+  { type: '娱乐时间', icon: 'Gamepad2' },
+  { type: '户外活动', icon: 'Trees' },
+  { type: '亲子陪伴', icon: 'HeartHandshake' },
+  { type: '家庭特权', icon: 'Crown' },
+  { type: '学习成长', icon: 'Sparkles' },
+  { type: '运动健康', icon: 'Dumbbell' },
+  { type: '创意手工', icon: 'Palette' },
+  { type: '旅行出游', icon: 'MapPinned' },
+  { type: '惊喜盲盒', icon: 'PackageOpen' },
+  { type: '现金储蓄', icon: 'PiggyBank' },
+  { type: '荣誉成就', icon: 'Trophy' },
+  { type: '自定义', icon: 'BadgePlus' },
 ];
+
+const REWARD_CATALOG_VERSION = 1;
+
+const DEFAULT_REWARDS = [
+  { id: 'reward-sticker-pack', points: '10', name: '可爱贴纸', description: '选一张喜欢的贴纸装饰本子。', type: '文具用品', icon: 'PenLine' },
+  { id: 'reward-pencil', points: '20', name: '卡通铅笔', description: '奖励一支喜欢的铅笔。', type: '文具用品', icon: 'PenLine' },
+  { id: 'reward-eraser', points: '30', name: '趣味橡皮', description: '挑一个可爱造型橡皮。', type: '文具用品', icon: 'PenLine' },
+  { id: 'reward-notebook', points: '80', name: '精美笔记本', description: '换一本专属小笔记本。', type: '文具用品', icon: 'PenLine' },
+  { id: 'reward-bookmark', points: '15', name: '可爱书签', description: '给正在读的书配一个书签。', type: '图书阅读', icon: 'BookOpen' },
+  { id: 'reward-bedtime-story', points: '30', name: '睡前故事加长', description: '今晚多听一个小故事。', type: '图书阅读', icon: 'BookOpen' },
+  { id: 'reward-comic-book', points: '120', name: '选一本漫画', description: '去书架里选一本漫画读。', type: '图书阅读', icon: 'BookOpen' },
+  { id: 'reward-new-book', points: '220', name: '买一本新书', description: '去书店挑一本喜欢的新书。', type: '图书阅读', icon: 'BookOpen' },
+  { id: 'reward-mini-blindbox', points: '30', name: '小盲盒', description: '领取一个小惊喜盲盒。', type: '玩具礼物', icon: 'Gift' },
+  { id: 'reward-puzzle', points: '80', name: '拼图玩具', description: '选一个适合自己的拼图。', type: '玩具礼物', icon: 'Gift' },
+  { id: 'reward-blocks', points: '150', name: '积木小套装', description: '兑换一个小型积木套装。', type: '玩具礼物', icon: 'Gift' },
+  { id: 'reward-plush', points: '280', name: '毛绒挂件', description: '挑一个喜欢的小挂件。', type: '玩具礼物', icon: 'Gift' },
+  { id: 'reward-fruit', points: '10', name: '喜欢的水果', description: '今天安排一份喜欢的水果。', type: '美食零食', icon: 'Cookie' },
+  { id: 'reward-cookie', points: '25', name: '小饼干', description: '兑换一份小饼干。', type: '美食零食', icon: 'Cookie' },
+  { id: 'reward-icecream', points: '60', name: '冰激凌', description: '周末领取一个冰激凌。', type: '美食零食', icon: 'Cookie' },
+  { id: 'reward-family-meal', points: '180', name: '美味大餐', description: '选择一次喜欢的家庭餐。', type: '美食零食', icon: 'Cookie' },
+  { id: 'reward-cartoon-10', points: '20', name: '动画片 10 分钟', description: '兑换 10 分钟动画时间。', type: '娱乐时间', icon: 'Gamepad2' },
+  { id: 'reward-game-15', points: '40', name: '游戏 15 分钟', description: '兑换 15 分钟游戏时间。', type: '娱乐时间', icon: 'Gamepad2' },
+  { id: 'reward-movie-night', points: '120', name: '家庭电影夜', description: '选一部适合全家看的电影。', type: '娱乐时间', icon: 'Gamepad2' },
+  { id: 'reward-tablet-time', points: '160', name: '平板娱乐时间', description: '兑换一次约定好的平板时间。', type: '娱乐时间', icon: 'Gamepad2' },
+  { id: 'reward-park', points: '50', name: '去公园玩', description: '安排一次公园活动。', type: '户外活动', icon: 'Trees' },
+  { id: 'reward-bike', points: '80', name: '骑车时间', description: '出去骑车放松一下。', type: '户外活动', icon: 'Trees' },
+  { id: 'reward-kite', points: '120', name: '放风筝', description: '天气合适时去放风筝。', type: '户外活动', icon: 'Trees' },
+  { id: 'reward-camping', points: '320', name: '户外露营', description: '兑换一次小型户外露营计划。', type: '户外活动', icon: 'Trees' },
+  { id: 'reward-parent-play', points: '30', name: '陪玩 30 分钟', description: '爸爸妈妈专心陪玩半小时。', type: '亲子陪伴', icon: 'HeartHandshake' },
+  { id: 'reward-board-game', points: '60', name: '亲子桌游', description: '全家一起玩一局桌游。', type: '亲子陪伴', icon: 'HeartHandshake' },
+  { id: 'reward-handcraft-together', points: '90', name: '一起做手工', description: '和家人一起完成一个手工作品。', type: '亲子陪伴', icon: 'HeartHandshake' },
+  { id: 'reward-parent-date', points: '180', name: '亲子约会', description: '安排一次专属亲子时间。', type: '亲子陪伴', icon: 'HeartHandshake' },
+  { id: 'reward-dinner-choice', points: '30', name: '今天选晚饭', description: '由小朋友决定今天晚饭吃什么。', type: '家庭特权', icon: 'Crown' },
+  { id: 'reward-captain', points: '50', name: '当一天小队长', description: '今天做家庭小队长。', type: '家庭特权', icon: 'Crown' },
+  { id: 'reward-weekend-choice', points: '120', name: '决定周末活动', description: '选择一次周末家庭活动。', type: '家庭特权', icon: 'Crown' },
+  { id: 'reward-room-decor', points: '180', name: '布置小角落', description: '给自己的书桌或房间添一点装饰。', type: '家庭特权', icon: 'Crown' },
+  { id: 'reward-science-kit', points: '80', name: '科学小实验', description: '做一次安全有趣的小实验。', type: '学习成长', icon: 'Sparkles' },
+  { id: 'reward-museum', points: '180', name: '博物馆参观', description: '去看一次展览或博物馆。', type: '学习成长', icon: 'Sparkles' },
+  { id: 'reward-interest-class', points: '260', name: '兴趣课体验', description: '体验一次感兴趣的课程。', type: '学习成长', icon: 'Sparkles' },
+  { id: 'reward-learning-tool', points: '360', name: '学习小工具', description: '选择一个有帮助的学习小工具。', type: '学习成长', icon: 'Sparkles' },
+  { id: 'reward-jump-rope', points: '40', name: '跳绳挑战奖励', description: '完成运动挑战后领取。', type: '运动健康', icon: 'Dumbbell' },
+  { id: 'reward-ball-game', points: '80', name: '球类活动', description: '安排一次球类运动。', type: '运动健康', icon: 'Dumbbell' },
+  { id: 'reward-swimming', points: '160', name: '去游泳', description: '兑换一次游泳活动。', type: '运动健康', icon: 'Dumbbell' },
+  { id: 'reward-sport-gear', points: '300', name: '运动装备', description: '挑一件运动小装备。', type: '运动健康', icon: 'Dumbbell' },
+  { id: 'reward-origami', points: '25', name: '折纸材料', description: '领取一套折纸材料。', type: '创意手工', icon: 'Palette' },
+  { id: 'reward-clay', points: '60', name: '黏土时间', description: '玩一次彩色黏土。', type: '创意手工', icon: 'Palette' },
+  { id: 'reward-painting-set', points: '120', name: '画画材料', description: '补充一份画画材料。', type: '创意手工', icon: 'Palette' },
+  { id: 'reward-diy-kit', points: '200', name: 'DIY 手工套装', description: '兑换一个完整手工套装。', type: '创意手工', icon: 'Palette' },
+  { id: 'reward-zoo', points: '220', name: '动物园', description: '去动物园看喜欢的动物。', type: '旅行出游', icon: 'MapPinned' },
+  { id: 'reward-aquarium', points: '300', name: '海洋馆', description: '安排一次海洋馆之旅。', type: '旅行出游', icon: 'MapPinned' },
+  { id: 'reward-theme-park', points: '500', name: '游乐园', description: '兑换一次游乐园计划。', type: '旅行出游', icon: 'MapPinned' },
+  { id: 'reward-short-trip', points: '800', name: '短途旅行', description: '攒够后安排一次短途出游。', type: '旅行出游', icon: 'MapPinned' },
+  { id: 'reward-little-surprise', points: '20', name: '小惊喜', description: '领取一个家长准备的小惊喜。', type: '惊喜盲盒', icon: 'PackageOpen' },
+  { id: 'reward-mystery-box', points: '60', name: '神秘盲盒', description: '不知道是什么，但一定很开心。', type: '惊喜盲盒', icon: 'PackageOpen' },
+  { id: 'reward-lucky-draw', points: '100', name: '幸运抽奖', description: '从奖励盒里抽一次奖。', type: '惊喜盲盒', icon: 'PackageOpen' },
+  { id: 'reward-big-gift', points: '360', name: '神秘大礼包', description: '兑换一份大惊喜。', type: '惊喜盲盒', icon: 'PackageOpen' },
+  { id: 'reward-save-5', points: '50', name: '存入 5 元', description: '放进自己的储蓄罐。', type: '现金储蓄', icon: 'PiggyBank' },
+  { id: 'reward-book-fund', points: '100', name: '买书基金', description: '攒到买书基金里。', type: '现金储蓄', icon: 'PiggyBank' },
+  { id: 'reward-save-20', points: '200', name: '存入 20 元', description: '用于长期目标储蓄。', type: '现金储蓄', icon: 'PiggyBank' },
+  { id: 'reward-money-plan', points: '300', name: '零花钱计划', description: '和家长一起制定使用计划。', type: '现金储蓄', icon: 'PiggyBank' },
+  { id: 'reward-today-star', points: '10', name: '今日之星', description: '获得一次家庭表扬。', type: '荣誉成就', icon: 'Trophy' },
+  { id: 'reward-progress-badge', points: '30', name: '进步徽章', description: '记录一次明显进步。', type: '荣誉成就', icon: 'Trophy' },
+  { id: 'reward-certificate', points: '80', name: '成就证书', description: '打印或手写一张成就证书。', type: '荣誉成就', icon: 'Trophy' },
+  { id: 'reward-honor-wall', points: '150', name: '家庭表扬墙', description: '把本周表现贴到表扬墙。', type: '荣誉成就', icon: 'Trophy' },
+  { id: 'reward-custom-small', points: '30', name: '自定义小奖励', description: '家长临时设置的小奖励。', type: '自定义', icon: 'BadgePlus' },
+  { id: 'reward-custom-medium', points: '100', name: '自定义大奖励', description: '留给家长自由安排。', type: '自定义', icon: 'BadgePlus' },
+];
+
+const REWARD_ICON_COMPONENTS = {
+  BadgePlus,
+  BookOpen,
+  Cookie,
+  Crown,
+  Dumbbell,
+  Gamepad2,
+  Gift,
+  HeartHandshake,
+  MapPinned,
+  PackageOpen,
+  Palette,
+  PenLine,
+  PiggyBank,
+  Sparkles,
+  Trees,
+  Trophy,
+};
+
+const LEGACY_REWARD_ICON_TYPES = {
+  gift: '玩具礼物',
+  star: '荣誉成就',
+  medal: '荣誉成就',
+  trophy: '荣誉成就',
+  book: '图书阅读',
+  pencil: '文具用品',
+  toy: '玩具礼物',
+  car: '玩具礼物',
+  puzzle: '玩具礼物',
+};
 
 function normalizeStatus(status) {
   return STATUS[status] ? status : 'empty';
@@ -271,15 +382,25 @@ function rewardKey(item, index) {
   return item.id || `reward-${index}`;
 }
 
+function rewardTypeMeta(type) {
+  return REWARD_TYPES.find((item) => item.type === type) || REWARD_TYPES[REWARD_TYPES.length - 1];
+}
+
 function normalizeRewardConfig(config = DEFAULT_REWARDS) {
   const source = config?.length ? config : DEFAULT_REWARDS;
-  return source.map((item, index) => ({
-    id: item.id || `reward-${index}`,
-    points: item.points ?? '',
-    name: item.name ?? '',
-    description: item.description ?? '',
-    icon: item.icon || REWARD_ICON_OPTIONS[index % REWARD_ICON_OPTIONS.length].value,
-  }));
+  return source.map((item, index) => {
+    const type = item.type || LEGACY_REWARD_ICON_TYPES[item.icon] || '自定义';
+    const meta = rewardTypeMeta(type);
+    const icon = REWARD_ICON_COMPONENTS[item.icon] ? item.icon : meta.icon;
+    return {
+      id: item.id || `reward-${index}`,
+      points: item.points ?? '',
+      name: item.name ?? '',
+      description: item.description ?? '',
+      type: meta.type,
+      icon,
+    };
+  });
 }
 
 function sortRewardsByPoints(rewards = []) {
@@ -574,6 +695,12 @@ function sanitizeLoadedState(saved) {
     return migrateLegacyState(next);
   }
   next.months = next.months.map(normalizeMonth);
+  if (next.rewardCatalogVersion !== REWARD_CATALOG_VERSION) {
+    next.rewardConfig = DEFAULT_REWARDS;
+    next.rewardCatalogVersion = REWARD_CATALOG_VERSION;
+  } else {
+    next.rewardConfig = normalizeRewardConfig(next.rewardConfig || DEFAULT_REWARDS);
+  }
   next.libraryBooks = normalizeLibraryBooks(next.libraryBooks?.length ? next.libraryBooks : collectLibraryBooks(next));
   next.bookTypes = normalizeBookTypes(next.bookTypes);
   next.learningTools = normalizeLearningTools(next.learningTools);
@@ -591,6 +718,8 @@ function createLocalCacheState(current) {
   if (!current || typeof current !== 'object') return current;
   return {
     ...current,
+    rewardConfig: normalizeRewardConfig(current.rewardConfig || DEFAULT_REWARDS),
+    rewardCatalogVersion: current.rewardCatalogVersion || REWARD_CATALOG_VERSION,
     libraryBooks: normalizeLibraryBooks(current.libraryBooks || []),
     bookTypes: normalizeBookTypes(current.bookTypes),
     learningTools: normalizeLearningTools(current.learningTools),
@@ -837,6 +966,8 @@ function migrateLegacyState(saved) {
     templates: saved.templates?.length ? saved.templates : [createSummerTemplate(months)],
     activeMonthId: months[0]?.id,
     snapshots: [],
+    rewardConfig: DEFAULT_REWARDS,
+    rewardCatalogVersion: REWARD_CATALOG_VERSION,
     libraryBooks: collectLibraryBooks({ ...saved, months }),
     bookTypes: normalizeBookTypes(saved.bookTypes),
     learningTools: normalizeLearningTools(saved.learningTools),
@@ -850,6 +981,7 @@ function createSeedState() {
     templates: [createSummerTemplate(months)],
     activeMonthId: months[0]?.id,
     rewardConfig: DEFAULT_REWARDS,
+    rewardCatalogVersion: REWARD_CATALOG_VERSION,
     libraryBooks: normalizeLibraryBooks(DEFAULT_BOOKS.map((name, index) => ({ id: `library-default-${index}`, name, type: '其它' }))),
     bookTypes: DEFAULT_BOOK_TYPES,
     books: DEFAULT_BOOKS,
@@ -1041,6 +1173,7 @@ function App() {
   const [bookTypesDialog, setBookTypesDialog] = useState(null);
   const [bookPagesDialog, setBookPagesDialog] = useState(null);
   const [newRewardDialog, setNewRewardDialog] = useState(null);
+  const [rewardTypeFilter, setRewardTypeFilter] = useState('全部');
   const [expandedReadingPlans, setExpandedReadingPlans] = useState({});
   const [learningTab, setLearningTab] = useState('grader');
   const [graderDraft, setGraderDraft] = useState(DEFAULT_GRADER_DRAFT);
@@ -1066,6 +1199,10 @@ function App() {
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
+  const displayedRewards = useMemo(
+    () => (rewardTypeFilter === '全部' ? rewardConfig : rewardConfig.filter((item) => item.type === rewardTypeFilter)),
+    [rewardConfig, rewardTypeFilter],
+  );
   const learningTools = useMemo(() => normalizeLearningTools(state.learningTools), [state.learningTools]);
   const libraryBooks = useMemo(() => normalizeLibraryBooks(state.libraryBooks || collectLibraryBooks({ ...state, months })), [state.libraryBooks, months]);
   const bookTypes = useMemo(() => normalizeBookTypes(state.bookTypes), [state.bookTypes]);
@@ -1597,7 +1734,8 @@ function App() {
       name,
       points: String(points),
       description: newRewardDialog.description.trim(),
-      icon: newRewardDialog.icon || 'gift',
+      type: rewardTypeMeta(newRewardDialog.type).type,
+      icon: newRewardDialog.icon || rewardTypeMeta(newRewardDialog.type).icon,
     };
     const rewards = normalizeRewardConfig(next.rewardConfig || DEFAULT_REWARDS);
     const rewardIndex = rewards.findIndex((item) => item.id === nextReward.id);
@@ -1618,7 +1756,8 @@ function App() {
       name: item.name || '',
       points: String(item.points || ''),
       description: item.description || '',
-      icon: item.icon || 'gift',
+      type: rewardTypeMeta(item.type).type,
+      icon: item.icon || rewardTypeMeta(item.type).icon,
     });
   };
 
@@ -3258,7 +3397,7 @@ function App() {
                 <span>当前可用积分：<strong>{availableRewardPoints}</strong> 分</span>
               </div>
               <div className="reward-hero-actions">
-                <button className="reward-add-button" onClick={() => setNewRewardDialog({ name: '', points: '', description: '', icon: 'gift' })}>
+                <button className="reward-add-button" onClick={() => setNewRewardDialog({ name: '', points: '', description: '', type: '文具用品', icon: 'PenLine' })}>
                   <Gift size={18} />
                   新增奖励
                 </button>
@@ -3294,17 +3433,26 @@ function App() {
                   <p>奖励货架</p>
                   <h3>挑一个想兑换的小奖励吧</h3>
                 </div>
-                <span>{rewardConfig.length} 个奖励</span>
+                <span>{displayedRewards.length} / {rewardConfig.length} 个奖励</span>
               </header>
+              <div className="reward-type-filter" aria-label="奖励类型筛选">
+                <button type="button" className={rewardTypeFilter === '全部' ? 'active' : ''} onClick={() => setRewardTypeFilter('全部')}>全部</button>
+                {REWARD_TYPES.map((item) => (
+                  <button type="button" key={item.type} className={rewardTypeFilter === item.type ? 'active' : ''} onClick={() => setRewardTypeFilter(item.type)}>
+                    {item.type}
+                  </button>
+                ))}
+              </div>
               <div className="reward-gallery">
-                {rewardConfig.map((item, index) => (
+                {displayedRewards.map((item, index) => (
                   (() => {
                     const points = Number(item.points || 0);
                     const key = rewardKey(item, index);
                     const redeemedCount = redeemedRewards.filter((record) => record.rewardId === key).length;
                     const canRedeem = points > 0 && availableRewardPoints >= points;
                     const missingPoints = Math.max(0, points - availableRewardPoints);
-                    const iconOption = REWARD_ICON_OPTIONS.find((option) => option.value === item.icon) || REWARD_ICON_OPTIONS[index % REWARD_ICON_OPTIONS.length];
+                    const typeMeta = rewardTypeMeta(item.type);
+                    const RewardIcon = REWARD_ICON_COMPONENTS[item.icon] || REWARD_ICON_COMPONENTS[typeMeta.icon] || Gift;
                     return (
                       <article className={`reward-shop-card ${canRedeem ? 'can-redeem' : ''} ${redeemedCount ? 'redeemed' : ''}`} key={key}>
                         <div className="reward-card-tools">
@@ -3317,8 +3465,9 @@ function App() {
                         </div>
                         {redeemedCount > 0 && <em className="reward-redeemed-count">已兑换 {redeemedCount} 次</em>}
                         <div className="reward-product-icon">
-                          <span aria-hidden="true">{iconOption.symbol}</span>
+                          <RewardIcon size={38} strokeWidth={2.4} />
                         </div>
+                        <span className="reward-type-badge">{typeMeta.type}</span>
                         <h3>{item.name || '未命名奖励'}</h3>
                         <strong>{item.points || '____'} 分</strong>
                         <p>{item.description || (canRedeem ? '可以兑换啦' : `还差 ${missingPoints} 分`)}</p>
@@ -4298,21 +4447,30 @@ function App() {
               </div>
             </header>
             <div className="book-dialog-fields">
-              <div className="reward-icon-picker">
-                <span>物品图标</span>
-                <div>
-                  {REWARD_ICON_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      className={newRewardDialog.icon === option.value ? 'active' : ''}
-                      type="button"
-                      onClick={() => setNewRewardDialog((current) => ({ ...current, icon: option.value }))}
-                    >
-                      <b>{option.image ? <img src={option.image} alt="" /> : option.symbol}</b>
-                      <small>{option.label}</small>
-                    </button>
-                  ))}
-                </div>
+              <label>
+                <span>奖励类型</span>
+                <select
+                  value={rewardTypeMeta(newRewardDialog.type).type}
+                  onChange={(event) => {
+                    const meta = rewardTypeMeta(event.target.value);
+                    setNewRewardDialog((current) => ({ ...current, type: meta.type, icon: meta.icon }));
+                  }}
+                >
+                  {REWARD_TYPES.map((item) => <option key={item.type} value={item.type}>{item.type}</option>)}
+                </select>
+              </label>
+              <div className="reward-type-preview">
+                {(() => {
+                  const meta = rewardTypeMeta(newRewardDialog.type);
+                  const PreviewIcon = REWARD_ICON_COMPONENTS[newRewardDialog.icon] || REWARD_ICON_COMPONENTS[meta.icon] || Gift;
+                  return (
+                    <>
+                      <span>推荐图标</span>
+                      <b><PreviewIcon size={30} /></b>
+                      <small>{meta.type}</small>
+                    </>
+                  );
+                })()}
               </div>
               <label>
                 <span>奖励内容</span>

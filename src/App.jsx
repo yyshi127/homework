@@ -875,7 +875,7 @@ function readingBookStats(month, book) {
     .map((day) => {
       const note = notes[day];
       const status = normalizeStatus(checks[day] || 'empty');
-      if (note && typeof note === 'object') {
+      if (status !== 'empty' && note && typeof note === 'object') {
         const endPage = Number(note.endPage || 0);
         if (endPage > currentPage) currentPage = endPage;
       }
@@ -884,6 +884,7 @@ function readingBookStats(month, book) {
         status,
         noteText: formatCellNote(note),
         hasNote: Boolean(note),
+        isCompleted: status !== 'empty',
       };
     })
     .filter((record) => record.status !== 'empty' || record.hasNote)
@@ -2150,7 +2151,10 @@ function App() {
           stats.records.map((record) => (
             <p key={`${book.id}-${record.day}`}>
               <span>{record.day}日</span>
-              <em>{record.noteText || STATUS[record.status].label}</em>
+              <em>
+                <i className={record.isCompleted ? 'record-done' : 'record-plan'}>{record.isCompleted ? '已完成' : '计划中'}</i>
+                {record.noteText || STATUS[record.status].label}
+              </em>
             </p>
           ))
         ) : (

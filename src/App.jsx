@@ -499,7 +499,7 @@ function buildTaskRows(month) {
     return tasks.map((task, itemIndex) => {
         const linkedBook = task.bookId ? month.readingBooks?.find((book) => book.id === task.bookId) : null;
         const effectiveType = linkedBook ? 'reading' : task.type;
-        const typeLabel = effectiveType === 'reading' ? '阅读' : effectiveType === 'stage' ? '阶段' : '每日';
+        const typeLabel = effectiveType === 'stage' || effectiveType === 'reading' ? '阶段' : '每日';
         const taskRow = {
           id: linkedBook?.id || task.id,
           subject: subject.name,

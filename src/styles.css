@@ -1453,15 +1453,28 @@ button {
 }
 
 .today-task-card.today-stage-task {
-  border-color: rgba(255, 185, 73, 0.55);
+  border-color: rgba(120, 151, 166, 0.42);
   background:
-    radial-gradient(circle at 94% 12%, rgba(255, 199, 92, 0.2), transparent 12rem),
-    linear-gradient(180deg, #fff9e9, #fffefa);
-  box-shadow: 0 12px 26px rgba(201, 132, 28, 0.08);
+    repeating-linear-gradient(135deg, rgba(101, 135, 148, 0.055) 0 8px, transparent 8px 18px),
+    radial-gradient(circle at 94% 12%, rgba(150, 196, 202, 0.17), transparent 12rem),
+    linear-gradient(180deg, #f8fcfb, #fffefa);
+  box-shadow: 0 12px 26px rgba(62, 101, 114, 0.08);
+}
+
+.today-task-card.today-stage-task::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed rgba(111, 143, 155, 0.38);
+  border-radius: 16px;
+  pointer-events: none;
 }
 
 .today-task-card.today-stage-task::before {
-  background: #ffb83e;
+  background:
+    linear-gradient(#6fa6b2, #6fa6b2) top / 100% 30% no-repeat,
+    linear-gradient(#f4c55f, #f4c55f) center / 100% 30% no-repeat,
+    linear-gradient(#56bd78, #56bd78) bottom / 100% 30% no-repeat;
 }
 
 .today-task-main {
@@ -1532,6 +1545,46 @@ button {
   font-weight: 900;
 }
 
+.today-task-copy .task-type-pill,
+.today-task-copy .check-mode-pill,
+.today-task-copy .task-date-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.today-task-copy .task-type-pill {
+  padding: 6px 10px;
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(39, 79, 88, 0.1);
+}
+
+.today-task-copy .daily-type {
+  background: linear-gradient(180deg, #48c96d, #2fae55);
+}
+
+.today-task-copy .stage-type {
+  background: linear-gradient(180deg, #5ba9bd, #357f95);
+}
+
+.today-task-copy .daily-mode {
+  color: #24954d;
+  background: #edf9ee;
+  border: 1px solid rgba(72, 201, 109, 0.24);
+}
+
+.today-task-copy .stage-mode {
+  color: #2f7387;
+  background: #edf8fb;
+  border: 1px solid rgba(91, 169, 189, 0.28);
+}
+
+.today-task-copy .task-date-range {
+  color: #755b16;
+  background: #fff7dd;
+  border: 1px solid rgba(244, 197, 95, 0.34);
+}
+
 .today-task-copy .score-chip-group {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1563,15 +1616,17 @@ button {
 }
 
 .today-collapsed-task {
-  border: 1px dashed rgba(255, 184, 62, 0.72);
+  border: 1px dashed rgba(111, 143, 155, 0.46);
   border-radius: 18px;
-  background: linear-gradient(180deg, #fff9e9, #fffefa);
+  background:
+    repeating-linear-gradient(135deg, rgba(101, 135, 148, 0.05) 0 8px, transparent 8px 18px),
+    linear-gradient(180deg, #f8fcfb, #fffefa);
   padding: 12px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  box-shadow: 0 8px 18px rgba(201, 132, 28, 0.06);
+  box-shadow: 0 8px 18px rgba(62, 101, 114, 0.06);
 }
 
 .today-collapsed-task > div {
@@ -1587,7 +1642,7 @@ button {
   height: 28px;
   border-radius: 9px;
   color: #fff;
-  background: #ffb83e;
+  background: linear-gradient(180deg, #5ba9bd, #357f95);
   display: grid;
   place-items: center;
   font-style: normal;
@@ -1595,7 +1650,7 @@ button {
 }
 
 .today-collapsed-task span {
-  color: #b86812;
+  color: #2f7387;
   font-size: 13px;
   font-weight: 950;
 }
@@ -1617,7 +1672,7 @@ button {
   border-radius: 999px;
   padding: 0 14px;
   color: #fff;
-  background: linear-gradient(180deg, #ffbd55, #f0982f);
+  background: linear-gradient(180deg, #5ba9bd, #357f95);
   font-size: 13px;
   font-weight: 950;
 }
@@ -1629,6 +1684,7 @@ button {
 }
 
 .today-status-button {
+  position: relative;
   width: 132px;
   min-height: 96px;
   border: 1px solid #e0e9e5;
@@ -1644,12 +1700,52 @@ button {
   font-size: 15px;
   font-weight: 950;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 8px 18px rgba(54, 67, 72, 0.06);
+  overflow: hidden;
 }
 
 .today-status-button strong {
+  position: relative;
+  z-index: 1;
   border-radius: 999px;
   padding: 4px 10px;
   background: rgba(238, 243, 241, 0.86);
+}
+
+.today-status-button.status-empty {
+  color: #35525b;
+  border-color: rgba(151, 181, 183, 0.5);
+  background:
+    radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.95), transparent 34%),
+    radial-gradient(circle at 86% 86%, rgba(136, 211, 193, 0.2), transparent 38%),
+    linear-gradient(180deg, #fbfffd, #eff7f4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.45),
+    0 10px 22px rgba(62, 101, 105, 0.09);
+}
+
+.today-status-button.status-empty::before {
+  content: "";
+  width: 28px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8bd9c2, #6aa7f2);
+  box-shadow: 0 6px 14px rgba(106, 167, 242, 0.18);
+}
+
+.today-status-button.status-empty::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border: 1px solid rgba(126, 165, 169, 0.22);
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+.today-status-button.status-empty strong {
+  color: #2f4d56;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(126, 165, 169, 0.18);
 }
 
 .today-status-button.status-done {

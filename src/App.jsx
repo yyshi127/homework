@@ -1049,7 +1049,7 @@ function App() {
   const [aiConfigStatus, setAiConfigStatus] = useState('未读取 AI 配置');
   const [mistakeTermFilter, setMistakeTermFilter] = useState('二年级上学期');
   const [mistakeSubjectFilter, setMistakeSubjectFilter] = useState('全部');
-  const [hiddenTodayStageTasks, setHiddenTodayStageTasks] = useState({});
+  const [expandedTodayStageTasks, setExpandedTodayStageTasks] = useState({});
   const [collapsedTodaySubjects, setCollapsedTodaySubjects] = useState({});
   const [todayFocusTaskId, setTodayFocusTaskId] = useState('');
   const [settingsFocusCategory, setSettingsFocusCategory] = useState('');
@@ -2309,11 +2309,7 @@ function App() {
     setActiveView('today');
     setCollapsedTodaySubjects((current) => ({ ...current, [target.subject]: false }));
     setTodayFocusTaskId(target.id);
-    setHiddenTodayStageTasks((current) => {
-      const next = { ...current };
-      delete next[`${todayHidePrefix}-${target.id}`];
-      return next;
-    });
+    setExpandedTodayStageTasks((current) => ({ ...current, [`${todayHidePrefix}-${target.id}`]: true }));
     window.setTimeout(() => {
       const element = document.querySelector(`[data-today-task-id="${target.id}"]`);
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2714,7 +2710,8 @@ function App() {
     const isHabit = row.subject === '好习惯';
     const taskTypeLabel = isStageRangeTask ? '阶段' : '每日';
     const checkModeLabel = isStageCheckMode ? '阶段打卡' : '每日打卡';
-    const isCollapsed = isStageCheckMode && !completedStageDay && hiddenTodayStageTasks[`${todayHidePrefix}-${row.id}`];
+    const stageTaskKey = `${todayHidePrefix}-${row.id}`;
+    const isCollapsed = isStageCheckMode && !expandedTodayStageTasks[stageTaskKey];
     const statusChips = isHabit
       ? [{ key: 'habit', label: `完成 +${Number(row.habitPoints || 2)} 分`, active: visualStatus !== 'empty' }]
       : [
@@ -2730,15 +2727,11 @@ function App() {
         <article className={`today-collapsed-task row-${row.color}`} key={row.id}>
           <div>
             <i>{row.badge}</i>
-            <span>阶段打卡已暂不打卡</span>
+            <span>阶段打卡 · {row.startDay}日 - {row.endDay}日</span>
             <strong>{row.item}</strong>
           </div>
-          <button onClick={() => setHiddenTodayStageTasks((current) => {
-            const next = { ...current };
-            delete next[`${todayHidePrefix}-${row.id}`];
-            return next;
-          })} type="button">
-            展开
+          <button onClick={() => setExpandedTodayStageTasks((current) => ({ ...current, [stageTaskKey]: true }))} type="button">
+            展开打卡
           </button>
         </article>
       );
@@ -2757,9 +2750,12 @@ function App() {
               {row.item}
             </p>
             <div>
-              <span>{taskTypeLabel}</span>
-              <span className={isStageCheckMode ? 'stage-pill' : ''}>{checkModeLabel}</span>
-              {isStageRangeTask && <span>{row.startDay}日 - {row.endDay}日</span>}
+              <span className={`task-type-pill ${isStageRangeTask ? 'stage-type' : 'daily-type'}`}>
+                {isStageRangeTask ? <CalendarDays size={13} strokeWidth={2.8} /> : <ClipboardCheck size={13} strokeWidth={2.8} />}
+                {taskTypeLabel}
+              </span>
+              <span className={`check-mode-pill ${isStageCheckMode ? 'stage-mode' : 'daily-mode'}`}>{checkModeLabel}</span>
+              {isStageRangeTask && <span className="task-date-range">{row.startDay}日 - {row.endDay}日</span>}
               <span className="score-chip-group">
                 {statusChips.map((chip) => (
                   <b key={chip.key} className={`score-chip ${chip.active ? 'active' : ''}`}>{chip.label}</b>
@@ -2776,9 +2772,13 @@ function App() {
             {((isHabit && visualStatus !== 'empty') || value === 'super') && <span className="rose-icon" aria-hidden="true">🌹</span>}
             <strong>{todayStatusLabel}</strong>
           </button>
-          {isStageCheckMode && !completedStageDay && (
-            <button className="today-skip-button" onClick={() => setHiddenTodayStageTasks((current) => ({ ...current, [`${todayHidePrefix}-${row.id}`]: true }))} type="button">
-              未完成，暂不打卡
+          {isStageCheckMode && (
+            <button className="today-skip-button" onClick={() => setExpandedTodayStageTasks((current) => {
+              const next = { ...current };
+              delete next[stageTaskKey];
+              return next;
+            })} type="button">
+              收起
             </button>
           )}
         </div>

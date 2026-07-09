@@ -1050,6 +1050,7 @@ function App() {
   const [mistakeTermFilter, setMistakeTermFilter] = useState('二年级上学期');
   const [mistakeSubjectFilter, setMistakeSubjectFilter] = useState('全部');
   const [expandedTodayStageTasks, setExpandedTodayStageTasks] = useState({});
+  const [expandedTodayNotes, setExpandedTodayNotes] = useState({});
   const [collapsedTodaySubjects, setCollapsedTodaySubjects] = useState({});
   const [todayFocusTaskId, setTodayFocusTaskId] = useState('');
   const [settingsFocusCategory, setSettingsFocusCategory] = useState('');
@@ -2704,6 +2705,8 @@ function App() {
     const value = getStatus(row.id, effectiveDay);
     const visualStatus = value;
     const note = month.notes?.[row.id]?.[noteDay];
+    const notePanelKey = `${todayHidePrefix}-${row.id}-${noteDay}`;
+    const isNoteExpanded = Boolean(expandedTodayNotes[notePanelKey]);
     const isReading = row.typeKey === 'reading';
     const readingNote = typeof note === 'object' && note ? note : {};
     const noteText = formatCellNote(note);
@@ -2783,11 +2786,12 @@ function App() {
           )}
         </div>
 
-        <div className="today-note-panel">
-          <div className="today-note-title">
+        <div className={`today-note-panel ${isNoteExpanded ? 'mobile-note-expanded' : 'mobile-note-collapsed'}`}>
+          <button className="today-note-title" type="button" onClick={() => setExpandedTodayNotes((current) => ({ ...current, [notePanelKey]: !current[notePanelKey] }))}>
             <strong>{noteText ? '已备注' : '今日备注'}</strong>
             {noteText && <span>{noteText}</span>}
-          </div>
+            <ChevronDown size={16} />
+          </button>
           {isReading ? (
             <div className="today-reading-note">
               <label>

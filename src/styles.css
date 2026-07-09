@@ -2015,10 +2015,15 @@ button {
 }
 
 .today-note-title {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  text-align: left;
 }
 
 .today-note-title strong {
@@ -2028,6 +2033,7 @@ button {
 }
 
 .today-note-title span {
+  flex: 1 1 auto;
   min-width: 0;
   color: #43a75a;
   font-size: 12px;
@@ -2035,6 +2041,12 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.today-note-title svg {
+  display: none;
+  flex: 0 0 auto;
+  color: #8a989c;
 }
 
 .today-note-input,
@@ -7872,6 +7884,32 @@ button {
 
   .today-note-panel {
     border-radius: 16px;
+    padding: 11px 12px;
+    gap: 0;
+  }
+
+  .today-note-title {
+    align-items: center;
+    min-height: 24px;
+    cursor: pointer;
+  }
+
+  .today-note-title svg {
+    display: block;
+    transition: transform .18s ease;
+  }
+
+  .today-note-panel.mobile-note-expanded .today-note-title svg {
+    transform: rotate(180deg);
+  }
+
+  .today-note-panel.mobile-note-collapsed .today-note-input,
+  .today-note-panel.mobile-note-collapsed .today-reading-note {
+    display: none;
+  }
+
+  .today-note-panel.mobile-note-expanded {
+    gap: 10px;
   }
 
   .today-reading-note {

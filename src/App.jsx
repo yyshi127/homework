@@ -18,6 +18,7 @@ import {
   Flag,
   Gamepad2,
   Gift,
+  GraduationCap,
   HeartHandshake,
   Home,
   MapPinned,
@@ -36,6 +37,7 @@ import {
   Trophy,
   Trees,
   Upload,
+  UserRound,
   Wrench,
   RotateCcw,
   Save,
@@ -74,6 +76,17 @@ const DEFAULT_POINT_CONFIG = {
   habit: 5,
   readingBook: 20,
 };
+const DEFAULT_PROFILE = {
+  avatarData: '',
+  avatarHistory: [],
+  name: '严艺欣',
+  gender: '女孩',
+  birthday: '',
+  school: '',
+  grade: '二年级',
+};
+const PROFILE_GENDERS = ['女孩', '男孩'];
+const PROFILE_GRADES = ['一年级', '二年级', '三年级', '四年级', '五年级', '六年级'];
 const DEFAULT_READING_REWARD_POINTS = DEFAULT_POINT_CONFIG.readingBook;
 const DEFAULT_HABIT_POINTS = DEFAULT_POINT_CONFIG.habit;
 const READING_REWARD_VERSION = 2;
@@ -419,6 +432,27 @@ function normalizePointConfig(config = {}) {
     super: Math.max(0, Number(config.super ?? DEFAULT_POINT_CONFIG.super)),
     habit: Math.max(0, Number(config.habit ?? DEFAULT_POINT_CONFIG.habit)),
     readingBook: Math.max(0, Number(config.readingBook ?? DEFAULT_POINT_CONFIG.readingBook)),
+  };
+}
+
+function normalizeProfile(value = {}) {
+  const gender = PROFILE_GENDERS.includes(value.gender) ? value.gender : DEFAULT_PROFILE.gender;
+  const grade = PROFILE_GRADES.includes(value.grade) ? value.grade : (value.grade || DEFAULT_PROFILE.grade);
+  const avatarData = typeof value.avatarData === 'string' && value.avatarData.startsWith('data:image/') ? value.avatarData : '';
+  const avatarHistory = Array.from(new Set([
+    avatarData,
+    ...((value.avatarHistory || []).filter((item) => typeof item === 'string' && item.startsWith('data:image/'))),
+  ].filter(Boolean))).slice(0, 3);
+  return {
+    ...DEFAULT_PROFILE,
+    ...(value || {}),
+    avatarData,
+    avatarHistory,
+    name: String(value.name || DEFAULT_PROFILE.name).trim(),
+    gender,
+    birthday: String(value.birthday || ''),
+    school: String(value.school || '').trim(),
+    grade,
   };
 }
 
@@ -818,10 +852,7 @@ function sanitizeLoadedState(saved) {
     next.rewardConfig = normalizeRewardConfig(next.rewardConfig || DEFAULT_REWARDS);
   }
   next.pointConfig = normalizePointConfig(next.pointConfig);
-  next.profile = {
-    ...(next.profile || {}),
-    avatarData: typeof next.profile?.avatarData === 'string' && next.profile.avatarData.startsWith('data:image/') ? next.profile.avatarData : '',
-  };
+  next.profile = normalizeProfile(next.profile);
   if (next.readingRewardVersion !== READING_REWARD_VERSION) {
     upgradeLegacyReadingRewardPoints(next);
   }
@@ -846,10 +877,7 @@ function createLocalCacheState(current) {
     rewardCatalogVersion: current.rewardCatalogVersion || REWARD_CATALOG_VERSION,
     pointConfig: normalizePointConfig(current.pointConfig),
     readingRewardVersion: current.readingRewardVersion || READING_REWARD_VERSION,
-    profile: {
-      ...(current.profile || {}),
-      avatarData: typeof current.profile?.avatarData === 'string' && current.profile.avatarData.startsWith('data:image/') ? current.profile.avatarData : '',
-    },
+    profile: normalizeProfile(current.profile),
     libraryBooks: normalizeLibraryBooks(current.libraryBooks || []),
     bookTypes: normalizeBookTypes(current.bookTypes),
     learningTools: normalizeLearningTools(current.learningTools),
@@ -1102,7 +1130,7 @@ function migrateLegacyState(saved) {
     rewardCatalogVersion: REWARD_CATALOG_VERSION,
     pointConfig: DEFAULT_POINT_CONFIG,
     readingRewardVersion: READING_REWARD_VERSION,
-    profile: { avatarData: '' },
+    profile: DEFAULT_PROFILE,
     libraryBooks: collectLibraryBooks({ ...saved, months }),
     bookTypes: normalizeBookTypes(saved.bookTypes),
     learningTools: normalizeLearningTools(saved.learningTools),
@@ -1119,7 +1147,7 @@ function createSeedState() {
     rewardCatalogVersion: REWARD_CATALOG_VERSION,
     pointConfig: DEFAULT_POINT_CONFIG,
     readingRewardVersion: READING_REWARD_VERSION,
-    profile: { avatarData: '' },
+    profile: DEFAULT_PROFILE,
     libraryBooks: normalizeLibraryBooks(DEFAULT_BOOKS.map((name, index) => ({ id: `library-default-${index}`, name, type: '其它' }))),
     bookTypes: DEFAULT_BOOK_TYPES,
     books: DEFAULT_BOOKS,
@@ -1324,6 +1352,7 @@ function App() {
   const [newBookDialog, setNewBookDialog] = useState(null);
   const [bookTypesDialog, setBookTypesDialog] = useState(null);
   const [bookPagesDialog, setBookPagesDialog] = useState(null);
+  const [profileDialog, setProfileDialog] = useState(null);
   const [newRewardDialog, setNewRewardDialog] = useState(null);
   const [pointConfigDialog, setPointConfigDialog] = useState(null);
   const [rewardTypeFilter, setRewardTypeFilter] = useState('全部');
@@ -1355,7 +1384,7 @@ function App() {
   const appDialogResolverRef = useRef(null);
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
-  const profile = state.profile || {};
+  const profile = normalizeProfile(state.profile);
   const pointConfig = useMemo(() => normalizePointConfig(state.pointConfig), [state.pointConfig]);
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
   const pointRules = useMemo(() => [
@@ -2357,20 +2386,49 @@ function App() {
     image.src = objectUrl;
   });
 
+  const openProfileDialog = () => {
+    setProfileDialog(normalizeProfile(stateRef.current?.profile || profile));
+  };
+
+  const updateProfileDialog = (patch) => {
+    setProfileDialog((current) => ({ ...(current || profile), ...patch }));
+  };
+
   const handleAvatarImageChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       const avatarData = await readAvatarImage(file);
-      const next = structuredClone(stateRef.current || state || {});
-      next.profile = { ...(next.profile || {}), avatarData };
-      setState(next);
-      await persistState(next, '头像已保存到 SQLite');
+      setProfileDialog((current) => {
+        const base = normalizeProfile(current || profile);
+        return normalizeProfile({
+          ...base,
+          avatarData,
+          avatarHistory: [avatarData, base.avatarData, ...(base.avatarHistory || [])],
+        });
+      });
     } catch (error) {
       showAppAlert(error?.message || '头像更换失败，请重试', { tone: 'warning' });
     } finally {
       event.target.value = '';
     }
+  };
+
+  const chooseProfileHistoryAvatar = (avatarData) => {
+    updateProfileDialog({
+      avatarData,
+      avatarHistory: [avatarData, ...(profileDialog?.avatarHistory || [])],
+    });
+  };
+
+  const saveProfileDialog = async () => {
+    if (!profileDialog) return;
+    const nextProfile = normalizeProfile(profileDialog);
+    const next = structuredClone(stateRef.current || state || {});
+    next.profile = nextProfile;
+    setState(next);
+    setProfileDialog(null);
+    await persistState(next, '小朋友信息已保存到 SQLite');
   };
 
   const handleHomeworkImageChange = async (event) => {
@@ -3592,11 +3650,10 @@ function App() {
         <header className="topbar">
           <div className="topbar-main">
             <div className="brand-block">
-              <button className="mascot-card" type="button" onClick={() => avatarInputRef.current?.click()} aria-label="更换头像" title="点击更换头像">
-                <img src={profile.avatarData || mascotImage} alt="严艺欣小朋友" />
-                <span>更换头像</span>
+              <button className="mascot-card" type="button" onClick={openProfileDialog} aria-label="设置小朋友信息" title="设置小朋友信息">
+                <img src={profile.avatarData || mascotImage} alt={`${profile.name || '小朋友'}头像`} />
+                <span><Pencil size={16} /></span>
               </button>
-              <input ref={avatarInputRef} className="avatar-file-input" type="file" accept="image/*" onChange={handleAvatarImageChange} />
               <div className="brand-copy">
                 <h1>{month.title || '学习好习惯·快乐成长每一天'}<Star className="title-star" size={25} fill="#ffc84a" /></h1>
                 <p>每天进步一点点，成长收获满满！</p>
@@ -4871,6 +4928,76 @@ function App() {
                 </label>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {profileDialog && (
+        <section className="settings-mask" role="dialog" aria-modal="true" aria-label="设置小朋友信息">
+          <div className="book-dialog-panel profile-dialog-panel">
+            <header>
+              <div>
+                <h2>小朋友信息</h2>
+                <p>设置头像和基础信息，顶部资料卡会同步显示新的头像。</p>
+              </div>
+            </header>
+            <div className="profile-dialog-body">
+              <section className="profile-avatar-editor">
+                <button className="profile-avatar-preview" type="button" onClick={() => avatarInputRef.current?.click()}>
+                  <img src={profileDialog.avatarData || mascotImage} alt="小朋友头像预览" />
+                  <span><Camera size={18} />更换头像</span>
+                </button>
+                <input ref={avatarInputRef} className="avatar-file-input" type="file" accept="image/*" onChange={handleAvatarImageChange} />
+                <div className="profile-avatar-history">
+                  <strong>最近头像</strong>
+                  <div>
+                    {profileDialog.avatarHistory?.length ? profileDialog.avatarHistory.map((avatarData, index) => (
+                      <button
+                        className={avatarData === profileDialog.avatarData ? 'active' : ''}
+                        key={`${avatarData.slice(0, 32)}-${index}`}
+                        type="button"
+                        onClick={() => chooseProfileHistoryAvatar(avatarData)}
+                        aria-label={`选择最近头像 ${index + 1}`}
+                      >
+                        <img src={avatarData} alt="" />
+                      </button>
+                    )) : <span>更换头像后会保留最近 3 个</span>}
+                  </div>
+                </div>
+              </section>
+              <section className="profile-form-grid">
+                <label>
+                  <span><UserRound size={16} />姓名</span>
+                  <input value={profileDialog.name} placeholder="小朋友姓名" onChange={(event) => updateProfileDialog({ name: event.target.value })} />
+                </label>
+                <label>
+                  <span><Sparkles size={16} />性别</span>
+                  <div className="profile-gender-switch">
+                    {PROFILE_GENDERS.map((gender) => (
+                      <button className={profileDialog.gender === gender ? 'active' : ''} key={gender} type="button" onClick={() => updateProfileDialog({ gender })}>{gender}</button>
+                    ))}
+                  </div>
+                </label>
+                <label>
+                  <span><CalendarDays size={16} />生日</span>
+                  <input type="date" value={profileDialog.birthday} onChange={(event) => updateProfileDialog({ birthday: event.target.value })} />
+                </label>
+                <label>
+                  <span><GraduationCap size={16} />年级</span>
+                  <select value={profileDialog.grade} onChange={(event) => updateProfileDialog({ grade: event.target.value })}>
+                    {PROFILE_GRADES.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+                  </select>
+                </label>
+                <label className="profile-school-field">
+                  <span><Home size={16} />学校</span>
+                  <input value={profileDialog.school} placeholder="填写学校名称" onChange={(event) => updateProfileDialog({ school: event.target.value })} />
+                </label>
+              </section>
+            </div>
+            <footer>
+              <button className="ghost" onClick={() => setProfileDialog(null)}>取消</button>
+              <button onClick={saveProfileDialog}>保存信息</button>
+            </footer>
           </div>
         </section>
       )}

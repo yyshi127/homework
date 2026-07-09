@@ -4322,33 +4322,26 @@ button {
 
 .reading-plan-list {
   display: grid;
-  gap: 7px;
+  gap: 0;
 }
 
 .reading-plan-row {
-  min-height: 36px;
-  padding: 8px;
-  border-radius: 12px;
-  border: 1px solid rgba(232, 238, 235, 0.92);
-  background: rgba(255, 255, 255, 0.54);
+  min-height: 42px;
+  padding: 9px 8px;
+  border-top: 1px solid rgba(226, 236, 232, 0.86);
+  background: transparent;
 }
 
 .reading-plan-row.today {
-  margin: 0 -6px;
-  padding: 7px 6px;
-  border-radius: 12px;
-  border-top-color: transparent;
+  margin: 0;
+  padding: 9px 8px;
   background: linear-gradient(180deg, #eef8ff, #f8fcff);
-  box-shadow: inset 0 0 0 1px rgba(93, 157, 232, 0.18);
 }
 
 .reading-plan-row.missed {
-  margin: 0 -6px;
-  padding: 7px 6px;
-  border-radius: 12px;
-  border-top-color: transparent;
+  margin: 0;
+  padding: 9px 8px;
   background: linear-gradient(180deg, #fff0ee, #fff8f5);
-  box-shadow: inset 0 0 0 1px rgba(223, 47, 50, 0.16);
 }
 
 .reading-plan-row > span {

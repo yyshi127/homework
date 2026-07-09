@@ -2531,7 +2531,7 @@ function App() {
     const showReadingSettingsAction = !stats.isComplete && stats.statusGroup === 'upcoming';
 
     return (
-    <article className={`reading-book-card ${stats.isComplete ? 'finished' : ''}`} key={book.id}>
+    <article className={`reading-book-card reading-status-${stats.statusGroup} ${stats.isComplete ? 'finished' : ''}`} key={book.id}>
       <div className="reading-book-head">
         <div>
           <span>{stats.startDay}日 - {stats.endDay}日</span>

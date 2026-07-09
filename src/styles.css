@@ -3554,8 +3554,27 @@ button {
 }
 
 .reading-book-card.finished {
-  border-color: #ccebd5;
-  background: linear-gradient(180deg, #fbfffb, #fffefa);
+  border-color: #aee5c4;
+  background: linear-gradient(180deg, #e9faef 0%, #f8fff9 100%);
+}
+
+.reading-book-card.reading-status-reading {
+  border-color: #bde9ee;
+  background: linear-gradient(180deg, #ecfbfc 0%, #fbffff 100%);
+}
+
+.reading-book-card.reading-status-upcoming {
+  border-color: #ffe0a8;
+  background: linear-gradient(180deg, #fff7e5 0%, #fffefa 100%);
+}
+
+.reading-book-card.reading-status-unfinished {
+  border-color: #ffd1bd;
+  background: linear-gradient(180deg, #fff3ed 0%, #fffefa 100%);
+}
+
+.reading-book-card.finished .reading-progress-wrap {
+  background: rgba(232, 249, 238, 0.78);
 }
 
 .reading-book-head {

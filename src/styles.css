@@ -982,6 +982,7 @@ button {
   font-size: clamp(18px, 1.25vw, 25px);
   font-weight: 950;
   letter-spacing: 0;
+  color: #fff;
 }
 
 .subject-cell i {
@@ -994,56 +995,64 @@ button {
   place-items: center;
   font-style: normal;
   font-size: 13px;
-  box-shadow: 0 5px 9px rgba(36, 50, 56, 0.12);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26), 0 8px 16px rgba(36, 50, 56, 0.14);
+  backdrop-filter: blur(6px);
 }
 
 .subject-cell span {
   display: block;
+  text-shadow: 0 2px 8px rgba(22, 48, 57, 0.16);
 }
 
 .row-blue .subject-cell {
-  background: linear-gradient(180deg, #e8f5ff, #dff0ff);
-  color: #2874bd;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, #61aaf2, #317fd1);
 }
 
 .row-green .subject-cell {
-  background: linear-gradient(180deg, #f0fbe9, #e5f8df);
-  color: #339c54;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, #63c978, #35a657);
 }
 
 .row-red .subject-cell {
-  background: linear-gradient(180deg, #fff0f0, #ffe7e6);
-  color: #ea5a4f;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, #ff8582, #ec5653);
 }
 
 .row-purple .subject-cell {
-  background: linear-gradient(180deg, #f6f0ff, #efe8ff);
-  color: #8b63dd;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, #ae8cff, #7f5ddd);
 }
 
 .row-orange .subject-cell {
-  background: linear-gradient(180deg, #fff6db, #ffedbd);
-  color: #f28a22;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.24), transparent 34%),
+    linear-gradient(180deg, #ffc75e, #f29325);
 }
 
 .row-blue .subject-cell i {
-  background: var(--blue);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .row-green .subject-cell i {
-  background: var(--green);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .row-red .subject-cell i {
-  background: var(--red);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .row-purple .subject-cell i {
-  background: var(--purple);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .row-orange .subject-cell i {
-  background: var(--yellow);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
 }
 

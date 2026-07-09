@@ -2538,6 +2538,37 @@ button {
   background-color: rgba(255, 238, 198, 0.96);
 }
 
+.row-blue.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #3f8fe0, #1f67b4); border-color: transparent; }
+.row-green.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #43b65f, #258844); border-color: transparent; }
+.row-red.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #f26562, #d8403d); border-color: transparent; }
+.row-purple.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #9669ee, #6f48c8); border-color: transparent; }
+.row-orange.task-temporary .type-cell span { color: #fff; background: linear-gradient(180deg, #f6a83a, #d97706); border-color: transparent; }
+
+.row-blue.task-temporary .plan-cell,
+.row-blue.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
+  background-color: rgba(202, 229, 255, 0.98);
+}
+
+.row-green.task-temporary .plan-cell,
+.row-green.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
+  background-color: rgba(205, 240, 198, 0.98);
+}
+
+.row-red.task-temporary .plan-cell,
+.row-red.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
+  background-color: rgba(255, 214, 214, 0.98);
+}
+
+.row-purple.task-temporary .plan-cell,
+.row-purple.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
+  background-color: rgba(226, 214, 255, 0.98);
+}
+
+.row-orange.task-temporary .plan-cell,
+.row-orange.task-temporary .mark-cell:not(.inactive-cell):not(.past-cell) {
+  background-color: rgba(255, 224, 166, 0.98);
+}
+
 .mark-cell {
   height: 34px;
   text-align: center;

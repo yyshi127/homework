@@ -5406,16 +5406,78 @@ button {
   margin-top: 12px;
 }
 
-.settings-months .month-list button {
+.settings-month-select {
+  display: none;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.settings-month-select span {
+  color: #536064;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.settings-month-select select {
+  width: 100%;
+  border: 1px solid #dbe7eb;
+  color: #164148;
+  background: linear-gradient(180deg, #ffffff, #f4f9fb);
+  box-shadow: 0 8px 16px rgba(70, 105, 120, 0.08);
+}
+
+.settings-months .month-list .month-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 7px;
+}
+
+.settings-months .month-list .month-pick-button {
   justify-content: flex-start;
   color: #536064;
   background: #f3f8fb;
   text-align: left;
 }
 
-.settings-months .month-list button.active {
+.settings-months .month-list .month-list-item.active .month-pick-button {
   color: white;
   background: linear-gradient(180deg, #78aefa, #5b8ee8);
+}
+
+.settings-months .month-delete-button {
+  width: 34px;
+  min-width: 0;
+  padding: 0;
+  color: #d9544d;
+  background: #fff0ee;
+  border: 1px solid rgba(232, 133, 126, 0.38);
+  display: grid;
+  place-items: center;
+}
+
+.settings-months .month-delete-button:disabled {
+  color: #b9c1c3;
+  background: #f3f6f6;
+  border-color: #e3e9e9;
+  cursor: not-allowed;
+}
+
+.settings-month-delete-mobile {
+  display: none;
+  width: 100%;
+  margin-top: 10px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #d9544d;
+  background: #fff0ee;
+  border: 1px solid rgba(232, 133, 126, 0.38);
+}
+
+.settings-month-delete-mobile:disabled {
+  color: #aab4b6;
+  background: #f3f6f6;
+  border-color: #e3e9e9;
 }
 
 .month-detail {
@@ -8676,11 +8738,16 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .settings-months .month-list {
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    overflow-x: auto;
+  .settings-month-select {
     display: grid;
+  }
+
+  .settings-month-delete-mobile {
+    display: inline-flex;
+  }
+
+  .settings-months .month-list {
+    display: none;
   }
 
   .settings-page-hero,

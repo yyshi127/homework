@@ -1558,6 +1558,38 @@ function App() {
     setMonthIndex(months.length);
   };
 
+  const isCurrentCalendarMonth = (targetMonth) => {
+    const now = new Date();
+    return targetMonth?.key === createMonthKey(now.getFullYear(), now.getMonth() + 1);
+  };
+
+  const deleteMonth = (targetMonth, targetIndex) => {
+    if (!targetMonth) return;
+    if (months.length <= 1) {
+      window.alert('至少需要保留一个月份清单，不能删除最后一个月份。');
+      return;
+    }
+    if (isCurrentCalendarMonth(targetMonth)) {
+      window.alert('不能删除当前自然月份的清单。');
+      return;
+    }
+    const confirmed = window.confirm(`即将删除“${targetMonth.label}”月份清单。该月份下的任务、打卡、阅读和兑换记录都会一起删除。确定继续吗？`);
+    if (!confirmed) return;
+    const typed = window.prompt(`这是高风险操作。请输入完整月份名称“${targetMonth.label}”确认删除：`);
+    if (typed !== targetMonth.label) {
+      window.alert('月份名称输入不一致，已取消删除。');
+      return;
+    }
+    const nextIndex = Math.max(0, Math.min(monthIndex >= targetIndex ? monthIndex - 1 : monthIndex, months.length - 2));
+    setState((current) => {
+      const next = structuredClone(current || {});
+      next.months = (next.months || []).filter((item) => item.id !== targetMonth.id);
+      next.activeMonthId = next.months[nextIndex]?.id || next.months[0]?.id;
+      return next;
+    });
+    setMonthIndex(nextIndex);
+  };
+
   const addCategory = () => {
     const fixed = FIXED_CATEGORIES.find((item) => item.name === categoryDraft);
     const customName = categoryDraft === 'custom' ? window.prompt('请输入自定义分类名称')?.trim() : '';
@@ -4051,11 +4083,40 @@ function App() {
                     <p>可长期复用，寒暑假和平时都能使用</p>
                   </div>
                 </div>
+                <label className="settings-month-select">
+                  <span>选择月份</span>
+                  <select value={month.id} onChange={(event) => setMonthIndex(months.findIndex((item) => item.id === event.target.value))}>
+                    {months.map((item) => (
+                      <option key={item.id} value={item.id}>{item.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  className="settings-month-delete-mobile"
+                  type="button"
+                  disabled={months.length <= 1 || isCurrentCalendarMonth(month)}
+                  onClick={() => deleteMonth(month, monthIndex)}
+                >
+                  <Trash2 size={15} />
+                  删除当前选择月份
+                </button>
                 <div className="month-list">
                   {months.map((item, index) => (
-                    <button key={item.id} className={item.id === month.id ? 'active' : ''} onClick={() => setMonthIndex(index)}>
-                      {item.label}
-                    </button>
+                    <div className={`month-list-item ${item.id === month.id ? 'active' : ''}`} key={item.id}>
+                      <button className="month-pick-button" onClick={() => setMonthIndex(index)}>
+                        {item.label}
+                      </button>
+                      <button
+                        className="month-delete-button"
+                        type="button"
+                        title={isCurrentCalendarMonth(item) ? '当前自然月份不能删除' : `删除${item.label}`}
+                        aria-label={`删除${item.label}`}
+                        disabled={months.length <= 1 || isCurrentCalendarMonth(item)}
+                        onClick={() => deleteMonth(item, index)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </aside>

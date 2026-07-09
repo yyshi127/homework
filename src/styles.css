@@ -2947,11 +2947,30 @@ button {
   white-space: nowrap;
 }
 
+.reward-type-filter button b {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: #f08a24;
+  background: #fff4d8;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .reward-type-filter button.active {
   color: #fff;
   background: linear-gradient(135deg, #ff9f45, #ff6f61);
   border-color: rgba(255, 137, 68, 0.42);
   box-shadow: 0 10px 20px rgba(255, 118, 73, 0.2);
+}
+
+.reward-type-filter button.active b {
+  color: #ff7046;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .reward-gallery {

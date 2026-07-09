@@ -1199,6 +1199,10 @@ function App() {
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
   const rewardConfig = useMemo(() => sortRewardsByPoints(normalizeRewardConfig(state.rewardConfig || DEFAULT_REWARDS)), [state.rewardConfig]);
+  const rewardTypeCounts = useMemo(() => rewardConfig.reduce((counts, item) => {
+    counts[item.type] = (counts[item.type] || 0) + 1;
+    return counts;
+  }, {}), [rewardConfig]);
   const displayedRewards = useMemo(
     () => (rewardTypeFilter === '全部' ? rewardConfig : rewardConfig.filter((item) => item.type === rewardTypeFilter)),
     [rewardConfig, rewardTypeFilter],
@@ -3436,10 +3440,12 @@ function App() {
                 <span>{displayedRewards.length} / {rewardConfig.length} 个奖励</span>
               </header>
               <div className="reward-type-filter" aria-label="奖励类型筛选">
-                <button type="button" className={rewardTypeFilter === '全部' ? 'active' : ''} onClick={() => setRewardTypeFilter('全部')}>全部</button>
+                <button type="button" className={rewardTypeFilter === '全部' ? 'active' : ''} onClick={() => setRewardTypeFilter('全部')}>
+                  全部 <b>{rewardConfig.length}</b>
+                </button>
                 {REWARD_TYPES.map((item) => (
                   <button type="button" key={item.type} className={rewardTypeFilter === item.type ? 'active' : ''} onClick={() => setRewardTypeFilter(item.type)}>
-                    {item.type}
+                    {item.type} <b>{rewardTypeCounts[item.type] || 0}</b>
                   </button>
                 ))}
               </div>

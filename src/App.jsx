@@ -3057,16 +3057,12 @@ function App() {
   const todayCompletionPercent = todayRows.length ? Math.round((todayCompletedCount / todayRows.length) * 100) : 0;
   const growthStageIndex = todayCompletionPercent <= 0 ? 0 : Math.min(GROWTH_TREE_IMAGES.length - 1, Math.ceil(todayCompletionPercent / 20));
   const growthTreeImage = GROWTH_TREE_IMAGES[growthStageIndex] || GROWTH_TREE_IMAGES[0];
-  const streakEndDay = isCurrentMonth && todayDay ? todayDay : Math.min(selectedCheckDay, month.days);
   const dayHasCheckin = (day) => rows.some((row) => {
     if (!isTaskCheckableOnDay(row, day)) return false;
     return getStatus(row.id, day) !== 'empty';
   });
-  let currentStreak = 0;
-  for (let day = streakEndDay; day >= 1; day -= 1) {
-    if (!dayHasCheckin(day)) break;
-    currentStreak += 1;
-  }
+  const wateredDays = Array.from({ length: month.days }, (_, index) => index + 1)
+    .filter((day) => dayHasCheckin(day)).length;
   const readingRewardPoints = completedReadingRewards(month, pointConfig);
   const monthPoints = cumulativePointsWithReadingRewards.at(-1) || 0;
   const allMonthPoints = months.reduce((sum, candidateMonth) => {
@@ -3660,7 +3656,7 @@ function App() {
             <div className="sapling-progress" style={{ '--growth-percent': `${todayCompletionPercent}%` }}>
               <i />
             </div>
-            <em>连续 {currentStreak} 天浇水</em>
+            <em>已浇水 {wateredDays} 天</em>
           </div>
           <nav>
             {NAV_ITEMS.map(({ label, icon: Icon }, index) => (
@@ -3801,7 +3797,7 @@ function App() {
               <img src={growthTreeImage} alt="" />
               <div>
                 <strong>今日成长</strong>
-                <span>{todayCompletedCount}/{todayRows.length || 0} 已完成 · 连续 {currentStreak} 天</span>
+                <span>{todayCompletedCount}/{todayRows.length || 0} 已完成 · 已浇水 {wateredDays} 天</span>
                 <i style={{ '--growth-percent': `${todayCompletionPercent}%` }} />
               </div>
             </div>

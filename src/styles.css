@@ -3581,6 +3581,7 @@ button {
   top: 10px;
   right: 10px;
   display: flex;
+  flex-direction: column;
   gap: 6px;
   z-index: 2;
   opacity: 0;
@@ -3611,7 +3612,7 @@ button {
   place-items: center;
 }
 
-.reward-shop-card .reward-card-tools button:last-child {
+.reward-shop-card .reward-card-tools button:first-child {
   color: #d7473f;
 }
 

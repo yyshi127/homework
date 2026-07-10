@@ -1595,7 +1595,7 @@ function App() {
       try {
         await saveDatabaseState(stateRef.current);
         setHasUnsavedChanges(false);
-        setDatabaseStatus('已自动保存到 SQLite');
+        setDatabaseStatus('已自动保存到数据库');
         showSaveToast('已保存到数据库');
       } catch {
         setDatabaseStatus('数据库保存失败，修改暂存在本机');
@@ -4432,11 +4432,11 @@ ${colorStyles}
                     return (
                       <article className={`reward-shop-card ${canRedeem ? 'can-redeem' : ''} ${redeemedCount ? 'redeemed' : ''}`} key={key}>
                         <div className="reward-card-tools">
-                          <button type="button" title="编辑奖励" aria-label={`编辑${item.name || '奖励'}`} onClick={() => openEditRewardDialog(item)}>
-                            <Pencil size={15} />
-                          </button>
                           <button type="button" title="删除奖励" aria-label={`删除${item.name || '奖励'}`} onClick={() => deleteReward(item)}>
                             <Trash2 size={15} />
+                          </button>
+                          <button type="button" title="编辑奖励" aria-label={`编辑${item.name || '奖励'}`} onClick={() => openEditRewardDialog(item)}>
+                            <Pencil size={15} />
                           </button>
                         </div>
                         <div className="reward-product-icon">

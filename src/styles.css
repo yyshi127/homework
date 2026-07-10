@@ -252,6 +252,46 @@ button {
   box-shadow: 0 10px 18px rgba(54, 169, 85, 0.18);
 }
 
+.month-export-tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.month-export-tools select {
+  height: 40px;
+  min-width: 112px;
+  border: 1px solid #dfe8e3;
+  border-radius: 13px;
+  padding: 0 34px 0 12px;
+  background: #fffdf8;
+  color: #617076;
+  font-size: 13px;
+  font-weight: 850;
+  box-shadow: 0 8px 16px rgba(39, 50, 56, 0.05);
+}
+
+.month-export-button {
+  height: 40px;
+  border: 0;
+  border-radius: 13px;
+  padding: 0 14px;
+  background: linear-gradient(180deg, #55bd70, #36a955);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 950;
+  box-shadow: 0 10px 18px rgba(54, 169, 85, 0.18);
+}
+
+.month-export-button svg {
+  flex: 0 0 auto;
+}
+
 .topbar {
   border: 1px solid rgba(225, 218, 205, 0.74);
   border-radius: 24px;
@@ -8949,8 +8989,18 @@ button {
 
   .content-tabbar .check-view-tabs,
   .content-goal-box,
+  .month-export-tools,
   .content-tabbar .month-switch {
     width: 100%;
+  }
+
+  .month-export-tools {
+    justify-content: stretch;
+  }
+
+  .month-export-tools select,
+  .month-export-button {
+    flex: 1 1 0;
   }
 
   .content-goal-box {

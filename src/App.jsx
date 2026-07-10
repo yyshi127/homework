@@ -82,6 +82,18 @@ const STATUS = {
   excellent: { label: '优秀', points: 2 },
   super: { label: '非常优秀', points: 5 },
 };
+const MONTH_EXPORT_STATUS_OPTIONS = [
+  { value: 'all', label: '全部状态' },
+  { value: 'completed', label: '已完成' },
+  { value: 'unfinished', label: '未完成' },
+];
+const MONTH_EXPORT_COLORS = {
+  blue: { header: '#347fd1', light: '#eaf5ff', text: '#1f67b4' },
+  green: { header: '#38a85a', light: '#eef9ea', text: '#258844' },
+  red: { header: '#f05a57', light: '#fff0f0', text: '#d8403d' },
+  purple: { header: '#825ee0', light: '#f5efff', text: '#6f48c8' },
+  orange: { header: '#f29325', light: '#fff5dc', text: '#c46a13' },
+};
 
 const REQUIRED_TODAY_SUBJECTS = ['语文', '数学', '英语', '阅读'];
 const DEFAULT_POINT_CONFIG = {
@@ -1241,6 +1253,46 @@ function formatCellNote(note) {
   return '';
 }
 
+function excelEscape(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function excelSheetName(value) {
+  return String(value || 'Sheet')
+    .replace(/[\\/?*[\]:]/g, ' ')
+    .slice(0, 31)
+    .trim() || 'Sheet';
+}
+
+function formatExportDate(month, day) {
+  return `${month.year}-${String(month.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function exportStatusLabel(status) {
+  return status === 'empty' ? '未完成' : STATUS.done.label;
+}
+
+function exportQualityLabel(status) {
+  if (status === 'done') return '普通';
+  if (status === 'excellent') return STATUS.excellent.label;
+  if (status === 'super') return STATUS.super.label;
+  return '';
+}
+
+function chunkByCalendarWeek(items, month) {
+  return items.reduce((weeks, item) => {
+    if (!weeks.length) weeks.push([]);
+    weeks[weeks.length - 1].push(item);
+    const dayOfWeek = new Date(Number(month.year), Number(month.month) - 1, item.day).getDay();
+    if (dayOfWeek === 0) weeks.push([]);
+    return weeks;
+  }, []).filter((week) => week.length);
+}
+
 function completedReadingRewards(month, pointConfig = DEFAULT_POINT_CONFIG) {
   return (month.readingBooks || []).reduce((sum, book) => {
     const start = Number(book.startDay || 1);
@@ -1373,6 +1425,8 @@ function App() {
   const [expandedReadingPlans, setExpandedReadingPlans] = useState({});
   const [temporaryTaskDrafts, setTemporaryTaskDrafts] = useState({});
   const [selectedTodayDay, setSelectedTodayDay] = useState(null);
+  const [monthExportStatusFilter, setMonthExportStatusFilter] = useState('all');
+  const [monthExportDialog, setMonthExportDialog] = useState(null);
   const [learningTab, setLearningTab] = useState('grader');
   const [graderDraft, setGraderDraft] = useState(DEFAULT_GRADER_DRAFT);
   const [latestReview, setLatestReview] = useState(null);
@@ -2936,6 +2990,222 @@ function App() {
       return sum + base;
     }, 0);
 
+  const buildMonthExportSections = (targetMonth, statusFilter = monthExportStatusFilter) => {
+    const shouldIncludeStatus = (status) => {
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'completed') return status !== 'empty';
+      if (statusFilter === 'unfinished') return status === 'empty';
+      return true;
+    };
+    const now = new Date();
+    const currentMonthKey = createMonthKey(now.getFullYear(), now.getMonth() + 1);
+    const exportEndDay = targetMonth.key === currentMonthKey ? Math.min(targetMonth.days, now.getDate()) : targetMonth.days;
+    const exportDays = Array.from({ length: exportEndDay }, (_, index) => index + 1);
+    const targetRows = buildTaskRows(targetMonth);
+    return exportDays.map((day) => {
+      const dayRows = targetRows.flatMap((row) => {
+        if (!isTaskActiveOnDay(row, day)) return [];
+        const status = normalizeStatus(targetMonth?.checks?.[row.id]?.[day] || 'empty');
+        if (!shouldIncludeStatus(status)) return [];
+        const note = targetMonth.notes?.[row.id]?.[day];
+        if (row.typeKey === 'temporary' && status === 'empty' && !note) return [];
+        return [{
+          row,
+          task: row.typeKey === 'temporary' ? temporaryTaskTitleFromNote(note) || TEMPORARY_TASK_TITLE : row.item,
+          status,
+          statusLabel: exportStatusLabel(status),
+          qualityLabel: exportQualityLabel(status),
+          note: row.typeKey === 'temporary' ? temporaryTaskRemarkFromNote(note) : formatCellNote(note),
+        }];
+      });
+      return { day, rows: dayRows };
+    });
+  };
+
+  const buildMonthExportTableHtml = (targetMonth, statusFilter = monthExportStatusFilter) => {
+    const dailySections = buildMonthExportSections(targetMonth, statusFilter);
+    if (!dailySections.some((section) => section.rows.length)) {
+      return '';
+    }
+
+    const withDayGaps = (items) => items.map((item, index) => (
+      `${item}${index < items.length - 1 ? '<th class="day-gap"></th>' : ''}`
+    )).join('');
+    const weekSections = chunkByCalendarWeek(dailySections, targetMonth);
+    const weekRows = weekSections.map((week, weekIndex) => {
+      const colSpan = week.length * 5 + Math.max(0, week.length - 1);
+      const maxRows = Math.max(...week.map((section) => Math.max(1, section.rows.length)));
+      const dayHeaderCells = withDayGaps(week.map((section) => (
+        `<th class="day-block" colspan="5">${excelEscape(`${targetMonth.month}月${section.day}日 ${weekday(targetMonth.key, section.day)}`)}</th>`
+      )));
+      const subHeaderCells = withDayGaps(week.map(() => (
+        '<th class="fixed-head">分类</th><th class="task-head">每日任务</th><th>状态</th><th>完成质量</th><th>备注信息</th>'
+      )));
+      const bodyRows = Array.from({ length: maxRows }, (_, index) => (
+        `<tr>${withDayGaps(week.map((section) => {
+          const record = section.rows[index];
+          if (!record) return '<td class="empty-day" colspan="5">&nbsp;</td>';
+          const color = MONTH_EXPORT_COLORS[record.row.color] || MONTH_EXPORT_COLORS.blue;
+          const statusClass = record.status === 'empty' ? 'status-empty' : 'status-done';
+          return `<td class="subject" style="background:${color.header};color:#fff;">${excelEscape(record.row.subject)}</td><td class="task" style="background:${color.light};color:${color.text};">${excelEscape(record.task)}</td><td class="${statusClass}">${excelEscape(record.statusLabel)}</td><td class="quality">${excelEscape(record.qualityLabel)}</td><td class="note">${excelEscape(record.note)}</td>`;
+        }))}</tr>`
+      )).join('');
+      return `<tr><th class="week-title" colspan="${colSpan}">第 ${weekIndex + 1} 周</th></tr><tr>${dayHeaderCells}</tr><tr>${subHeaderCells}</tr>${bodyRows}<tr class="week-gap"><td colspan="${colSpan}"></td></tr>`;
+    }).join('');
+    return `<table><tbody>${weekRows}</tbody></table>`;
+  };
+
+  const buildMonthExportFileHtml = (targetMonths, statusFilter = monthExportStatusFilter) => {
+    const tablesHtml = targetMonths.map((targetMonth) => buildMonthExportTableHtml(targetMonth, statusFilter)).filter(Boolean).join('<br style="mso-data-placement:same-cell;" />');
+    if (!tablesHtml) return '';
+    const html = `<!doctype html><html><head><meta charset="UTF-8"><style>
+      body { font-family: "Microsoft YaHei", Arial, sans-serif; color: #273238; }
+      table { border-collapse: collapse; mso-cellspacing: 0; mso-padding-alt: 0; }
+      th, td { border: 1px solid #d8e1dc; padding: 8px 10px; font-size: 13px; vertical-align: middle; }
+      th { background: #f4f8f6; color: #334247; font-weight: 700; text-align: center; }
+      .week-title { background: #f29325; color: #fff; font-size: 16px; text-align: center; padding: 11px 14px; font-weight: 800; }
+      .fixed-head { background: #edf6ef; color: #244730; min-width: 90px; }
+      .task-head { background: #edf6ef; color: #244730; min-width: 220px; }
+      .day-block { background: #dff3e5; color: #255f3b; font-size: 15px; text-align: center; padding: 11px 14px; }
+      .day-gap { min-width: 30px; width: 30px; border: 0; background: #fff; padding: 0; }
+      .subject { text-align: center; font-weight: 700; min-width: 78px; }
+      .task { font-weight: 700; min-width: 240px; }
+      .status-done { background: #edf9f0; color: #23733c; text-align: center; font-weight: 700; }
+      .status-empty { background: #f7f8f7; color: #8a9692; text-align: center; }
+      .quality { background: #fffdf8; text-align: center; font-weight: 700; color: #4f6658; }
+      .note { background: #fff; min-width: 260px; color: #42525a; }
+      .empty-day { background: #fff; color: #fff; text-align: center; border: 0; }
+      .week-gap td { height: 36px; padding: 8px 10px; border: 0; background: #fff; }
+    </style></head><body>${tablesHtml}</body></html>`;
+    return html;
+  };
+
+  const downloadMonthExport = (targetMonths, filenamePrefix, statusFilter = monthExportStatusFilter) => {
+    const html = buildMonthExportFileHtml(targetMonths, statusFilter);
+    if (!html) {
+      showAppAlert('当前筛选条件下没有可导出的打卡记录。', { title: '暂无记录', tone: 'warning' });
+      return false;
+    }
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const filterLabel = MONTH_EXPORT_STATUS_OPTIONS.find((item) => item.value === statusFilter)?.label || '全部状态';
+    link.href = url;
+    link.download = `${filenamePrefix}-本月打卡记录-${filterLabel}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return true;
+  };
+
+  const buildMonthWorksheetXml = (targetMonth, statusFilter = monthExportStatusFilter) => {
+    const dailySections = buildMonthExportSections(targetMonth, statusFilter);
+    if (!dailySections.some((section) => section.rows.length)) return '';
+
+    const withDayGaps = (items) => items.map((item, index) => (
+      `${item}${index < items.length - 1 ? '<Cell ss:StyleID="gap"/>' : ''}`
+    )).join('');
+    const weekSections = chunkByCalendarWeek(dailySections, targetMonth);
+    const weekRows = weekSections.map((week, weekIndex) => {
+      const colSpan = week.length * 5 + Math.max(0, week.length - 1);
+      const maxRows = Math.max(...week.map((section) => Math.max(1, section.rows.length)));
+      const dayHeaderCells = withDayGaps(week.map((section) => (
+        `<Cell ss:MergeAcross="4" ss:StyleID="day"><Data ss:Type="String">${excelEscape(`${targetMonth.month}月${section.day}日 ${weekday(targetMonth.key, section.day)}`)}</Data></Cell>`
+      )));
+      const subHeaderCells = withDayGaps(week.map(() => (
+        '<Cell ss:StyleID="head"><Data ss:Type="String">分类</Data></Cell><Cell ss:StyleID="head-task"><Data ss:Type="String">每日任务</Data></Cell><Cell ss:StyleID="head"><Data ss:Type="String">状态</Data></Cell><Cell ss:StyleID="head"><Data ss:Type="String">完成质量</Data></Cell><Cell ss:StyleID="head-note"><Data ss:Type="String">备注信息</Data></Cell>'
+      )));
+      const bodyRows = Array.from({ length: maxRows }, (_, index) => (
+        `<Row ss:Height="18">${withDayGaps(week.map((section) => {
+          const record = section.rows[index];
+          if (!record) return '<Cell ss:MergeAcross="4" ss:StyleID="empty"/>';
+          const statusClass = record.status === 'empty' ? 'status-empty' : 'status-done';
+          const colorKey = MONTH_EXPORT_COLORS[record.row.color] ? record.row.color : 'blue';
+          return `<Cell ss:StyleID="subject-${colorKey}"><Data ss:Type="String">${excelEscape(record.row.subject)}</Data></Cell><Cell ss:StyleID="task-${colorKey}"><Data ss:Type="String">${excelEscape(record.task)}</Data></Cell><Cell ss:StyleID="${statusClass}"><Data ss:Type="String">${excelEscape(record.statusLabel)}</Data></Cell><Cell ss:StyleID="quality"><Data ss:Type="String">${excelEscape(record.qualityLabel)}</Data></Cell><Cell ss:StyleID="note"><Data ss:Type="String">${excelEscape(record.note)}</Data></Cell>`;
+        }))}</Row>`
+      )).join('');
+      return `<Row ss:Height="18"><Cell ss:MergeAcross="${colSpan - 1}" ss:StyleID="week"><Data ss:Type="String">第 ${weekIndex + 1} 周</Data></Cell></Row><Row ss:Height="20">${dayHeaderCells}</Row><Row ss:Height="18">${subHeaderCells}</Row>${bodyRows}<Row ss:Height="22"><Cell ss:MergeAcross="${colSpan - 1}" ss:StyleID="gap"/></Row>`;
+    }).join('');
+    const columns = Array.from({ length: 7 }, () => (
+      '<Column ss:Width="52"/><Column ss:Width="235"/><Column ss:Width="42"/><Column ss:Width="52"/><Column ss:Width="90"/><Column ss:Width="18"/>'
+    )).join('');
+    return `<Worksheet ss:Name="${excelEscape(excelSheetName(targetMonth.short || targetMonth.label))}"><Table>${columns}${weekRows}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><DoNotDisplayGridlines/></WorksheetOptions></Worksheet>`;
+  };
+
+  const buildYearExportWorkbookXml = (targetMonths, statusFilter = monthExportStatusFilter) => {
+    const worksheets = targetMonths.map((targetMonth) => buildMonthWorksheetXml(targetMonth, statusFilter)).filter(Boolean).join('');
+    if (!worksheets) return '';
+    const borderXml = '<Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D8E1DC"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D8E1DC"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D8E1DC"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D8E1DC"/></Borders>';
+    const colorStyles = Object.entries(MONTH_EXPORT_COLORS).map(([key, color]) => (
+      `<Style ss:ID="subject-${key}"><Font ss:Size="8" ss:Color="#FFFFFF"/><Interior ss:Color="${color.header}" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style><Style ss:ID="task-${key}"><Font ss:Size="8" ss:Color="${color.text}"/><Interior ss:Color="${color.light}" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:WrapText="0" ss:ShrinkToFit="1"/>${borderXml}</Style>`
+    )).join('');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+<Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Microsoft YaHei" ss:Size="8"/><Alignment ss:Vertical="Center" ss:WrapText="1"/></Style>
+<Style ss:ID="week"><Font ss:Size="9" ss:Color="#FFFFFF"/><Interior ss:Color="#F29325" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="day"><Font ss:Size="9" ss:Color="#255F3B"/><Interior ss:Color="#DFF3E5" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="head"><Font ss:Size="8" ss:Color="#244730"/><Interior ss:Color="#EDF6EF" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="head-task"><Font ss:Size="8" ss:Color="#244730"/><Interior ss:Color="#EDF6EF" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="head-note"><Font ss:Size="8" ss:Color="#244730"/><Interior ss:Color="#EDF6EF" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="status-done"><Font ss:Size="8" ss:Color="#23733C"/><Interior ss:Color="#EDF9F0" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="status-empty"><Font ss:Size="8" ss:Color="#8A9692"/><Interior ss:Color="#F7F8F7" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="quality"><Font ss:Size="8" ss:Color="#4F6658"/><Interior ss:Color="#FFFDF8" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${borderXml}</Style>
+<Style ss:ID="note"><Font ss:Size="8" ss:Color="#42525A"/><Alignment ss:Vertical="Center" ss:WrapText="1"/>${borderXml}</Style>
+<Style ss:ID="empty"><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/></Style>
+<Style ss:ID="gap"><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/></Style>
+${colorStyles}
+</Styles>${worksheets}</Workbook>`;
+  };
+
+  const downloadYearExport = (targetMonths, filenamePrefix, statusFilter = monthExportStatusFilter) => {
+    const workbookXml = buildYearExportWorkbookXml(targetMonths, statusFilter);
+    if (!workbookXml) {
+      showAppAlert('当前筛选条件下没有可导出的打卡记录。', { title: '暂无记录', tone: 'warning' });
+      return false;
+    }
+    const blob = new Blob([workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const filterLabel = MONTH_EXPORT_STATUS_OPTIONS.find((item) => item.value === statusFilter)?.label || '全部状态';
+    link.href = url;
+    link.download = `${filenamePrefix}-本月打卡记录-${filterLabel}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return true;
+  };
+
+  const openMonthExportDialog = () => {
+    setMonthExportDialog({
+      scope: 'month',
+      monthId: month.id,
+      year: String(month.year),
+      status: monthExportStatusFilter,
+    });
+  };
+
+  const confirmMonthExport = () => {
+    if (!monthExportDialog) return;
+    setMonthExportStatusFilter(monthExportDialog.status || 'all');
+    const targetMonths = monthExportDialog.scope === 'year'
+      ? months.filter((item) => String(item.year) === String(monthExportDialog.year))
+      : months.filter((item) => item.id === monthExportDialog.monthId);
+    const filenamePrefix = monthExportDialog.scope === 'year' ? `${monthExportDialog.year}年` : targetMonths[0]?.label || month.label;
+    const previousStatus = monthExportStatusFilter;
+    const nextStatus = monthExportDialog.status || 'all';
+    if (previousStatus !== nextStatus) {
+      setMonthExportStatusFilter(nextStatus);
+    }
+    const ok = monthExportDialog.scope === 'year'
+      ? downloadYearExport(targetMonths, filenamePrefix, nextStatus)
+      : downloadMonthExport(targetMonths, filenamePrefix, nextStatus);
+    if (ok) setMonthExportDialog(null);
+  };
+
   const dailyPoints = Array.from({ length: month.days }, (_, index) => dayPoints(index + 1));
   const cumulativePoints = dailyPoints.reduce((list, value, index) => {
     list.push(value + (list[index - 1] || 0));
@@ -3643,6 +3913,15 @@ function App() {
     );
   };
 
+  const renderMonthExportTools = () => (
+    <div className="month-export-tools">
+      <button className="month-export-button" onClick={openMonthExportDialog} type="button" title="导出打卡记录">
+        <Download size={16} />
+        导出
+      </button>
+    </div>
+  );
+
   return (
     <main className="premium-app">
       <aside className="side-rail">
@@ -3768,6 +4047,7 @@ function App() {
                 <button className="active" onClick={() => setActiveView('today')} type="button">今日打卡</button>
                 <button onClick={() => setActiveView('home')} type="button">本月打卡</button>
               </div>
+              {renderMonthExportTools()}
             </div>
 
             <div className={`today-hero ${isSelectedCheckFuture ? 'future-view' : ''}`}>
@@ -3871,6 +4151,7 @@ function App() {
               <button onClick={() => setActiveView('today')} type="button">今日打卡</button>
               <button className="active" onClick={() => setActiveView('home')} type="button">本月打卡</button>
             </div>
+            {renderMonthExportTools()}
           </div>
 
           <div className="legend-bar">
@@ -5273,6 +5554,73 @@ function App() {
             <footer>
               <button className="ghost" onClick={() => setPointConfigDialog(null)}>取消</button>
               <button onClick={confirmPointConfig}>保存配置</button>
+            </footer>
+          </div>
+        </section>
+      )}
+
+      {monthExportDialog && (
+        <section className="settings-mask" role="dialog" aria-modal="true" aria-label="导出打卡记录">
+          <div className="book-dialog-panel month-export-dialog-panel">
+            <header>
+              <div>
+                <h2>导出打卡记录</h2>
+                <p>选择要导出的月份或年份，表格样式保持当前周报格式。</p>
+              </div>
+            </header>
+            <div className="book-dialog-fields">
+              <label>
+                <span>导出范围</span>
+                <select
+                  value={monthExportDialog.scope}
+                  onChange={(event) => setMonthExportDialog((current) => ({ ...current, scope: event.target.value }))}
+                >
+                  <option value="month">按月导出</option>
+                  <option value="year">按年导出</option>
+                </select>
+              </label>
+              {monthExportDialog.scope === 'month' ? (
+                <label>
+                  <span>选择月份</span>
+                  <select
+                    value={monthExportDialog.monthId}
+                    onChange={(event) => setMonthExportDialog((current) => ({ ...current, monthId: event.target.value }))}
+                  >
+                    {months.map((item) => (
+                      <option key={item.id} value={item.id}>{item.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label>
+                  <span>选择年份</span>
+                  <select
+                    value={monthExportDialog.year}
+                    onChange={(event) => setMonthExportDialog((current) => ({ ...current, year: event.target.value }))}
+                  >
+                    {Array.from(new Set(months.map((item) => String(item.year)))).map((year) => (
+                      <option key={year} value={year}>{year}年</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label>
+                <span>状态筛选</span>
+                <select
+                  value={monthExportDialog.status}
+                  onChange={(event) => setMonthExportDialog((current) => ({ ...current, status: event.target.value }))}
+                >
+                  {MONTH_EXPORT_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <footer>
+              <button className="ghost" type="button" onClick={() => setMonthExportDialog(null)}>取消</button>
+              <button type="button" onClick={confirmMonthExport}>
+                <Download size={16} />导出
+              </button>
             </footer>
           </div>
         </section>

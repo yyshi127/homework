@@ -83,9 +83,11 @@ button {
   min-height: 126px;
   padding: 4px 8px 9px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   align-content: center;
   gap: 5px;
+  text-align: center;
   isolation: isolate;
 }
 
@@ -120,6 +122,7 @@ button {
   color: #6d7e80;
   font-size: 11px;
   font-weight: 950;
+  white-space: nowrap;
 }
 
 .sapling-progress {
@@ -139,14 +142,15 @@ button {
 }
 
 .rail-sapling-card em {
-  min-height: 21px;
-  border-radius: 999px;
-  padding: 4px 8px;
+  min-height: 0;
+  padding: 0;
   color: #3e7b63;
-  background: rgba(235, 247, 239, 0.92);
+  background: transparent;
   font-size: 11px;
   font-style: normal;
   font-weight: 950;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .mobile-growth-card {
@@ -2267,7 +2271,7 @@ button {
 
 .today-check-panel {
   display: grid;
-  place-items: center;
+  place-items: center start;
   align-content: center;
   gap: 7px;
 }
@@ -2412,21 +2416,42 @@ button {
 }
 
 .today-skip-button {
-  min-width: 136px;
-  height: 30px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
   border: 1px solid #e2e9e6;
-  border-radius: 999px;
+  border-radius: 15px;
+  padding: 7px 8px;
   color: #687579;
   background: #fff;
-  font-size: 13px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.2;
   font-weight: 950;
   box-shadow: 0 8px 18px rgba(61, 79, 88, 0.06);
+}
+
+.today-skip-button span {
+  color: #748286;
+  font-size: 11px;
+}
+
+.today-skip-button strong {
+  color: #52646a;
+  font-size: 12px;
 }
 
 .today-skip-button:hover {
   color: #f08a24;
   border-color: #f4d5a4;
   background: #fff8ec;
+}
+
+.today-skip-button:hover span,
+.today-skip-button:hover strong {
+  color: #d77b20;
 }
 
 .today-temporary-delete {
@@ -5123,15 +5148,25 @@ button {
 .reading-plan-range {
   justify-self: center;
   min-width: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 5px 12px;
   color: #26383e;
   background: rgba(255, 255, 255, 0.78);
   font-size: 13px;
   font-weight: 950;
+  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.reading-plan-range:hover,
+.reading-plan-range:focus-visible {
+  color: #216fbd;
+  border-color: #b9dcf6;
+  background: #eef8ff;
+  outline: 0;
 }
 
 .reading-plan-unset {
@@ -5949,8 +5984,218 @@ button {
   white-space: nowrap;
 }
 
+.month-config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-page .save-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #714713;
+  background: #fff1cf;
+  border: 1px solid #f2ce84;
+  white-space: nowrap;
+}
+
+.new-month-dialog-panel {
+  width: min(520px, calc(100vw - 34px));
+}
+
+.new-month-template-note {
+  padding: 4px 24px 0;
+  color: #627276;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 750;
+}
+
+.book-dialog-panel.template-manager-panel {
+  width: min(920px, calc(100vw - 34px));
+  max-height: calc(100vh - 36px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.template-manager-toolbar {
+  padding: 16px 24px 10px;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1.2fr);
+  gap: 12px;
+}
+
+.template-manager-toolbar label {
+  display: grid;
+  gap: 7px;
+}
+
+.template-manager-toolbar label > span {
+  color: #506166;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.template-manager-toolbar input,
+.template-manager-toolbar select,
+.template-category-editor input,
+.template-category-editor select {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid #dce7e2;
+  border-radius: 9px;
+  padding: 0 10px;
+  color: #243c42;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  outline: 0;
+}
+
+.template-manager-toolbar input:focus,
+.template-manager-toolbar select:focus,
+.template-category-editor input:focus,
+.template-category-editor select:focus {
+  border-color: #70b7e8;
+  box-shadow: 0 0 0 3px rgba(112, 183, 232, 0.14);
+}
+
+.template-editor-list {
+  min-height: 180px;
+  padding: 8px 24px 4px;
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.template-category-editor {
+  border: 1px solid #e2ebe7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfefc;
+}
+
+.book-dialog-panel .template-category-editor > header {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 110px 36px;
+  gap: 8px;
+  align-items: center;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.template-task-list {
+  margin-top: 9px;
+  display: grid;
+  gap: 7px;
+}
+
+.template-task-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 100px 100px 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.template-task-type {
+  height: 34px;
+  border-radius: 8px;
+  color: #40725c;
+  background: #edf8f2;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.template-habit-points {
+  position: relative;
+  min-width: 0;
+}
+
+.template-habit-points input {
+  padding-right: 28px;
+}
+
+.template-habit-points span {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6a7779;
+  font-size: 12px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.template-icon-danger {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  color: #d85f55;
+  background: #fff0ee;
+  display: grid;
+  place-items: center;
+}
+
+.template-add-task,
+.template-add-category {
+  min-height: 34px;
+  border: 1px dashed #9fceb3;
+  border-radius: 8px;
+  color: #397257;
+  background: #f1faf5;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.template-add-task {
+  margin-top: 9px;
+  padding: 0 12px;
+}
+
+.template-add-category {
+  margin: 10px 24px 2px;
+  flex: 0 0 auto;
+}
+
+.template-manager-panel footer {
+  flex: 0 0 auto;
+  border-top: 1px solid #edf0ee;
+}
+
+.template-manager-panel footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.template-manager-panel footer .template-delete {
+  margin-right: auto;
+  color: #fff;
+  background: #df655c;
+}
+
 .settings-page .compact-primary {
   background: linear-gradient(180deg, #679be7, #4d7fd5);
+}
+
+.settings-page .template-manager-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #315c50;
+  background: #edf8f2;
+  border: 1px solid #b9dfcb;
 }
 
 .settings-months .month-list {
@@ -10032,6 +10277,90 @@ button {
 @media (max-width: 520px) {
   .points-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media screen and (min-width: 921px) {
+  html {
+    zoom: 0.8;
+  }
+
+  .rail-card {
+    min-height: calc(125vh - var(--adaptive-pad) * 2);
+  }
+
+  .rail-sapling-card {
+    min-height: 154px;
+  }
+
+  .rail-card nav {
+    padding-top: 210px;
+  }
+
+  .reward-type-filter {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: clamp(4px, 0.4vw, 8px);
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+
+  .reward-type-filter button {
+    flex: 1 1 auto;
+    min-width: max-content;
+    padding-inline: clamp(6px, 0.55vw, 12px);
+  }
+}
+
+@media (max-width: 700px) {
+  .template-manager-mask {
+    padding: 10px;
+  }
+
+  .book-dialog-panel.template-manager-panel {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .template-manager-toolbar {
+    grid-template-columns: 1fr;
+    padding: 12px 14px 8px;
+  }
+
+  .template-editor-list {
+    padding: 6px 14px 2px;
+  }
+
+  .book-dialog-panel .template-category-editor > header {
+    grid-template-columns: minmax(0, 1fr) 92px 36px;
+  }
+
+  .template-task-row {
+    grid-template-columns: minmax(0, 1fr) 88px 36px;
+  }
+
+  .template-task-row > .template-task-type,
+  .template-task-row > .template-habit-points {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  .template-task-row > .template-icon-danger {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .template-add-category {
+    margin: 9px 14px 0;
+  }
+
+  .template-manager-panel footer {
+    padding: 12px 14px 16px;
+    flex-wrap: wrap;
+  }
+
+  .template-manager-panel footer .template-delete {
+    margin-right: 0;
   }
 }
 

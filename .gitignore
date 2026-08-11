@@ -9,13 +9,20 @@ data-test*/
 
 # Local build/deploy archives
 *.tar.gz
+*.tgz
 *.zip
 pnpm-lock.yaml
+archives/
+tmp/
 
 # Planning/export helper files kept outside the app source
 /*.md
 !/README.md
+!/CONTRIBUTING.md
+!/SECURITY.md
 /*.py
+docs/HANDOFF.md
+docs/BASE44-*.md
 
 # Local screenshots, generated drafts, and working files
 .chrome-shot/

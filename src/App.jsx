@@ -39,12 +39,12 @@ import {
   Upload,
   UserRound,
   Wrench,
-  RotateCcw,
   Save,
   Trash2,
 } from 'lucide-react';
 import './styles.css';
-import mascotImage from './assets/yanyixin-mascot.png';
+import { calculateRewardWallet, createTaskTemplate, mergeCatalogItems } from './state-utils.js';
+import mascotImage from './assets/child-mascot.png';
 import growthSeedImage from './assets/growth-tree/seed.png';
 import growthSproutImage from './assets/growth-tree/sprout.png';
 import growthSeedlingImage from './assets/growth-tree/seedling.png';
@@ -58,10 +58,13 @@ const LEGACY_MONTHS = [
 ];
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-const STORAGE_KEY = 'yan-yixin-summer-dashboard-v4';
-const VIEW_STORAGE_KEY = 'yan-yixin-active-view';
-const READING_SCOPE_STORAGE_KEY = 'yan-yixin-reading-scope';
+const STORAGE_KEY = 'little-growth-planet-state-v1';
+const VIEW_STORAGE_KEY = 'little-growth-planet-active-view';
+const READING_SCOPE_STORAGE_KEY = 'little-growth-planet-reading-scope';
+const LEGACY_STORAGE_KEY = 'yan-yixin-summer-dashboard-v4';
+const LEGACY_READING_SCOPE_STORAGE_KEY = 'yan-yixin-reading-scope';
 const API_STATE_URL = '/api/state';
+const API_STATE_EVENTS_URL = '/api/state/events';
 const API_GRADE_HOMEWORK_URL = '/api/grade-homework';
 const API_AI_CONFIG_URL = '/api/ai-config';
 const STATUS_ORDER = ['empty', 'done', 'excellent', 'super'];
@@ -105,7 +108,7 @@ const DEFAULT_POINT_CONFIG = {
 const DEFAULT_PROFILE = {
   avatarData: '',
   avatarHistory: [],
-  name: '严艺欣',
+  name: '小小星',
   gender: '女孩',
   birthday: '',
   school: '',
@@ -413,11 +416,6 @@ function normalizeStatus(status) {
   return STATUS[status] ? status : 'empty';
 }
 
-function snapshotLabel(date = new Date()) {
-  const pad = (value) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 function weekday(monthKey, day) {
   const [year, month] = monthKey.split('-').map(Number);
   return WEEKDAYS[new Date(year, month - 1, day).getDay()];
@@ -532,7 +530,8 @@ function initialActiveView() {
 }
 
 function initialReadingScope() {
-  return localStorage.getItem(READING_SCOPE_STORAGE_KEY) === 'library' ? 'library' : 'month';
+  const savedScope = localStorage.getItem(READING_SCOPE_STORAGE_KEY) || localStorage.getItem(LEGACY_READING_SCOPE_STORAGE_KEY);
+  return savedScope === 'library' ? 'library' : 'month';
 }
 
 function daysInMonth(year, month) {
@@ -620,12 +619,7 @@ function createDefaultMonths() {
 }
 
 function createSummerTemplate(months = createDefaultMonths()) {
-  return {
-    id: 'template-summer-2026',
-    name: '7-8月暑假模板',
-    categories: structuredClone(months[0]?.categories || []),
-    readingBooks: structuredClone(months[0]?.readingBooks || []),
-  };
+  return createTaskTemplate(months[0], '7-8月暑假模板', 'template-summer-2026');
 }
 
 function normalizeLibraryBooks(books = []) {
@@ -825,7 +819,7 @@ function buildTaskRows(month) {
 
 function loadState() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY));
     return saved ? sanitizeLoadedState(saved) : createSeedState();
   } catch {
     return createSeedState();
@@ -838,14 +832,40 @@ async function fetchDatabaseState() {
   return response.json();
 }
 
-async function saveDatabaseState(state) {
+function isTextEditingElement(element) {
+  return Boolean(element?.matches?.([
+    'textarea',
+    'input:not([type])',
+    'input[type="text"]',
+    'input[type="search"]',
+    'input[type="email"]',
+    'input[type="number"]',
+    'input[type="date"]',
+    'input[type="password"]',
+    'input[type="url"]',
+    'input[type="tel"]',
+    '[contenteditable="true"]',
+  ].join(',')));
+}
+
+async function saveDatabaseState(state, expectedVersion, clientId) {
   const response = await fetch(API_STATE_URL, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ state: createLocalCacheState(state) }),
+    body: JSON.stringify({
+      state: createLocalCacheState(state),
+      expectedVersion,
+      clientId,
+    }),
   });
-  if (!response.ok) throw new Error('保存数据库失败');
-  return response.json();
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.error || '保存数据库失败');
+    error.code = payload.code || '';
+    error.currentVersion = payload.currentVersion;
+    throw error;
+  }
+  return payload;
 }
 
 async function fetchAiConfig() {
@@ -871,8 +891,13 @@ function sanitizeLoadedState(saved) {
     return migrateLegacyState(next);
   }
   next.months = next.months.map(normalizeMonth);
+  next.templates = (next.templates || [])
+    .map((template) => createTaskTemplate(template, template.name, template.id || createId('template')));
   if (next.rewardCatalogVersion !== REWARD_CATALOG_VERSION) {
-    next.rewardConfig = DEFAULT_REWARDS;
+    next.rewardConfig = normalizeRewardConfig(mergeCatalogItems(
+      DEFAULT_REWARDS,
+      normalizeRewardConfig(next.rewardConfig || []),
+    ));
     next.rewardCatalogVersion = REWARD_CATALOG_VERSION;
   } else {
     next.rewardConfig = normalizeRewardConfig(next.rewardConfig || DEFAULT_REWARDS);
@@ -1140,12 +1165,6 @@ function migrateLegacyState(saved) {
     nextMonth.checks = structuredClone(saved.checks?.[legacyMonth.key] || {});
     return nextMonth;
   });
-  const backupSnapshot = {
-    id: Date.now(),
-    label: '旧版本数据备份',
-    month: '旧版本',
-    data: structuredClone(saved),
-  };
   return {
     ...saved,
     months,
@@ -1391,14 +1410,21 @@ function App() {
   const [state, setState] = useState(loadState);
   const [monthIndex, setMonthIndex] = useState(() => findCurrentMonthIndex((state.months?.length ? state.months : createDefaultMonths()).map(normalizeMonth)));
   const stateRef = useRef(state);
+  const monthIndexRef = useRef(monthIndex);
   const avatarInputRef = useRef(null);
   const loadingFromDatabase = useRef(true);
   const [databaseReady, setDatabaseReady] = useState(false);
   const [databaseStatus, setDatabaseStatus] = useState('正在连接数据库...');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const hasUnsavedChangesRef = useRef(false);
   const [saveToast, setSaveToast] = useState(null);
   const localSaveTimerRef = useRef(null);
   const databaseSaveTimerRef = useRef(null);
+  const databaseVersionRef = useRef(0);
+  const databaseWriteChainRef = useRef(Promise.resolve());
+  const databaseSyncRequestRef = useRef(null);
+  const syncClientIdRef = useRef(globalThis.crypto?.randomUUID?.() || `client-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const saveAfterTextBlurRef = useRef(false);
   const saveToastTimerRef = useRef(null);
   const manualSavePendingRef = useRef(false);
   const [activePanel, setActivePanel] = useState(null);
@@ -1416,6 +1442,8 @@ function App() {
   const [isLibraryTypeMenuOpen, setIsLibraryTypeMenuOpen] = useState(false);
   const [libraryViewMode, setLibraryViewMode] = useState('card');
   const [newBookDialog, setNewBookDialog] = useState(null);
+  const [newMonthDialog, setNewMonthDialog] = useState(null);
+  const [templateManagerDialog, setTemplateManagerDialog] = useState(null);
   const [bookTypesDialog, setBookTypesDialog] = useState(null);
   const [bookPagesDialog, setBookPagesDialog] = useState(null);
   const [profileDialog, setProfileDialog] = useState(null);
@@ -1449,8 +1477,10 @@ function App() {
   const [settingsFocusCategory, setSettingsFocusCategory] = useState('');
   const [isBackfillMode, setIsBackfillMode] = useState(false);
   const [appDialog, setAppDialog] = useState(null);
+  const [saveScheduleRevision, setSaveScheduleRevision] = useState(0);
   const appDialogResolverRef = useRef(null);
   const months = useMemo(() => (state.months?.length ? state.months.map(normalizeMonth) : createDefaultMonths()), [state.months]);
+  monthIndexRef.current = monthIndex;
   const month = months[Math.min(monthIndex, months.length - 1)] || months[0];
   const profile = normalizeProfile(state.profile);
   const pointConfig = useMemo(() => normalizePointConfig(state.pointConfig), [state.pointConfig]);
@@ -1552,12 +1582,71 @@ function App() {
   const mistakeItems = learningTools.mistakes;
   const books = useMemo(() => month.readingBooks?.map((book) => book.name) || state.books || DEFAULT_BOOKS, [month.readingBooks, state.books]);
   const reminders = useMemo(() => state.reminders || DEFAULT_REMINDERS, [state.reminders]);
-  const snapshots = useMemo(() => state.snapshots || [], [state.snapshots]);
-
   const showSaveToast = (message, type = 'success') => {
     setSaveToast({ message, type });
     if (saveToastTimerRef.current) window.clearTimeout(saveToastTimerRef.current);
     saveToastTimerRef.current = window.setTimeout(() => setSaveToast(null), 2200);
+  };
+
+  const markUnsavedChanges = (value) => {
+    hasUnsavedChangesRef.current = value;
+    setHasUnsavedChanges(value);
+  };
+
+  const applyDatabasePayload = (payload, { notify = false } = {}) => {
+    if (!payload.state?.months && !payload.state?.checks) return false;
+    const selectedMonthId = stateRef.current?.months?.[monthIndexRef.current]?.id;
+    const loadedState = sanitizeLoadedState(payload.state);
+    const selectedMonthIndex = loadedState.months?.findIndex((item) => item.id === selectedMonthId) ?? -1;
+
+    loadingFromDatabase.current = true;
+    if (databaseSaveTimerRef.current) {
+      window.clearTimeout(databaseSaveTimerRef.current);
+      databaseSaveTimerRef.current = null;
+    }
+    stateRef.current = loadedState;
+    databaseVersionRef.current = Number(payload.version || 0);
+    setState(loadedState);
+    setMonthIndex(selectedMonthIndex >= 0 ? selectedMonthIndex : findCurrentMonthIndex(loadedState.months || []));
+    markUnsavedChanges(false);
+    setDatabaseStatus(notify ? '已同步其他设备的最新修改' : '已连接 SQLite');
+    if (notify) showSaveToast('已同步其他设备的最新修改');
+    window.setTimeout(() => {
+      loadingFromDatabase.current = false;
+    }, 0);
+    return true;
+  };
+
+  const syncDatabaseState = () => {
+    if (databaseSyncRequestRef.current) return databaseSyncRequestRef.current;
+    const operation = fetchDatabaseState()
+      .then((payload) => {
+        if (Number(payload.version || 0) <= databaseVersionRef.current) return false;
+        if (hasUnsavedChangesRef.current || manualSavePendingRef.current) {
+          setDatabaseStatus('其他设备有新修改，当前操作尚未保存');
+          showSaveToast('其他设备有新修改，请先处理当前未保存内容', 'error');
+          return false;
+        }
+        return applyDatabasePayload(payload, { notify: true });
+      })
+      .finally(() => {
+        if (databaseSyncRequestRef.current === operation) databaseSyncRequestRef.current = null;
+      });
+    databaseSyncRequestRef.current = operation;
+    return operation;
+  };
+
+  const queueDatabaseSave = (nextState) => {
+    const stateSnapshot = structuredClone(createLocalCacheState(nextState));
+    const operation = databaseWriteChainRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const payload = await saveDatabaseState(stateSnapshot, databaseVersionRef.current, syncClientIdRef.current);
+        databaseVersionRef.current = Number(payload.version || 0);
+        return payload;
+      });
+    databaseWriteChainRef.current = operation;
+    return operation;
   };
 
   useEffect(() => {
@@ -1580,7 +1669,7 @@ function App() {
 
     if (!databaseReady || loadingFromDatabase.current) return undefined;
     if (manualSavePendingRef.current) {
-      setHasUnsavedChanges(true);
+      markUnsavedChanges(true);
       setDatabaseStatus('本月打卡有未保存修改，请点击保存');
       if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
       return () => {
@@ -1588,26 +1677,48 @@ function App() {
         if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
       };
     }
-    setHasUnsavedChanges(true);
+    markUnsavedChanges(true);
+    if (isTextEditingElement(document.activeElement) && !saveAfterTextBlurRef.current) {
+      setDatabaseStatus('正在编辑，离开输入框后自动保存');
+      if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
+      return () => {
+        if (localSaveTimerRef.current) window.clearTimeout(localSaveTimerRef.current);
+        if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
+      };
+    }
+    const saveDelay = saveAfterTextBlurRef.current ? 0 : 1500;
+    saveAfterTextBlurRef.current = false;
     setDatabaseStatus('有未保存修改，正在自动保存...');
     if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
     databaseSaveTimerRef.current = window.setTimeout(async () => {
       try {
-        await saveDatabaseState(stateRef.current);
-        setHasUnsavedChanges(false);
+        await queueDatabaseSave(stateRef.current);
+        markUnsavedChanges(false);
         setDatabaseStatus('已自动保存到数据库');
         showSaveToast('已保存到数据库');
-      } catch {
-        setDatabaseStatus('数据库保存失败，修改暂存在本机');
-        showSaveToast('数据库保存失败', 'error');
+      } catch (error) {
+        const conflict = error?.code === 'STATE_CONFLICT';
+        setDatabaseStatus(conflict ? '其他设备已先保存，当前修改未覆盖服务器数据' : '数据库保存失败，修改暂存在本机');
+        showSaveToast(conflict ? '其他设备已先保存，当前修改尚未保存' : '数据库保存失败', 'error');
       }
-    }, 1800);
+    }, saveDelay);
 
     return () => {
       if (localSaveTimerRef.current) window.clearTimeout(localSaveTimerRef.current);
       if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
     };
-  }, [state, databaseReady]);
+  }, [state, databaseReady, saveScheduleRevision]);
+
+  useEffect(() => {
+    const saveWhenTextEditingEnds = (event) => {
+      if (!isTextEditingElement(event.target)) return;
+      if (!hasUnsavedChangesRef.current) return;
+      saveAfterTextBlurRef.current = true;
+      setSaveScheduleRevision((current) => current + 1);
+    };
+    document.addEventListener('focusout', saveWhenTextEditingEnds);
+    return () => document.removeEventListener('focusout', saveWhenTextEditingEnds);
+  }, []);
 
   useEffect(() => () => {
     if (saveToastTimerRef.current) window.clearTimeout(saveToastTimerRef.current);
@@ -1666,17 +1777,19 @@ function App() {
         loadingFromDatabase.current = true;
         if (payload.state?.months || payload.state?.checks) {
           const loadedState = sanitizeLoadedState(payload.state);
+          databaseVersionRef.current = Number(payload.version || 0);
           setState(loadedState);
           setMonthIndex(findCurrentMonthIndex(loadedState.months || []));
           setDatabaseStatus('已连接 SQLite');
         } else {
-          await saveDatabaseState(stateRef.current);
+          databaseVersionRef.current = Number(payload.version || 0);
+          await queueDatabaseSave(stateRef.current);
           if (!active) return;
           setMonthIndex(findCurrentMonthIndex((stateRef.current?.months || []).map(normalizeMonth)));
           setDatabaseStatus('已初始化 SQLite');
         }
         setDatabaseReady(true);
-        setHasUnsavedChanges(false);
+        markUnsavedChanges(false);
         window.setTimeout(() => {
           loadingFromDatabase.current = false;
         }, 0);
@@ -1690,6 +1803,47 @@ function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!databaseReady) return undefined;
+
+    const eventSource = new EventSource(API_STATE_EVENTS_URL);
+    const checkForUpdates = () => {
+      if (document.visibilityState === 'hidden') return;
+      syncDatabaseState().catch(() => undefined);
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.sourceClientId === syncClientIdRef.current) return;
+        if (Number(payload.version || 0) <= databaseVersionRef.current) return;
+        if (hasUnsavedChangesRef.current || manualSavePendingRef.current) {
+          setDatabaseStatus('其他设备有新修改，当前操作尚未保存');
+          showSaveToast('其他设备有新修改，请先处理当前未保存内容', 'error');
+          return;
+        }
+        if (payload.state) {
+          applyDatabasePayload(payload, { notify: true });
+          return;
+        }
+        checkForUpdates();
+      } catch {
+        // Ignore malformed event payloads; EventSource will continue listening.
+      }
+    };
+
+    window.addEventListener('focus', checkForUpdates);
+    document.addEventListener('visibilitychange', checkForUpdates);
+    const fallbackTimer = window.setInterval(checkForUpdates, 15_000);
+
+    return () => {
+      eventSource.close();
+      window.removeEventListener('focus', checkForUpdates);
+      document.removeEventListener('visibilitychange', checkForUpdates);
+      window.clearInterval(fallbackTimer);
+    };
+  }, [databaseReady]);
 
   const rows = useMemo(() => buildTaskRows(month), [month]);
 
@@ -1869,14 +2023,25 @@ function App() {
     });
   };
 
-  const addMonth = async () => {
+  const addMonth = () => {
     const now = new Date();
-    const input = await showAppPrompt('请输入新月份，例如：2026-09', createMonthKey(now.getFullYear(), now.getMonth() + 1), {
-      title: '新增月份清单',
-      inputLabel: '月份',
-      placeholder: 'YYYY-MM',
+    let year = now.getFullYear();
+    let monthNumber = now.getMonth() + 1;
+    while (months.some((item) => item.key === createMonthKey(year, monthNumber))) {
+      monthNumber += 1;
+      if (monthNumber > 12) {
+        monthNumber = 1;
+        year += 1;
+      }
+    }
+    setNewMonthDialog({
+      monthKey: createMonthKey(year, monthNumber),
+      templateId: '',
     });
-    if (!input) return;
+  };
+
+  const confirmAddMonth = () => {
+    const input = newMonthDialog?.monthKey?.trim() || '';
     const match = input.match(/^(\d{4})-(\d{1,2})$/);
     if (!match) {
       showAppAlert('月份格式请填写为 YYYY-MM，例如 2026-09', { tone: 'warning' });
@@ -1885,27 +2050,167 @@ function App() {
     const year = Number(match[1]);
     const monthNumber = Number(match[2]);
     if (monthNumber < 1 || monthNumber > 12) return;
+    const monthKey = createMonthKey(year, monthNumber);
+    if (months.some((item) => item.key === monthKey)) {
+      showAppAlert(`${year}年${monthNumber}月的清单已经存在`, { tone: 'warning' });
+      return;
+    }
+    const selectedTemplate = (state.templates || []).find((template) => template.id === newMonthDialog.templateId);
     setState((current) => {
       const next = structuredClone(current || {});
       next.months ||= [];
       const created = createMonthShell(year, monthNumber);
-      const template = next.templates?.[0];
-      if (template) {
+      if (selectedTemplate) {
+        const template = createTaskTemplate(selectedTemplate, selectedTemplate.name, selectedTemplate.id);
         created.categories = structuredClone(template.categories || []).map((category) => ({
           ...category,
           id: createId('cat'),
-          tasks: (category.tasks || []).map((task) => ({ ...task, id: createId('task'), checkMode: task.checkMode || 'daily', importance: task.importance || 'normal', endDay: Math.min(created.days, Number(task.endDay || created.days)) })),
-        }));
-        created.readingBooks = structuredClone(template.readingBooks || []).map((book) => ({
-          ...book,
-          id: createId('book'),
-          endDay: Math.min(created.days, Number(book.endDay || created.days)),
+          tasks: (category.tasks || []).map((task) => ({
+            ...task,
+            id: createId('task'),
+            type: 'daily',
+            checkMode: 'daily',
+            importance: task.importance || 'normal',
+            startDay: 1,
+            endDay: created.days,
+          })),
         }));
       }
       next.months.push(created);
       return next;
     });
     setMonthIndex(months.length);
+    setNewMonthDialog(null);
+  };
+
+  const saveCurrentMonthAsTemplate = async () => {
+    const input = await showAppPrompt('为当前任务清单填写一个模板名称。阶段任务和临时任务不会保存到模板。', `${month.label}任务模板`, {
+      title: '保存为模板',
+      inputLabel: '模板名称',
+      placeholder: '例如：日常学习模板',
+      confirmText: '保存模板',
+    });
+    const name = input?.trim();
+    if (!name) return;
+    const existing = (stateRef.current.templates || []).find((template) => template.name === name);
+    if (existing) {
+      const confirmed = await showAppConfirm(`已经存在“${name}”，是否用当前月份的每日固定任务覆盖它？`, {
+        title: '覆盖模板',
+        confirmText: '确认覆盖',
+        tone: 'warning',
+      });
+      if (!confirmed) return;
+    }
+
+    const sourceMonth = stateRef.current.months?.find((item) => item.id === month.id) || month;
+    const next = structuredClone(stateRef.current || {});
+    next.templates ||= [];
+    const template = createTaskTemplate(sourceMonth, name, existing?.id || createId('template'));
+    const taskCount = template.categories.reduce((sum, category) => sum + category.tasks.length, 0);
+    if (taskCount === 0) {
+      showAppAlert('当前月份没有可保存的每日固定任务。阶段任务和临时任务不会进入模板。', { tone: 'warning' });
+      return;
+    }
+    if (existing) {
+      next.templates = next.templates.map((item) => (item.id === existing.id ? template : item));
+    } else {
+      next.templates.push(template);
+    }
+
+    loadingFromDatabase.current = true;
+    stateRef.current = next;
+    setState(next);
+    const ok = await persistState(next, '任务模板已保存到 SQLite');
+    window.setTimeout(() => {
+      loadingFromDatabase.current = false;
+    }, 0);
+    if (ok) showAppAlert(`“${name}”已保存。新建月份清单时可以直接选择使用。`, { title: '模板已保存' });
+  };
+
+  const openTemplateManager = () => {
+    const templates = stateRef.current.templates || [];
+    if (!templates.length) {
+      showAppAlert('还没有可管理的模板，请先将一个月份配置保存为模板。', { tone: 'warning' });
+      return;
+    }
+    setTemplateManagerDialog({
+      templateId: templates[0].id,
+      draft: structuredClone(templates[0]),
+    });
+  };
+
+  const selectManagedTemplate = (templateId) => {
+    const template = (stateRef.current.templates || []).find((item) => item.id === templateId);
+    if (!template) return;
+    setTemplateManagerDialog({ templateId, draft: structuredClone(template) });
+  };
+
+  const updateTemplateDraft = (updater) => {
+    setTemplateManagerDialog((current) => {
+      if (!current) return current;
+      const draft = structuredClone(current.draft);
+      updater(draft);
+      return { ...current, draft };
+    });
+  };
+
+  const persistTemplateList = async (templates, successMessage) => {
+    const next = structuredClone(stateRef.current || {});
+    next.templates = templates;
+    loadingFromDatabase.current = true;
+    stateRef.current = next;
+    setState(next);
+    const ok = await persistState(next, successMessage);
+    window.setTimeout(() => {
+      loadingFromDatabase.current = false;
+    }, 0);
+    return ok;
+  };
+
+  const saveManagedTemplate = async () => {
+    const draft = templateManagerDialog?.draft;
+    if (!draft) return;
+    const name = draft.name?.trim();
+    if (!name) {
+      showAppAlert('模板名称不能为空。', { tone: 'warning' });
+      return;
+    }
+    const duplicate = (stateRef.current.templates || []).find((item) => item.id !== draft.id && item.name === name);
+    if (duplicate) {
+      showAppAlert(`已经存在名为“${name}”的模板，请使用其他名称。`, { tone: 'warning' });
+      return;
+    }
+    const normalized = createTaskTemplate(draft, name, draft.id);
+    const taskCount = normalized.categories.reduce((sum, category) => sum + category.tasks.length, 0);
+    if (!taskCount) {
+      showAppAlert('模板至少需要保留一个每日固定任务。', { tone: 'warning' });
+      return;
+    }
+    const templates = (stateRef.current.templates || []).map((item) => (item.id === draft.id ? normalized : item));
+    const ok = await persistTemplateList(templates, '任务模板修改已保存到 SQLite');
+    if (ok) {
+      setTemplateManagerDialog({ templateId: normalized.id, draft: structuredClone(normalized) });
+      showSaveToast('模板修改已保存');
+    }
+  };
+
+  const deleteManagedTemplate = async () => {
+    const draft = templateManagerDialog?.draft;
+    if (!draft) return;
+    const confirmed = await showAppConfirm(`确定删除模板“${draft.name}”吗？已创建的月份不会受到影响。`, {
+      title: '删除模板',
+      confirmText: '确认删除',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    const templates = (stateRef.current.templates || []).filter((item) => item.id !== draft.id);
+    const ok = await persistTemplateList(templates, '任务模板已删除');
+    if (!ok) return;
+    if (!templates.length) {
+      setTemplateManagerDialog(null);
+    } else {
+      setTemplateManagerDialog({ templateId: templates[0].id, draft: structuredClone(templates[0]) });
+    }
   };
 
   const isCurrentCalendarMonth = (targetMonth) => {
@@ -2799,14 +3104,15 @@ function App() {
     }
     setDatabaseStatus('正在保存到 SQLite...');
     try {
-      await saveDatabaseState(nextState);
-      setHasUnsavedChanges(false);
+      await queueDatabaseSave(nextState);
+      markUnsavedChanges(false);
       setDatabaseStatus(successMessage);
       showSaveToast(successMessage.replace(' SQLite', '数据库'));
       return true;
-    } catch {
-      setDatabaseStatus('数据库保存失败，修改暂存在本机');
-      showSaveToast('数据库保存失败', 'error');
+    } catch (error) {
+      const conflict = error?.code === 'STATE_CONFLICT';
+      setDatabaseStatus(conflict ? '其他设备已先保存，当前修改未覆盖服务器数据' : '数据库保存失败，修改暂存在本机');
+      showSaveToast(conflict ? '其他设备已先保存，当前修改尚未保存' : '数据库保存失败', 'error');
       return false;
     }
   };
@@ -2936,50 +3242,6 @@ function App() {
       tone: 'warning',
     })) return;
     setIsBackfillMode(true);
-  };
-
-  const createSnapshot = async () => {
-    const label = snapshotLabel();
-    const current = stateRef.current || {};
-    const { snapshots: _snapshots, ...rest } = current;
-    const nextSnapshot = {
-      id: Date.now(),
-      label,
-      month: month.label,
-      data: structuredClone(rest),
-    };
-    const nextState = {
-      ...current,
-      snapshots: [nextSnapshot, ...(current.snapshots || [])].slice(0, 20),
-    };
-    stateRef.current = nextState;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(createLocalCacheState(nextState)));
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-    setState(nextState);
-    const ok = await persistState(nextState, '当前状态已保存到 SQLite');
-    if (ok) showAppAlert(`已保存当前状态：${label}`, { title: '保存成功' });
-  };
-
-  const restoreSnapshot = async (snapshot) => {
-    if (!await showAppConfirm(`确定恢复到保存点「${snapshot.label}」吗？当前未保存的修改会被覆盖。`, {
-      title: '恢复保存点',
-      confirmText: '恢复',
-      tone: 'warning',
-    })) return;
-    setState((current) => ({
-      ...structuredClone(snapshot.data),
-      snapshots: (current || {}).snapshots || [],
-    }));
-  };
-
-  const deleteSnapshot = (snapshotId) => {
-    setState((current) => ({
-      ...(current || {}),
-      snapshots: ((current || {}).snapshots || []).filter((snapshot) => snapshot.id !== snapshotId),
-    }));
   };
 
   const dayPoints = (day) =>
@@ -3335,7 +3597,7 @@ ${colorStyles}
     .filter((day) => dayHasCheckin(day)).length;
   const readingRewardPoints = completedReadingRewards(month, pointConfig);
   const monthPoints = cumulativePointsWithReadingRewards.at(-1) || 0;
-  const allMonthPoints = months.reduce((sum, candidateMonth) => {
+  const earnedPointsForMonth = (candidateMonth) => {
     const candidateRows = buildTaskRows(candidateMonth);
     const taskPoints = Array.from({ length: candidateMonth.days }, (_, index) => index + 1).reduce((daySum, day) => (
       daySum + candidateRows.reduce((rowSum, row) => {
@@ -3345,11 +3607,15 @@ ${colorStyles}
         return rowSum + base;
       }, 0)
     ), 0);
-    return sum + taskPoints + completedReadingRewards(candidateMonth, pointConfig);
-  }, 0);
-  const redeemedRewards = month.redeemedRewards || [];
-  const redeemedRewardPoints = redeemedRewards.reduce((sum, item) => sum + Number(item.points || 0), 0);
-  const availableRewardPoints = Math.max(0, monthPoints - redeemedRewardPoints);
+    return taskPoints + completedReadingRewards(candidateMonth, pointConfig);
+  };
+  const rewardWallet = calculateRewardWallet(months, earnedPointsForMonth);
+  const allMonthPoints = rewardWallet.earned;
+  const redeemedRewards = months
+    .flatMap((candidateMonth) => (candidateMonth.redeemedRewards || []).map((record) => ({ ...record, monthLabel: candidateMonth.label })))
+    .sort((a, b) => String(b.redeemedAt || '').localeCompare(String(a.redeemedAt || '')));
+  const redeemedRewardPoints = rewardWallet.redeemed;
+  const availableRewardPoints = Math.max(0, allMonthPoints - redeemedRewardPoints);
   const readingBooksWithStats = (month.readingBooks || []).map((book) => ({ book, stats: readingBookStats(month, book, pointConfig) }));
   const plannedLibraryBookIds = new Set(months.flatMap((item) => item.readingBooks || []).map((book) => book.id));
   const finishedLibraryBookIds = new Set(months.flatMap((item) => (
@@ -3621,7 +3887,15 @@ ${colorStyles}
                   <div className={`reading-plan-row ${record.isToday ? 'today' : ''} ${record.isMissed ? 'missed' : ''}`} key={`${book.id}-plan-${record.day}`}>
                     <span>第{record.dayIndex}天</span>
                     {record.startPage && record.endPage ? (
-                      <strong className="reading-plan-range">{record.startPage} 至 {record.endPage} 页</strong>
+                      <button
+                        className="reading-plan-range"
+                        type="button"
+                        title="修改阅读范围"
+                        aria-label={`修改第${record.dayIndex}天阅读范围：${record.startPage}至${record.endPage}页`}
+                        onClick={() => setReadingPlanEditor({ bookId: book.id, bookName: book.name || '未命名书目', day: record.day, startPage: record.startPage, endPage: record.endPage })}
+                      >
+                        {record.startPage} 至 {record.endPage} 页
+                      </button>
                     ) : (
                       <button className="reading-plan-unset" type="button" onClick={() => setReadingPlanEditor({ bookId: book.id, bookName: book.name || '未命名书目', day: record.day, startPage: record.startPage, endPage: record.endPage })}>未设置</button>
                     )}
@@ -3801,7 +4075,8 @@ ${colorStyles}
               delete next[stageTaskKey];
               return next;
             })} type="button">
-              收起
+              <span>阶段任务可以暂不打卡</span>
+              <strong>点击这里可以收起</strong>
             </button>
           )}
         </div>
@@ -3938,20 +4213,19 @@ ${colorStyles}
             <em>已浇水 {wateredDays} 天</em>
           </div>
           <nav>
-            {NAV_ITEMS.map(({ label, icon: Icon }, index) => (
+            {NAV_ITEMS.map(({ label, icon: Icon }) => (
               <button
                 key={label}
-                className={(label === '今日打卡' && (activeView === 'today' || activeView === 'home')) || (label === '积分奖励' && activeView === 'rewards') || (label === '历史记录' && activeView === 'history') || (label === '设置中心' && activeView === 'settings') || (label === '阅读书单' && activeView === 'books') || (label === '学习工具' && activeView === 'tools') ? 'active' : ''}
+                className={(label === '今日打卡' && (activeView === 'today' || activeView === 'home')) || (label === '积分奖励' && activeView === 'rewards') || (label === '设置中心' && activeView === 'settings') || (label === '阅读书单' && activeView === 'books') || (label === '学习工具' && activeView === 'tools') ? 'active' : ''}
                 onClick={() => {
                   if (label === '今日打卡') setActiveView('today');
-                  if (label === '历史记录') setActiveView('history');
                   if (label === '设置中心') setActiveView('settings');
                   if (label === '积分奖励') setActiveView('rewards');
                   if (label === '阅读书单') setActiveView('books');
                   if (label === '学习工具') setActiveView('tools');
                 }}
               >
-                <Icon size={25} strokeWidth={((label === '今日打卡' && (activeView === 'today' || activeView === 'home')) || (label === '积分奖励' && activeView === 'rewards') || (label === '历史记录' && activeView === 'history') || (label === '设置中心' && activeView === 'settings') || (label === '阅读书单' && activeView === 'books') || (label === '学习工具' && activeView === 'tools')) ? 2.6 : 2.2} />
+                <Icon size={25} strokeWidth={((label === '今日打卡' && (activeView === 'today' || activeView === 'home')) || (label === '积分奖励' && activeView === 'rewards') || (label === '设置中心' && activeView === 'settings') || (label === '阅读书单' && activeView === 'books') || (label === '学习工具' && activeView === 'tools')) ? 2.6 : 2.2} />
                 <span>{label}</span>
               </button>
             ))}
@@ -4967,41 +5241,6 @@ ${colorStyles}
               </section>
             )}
           </section>
-        ) : activeView === 'history' ? (
-          <section className="history-page">
-            <div className="history-hero">
-              <div>
-                <p>历史记录</p>
-                <h2>保存当前打卡状态，误点后可以恢复</h2>
-                <span>最多保留最近 20 个保存点</span>
-              </div>
-              <button onClick={createSnapshot}><Save size={20} />保存当前状态</button>
-            </div>
-
-            <div className="snapshot-list">
-              {snapshots.length === 0 ? (
-                <div className="empty-snapshot">
-                  <CalendarDays size={42} />
-                  <strong>还没有保存点</strong>
-                  <p>打卡到一个比较满意的状态后，点击“保存当前状态”。</p>
-                </div>
-              ) : (
-                snapshots.map((snapshot, index) => (
-                  <article className="snapshot-card" key={snapshot.id}>
-                    <div>
-                      <span>保存点 {snapshots.length - index}</span>
-                      <h3>{snapshot.label}</h3>
-                      <p>保存月份：{snapshot.month}</p>
-                    </div>
-                    <div className="snapshot-actions">
-                      <button onClick={() => restoreSnapshot(snapshot)}><RotateCcw size={18} />恢复</button>
-                      <button className="danger" onClick={() => deleteSnapshot(snapshot.id)}><Trash2 size={18} />删除</button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
         ) : (
           <section className="settings-page">
             <div className="settings-page-hero">
@@ -5010,7 +5249,10 @@ ${colorStyles}
                 <h2>长期学习打卡配置</h2>
                 <span>{databaseStatus}</span>
               </div>
-              <button className="compact-primary" onClick={addMonth}>+ 新建月份清单</button>
+              <div className="settings-hero-actions">
+                <button className="template-manager-button" onClick={openTemplateManager}><ClipboardCheck size={15} />模板管理</button>
+                <button className="compact-primary" onClick={addMonth}>+ 新建月份清单</button>
+              </div>
             </div>
 
             <div className="settings-layout">
@@ -5066,7 +5308,10 @@ ${colorStyles}
                       <h3>{month.label}</h3>
                       <p>当前月份目标、任务分类、阅读书单都会保存到这个月份清单中</p>
                     </div>
-                    <button className="save-config" onClick={saveConfiguration}><Save size={15} />保存本月配置</button>
+                    <div className="month-config-actions">
+                      <button className="save-template" onClick={saveCurrentMonthAsTemplate}><ClipboardCheck size={15} />保存为模板</button>
+                      <button className="save-config" onClick={saveConfiguration}><Save size={15} />保存本月配置</button>
+                    </div>
                   </div>
                   <label className="month-goal-field">
                     <span>本月标题</span>
@@ -5507,6 +5752,199 @@ ${colorStyles}
             <footer>
               <button className="ghost" onClick={() => setBookPagesDialog(null)}>取消</button>
               <button onClick={confirmBookPages} disabled={Number(bookPagesDialog.totalPages || 0) <= 0}>保存页数</button>
+            </footer>
+          </div>
+        </section>
+      )}
+
+      {templateManagerDialog && (
+        <section className="settings-mask template-manager-mask" role="dialog" aria-modal="true" aria-label="模板管理">
+          <div className="book-dialog-panel template-manager-panel">
+            <header>
+              <div>
+                <h2>模板管理</h2>
+                <p>管理可复用的每日固定任务。这里的修改不会影响已经创建的月份。</p>
+              </div>
+            </header>
+
+            <div className="template-manager-toolbar">
+              <label>
+                <span>选择模板</span>
+                <select value={templateManagerDialog.templateId} onChange={(event) => selectManagedTemplate(event.target.value)}>
+                  {(state.templates || []).map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>模板名称</span>
+                <input value={templateManagerDialog.draft.name || ''} onChange={(event) => updateTemplateDraft((draft) => { draft.name = event.target.value; })} />
+              </label>
+            </div>
+
+            <div className="template-editor-list">
+              {(templateManagerDialog.draft.categories || []).map((category, categoryIndex) => (
+                <section className="template-category-editor" key={category.id || categoryIndex}>
+                  <header>
+                    <input
+                      aria-label={`第${categoryIndex + 1}个分类名称`}
+                      value={category.name || ''}
+                      onChange={(event) => updateTemplateDraft((draft) => {
+                        draft.categories[categoryIndex].name = event.target.value;
+                        draft.categories[categoryIndex].badge = event.target.value.slice(0, 1) || '类';
+                      })}
+                    />
+                    <select
+                      aria-label={`${category.name || '分类'}颜色`}
+                      value={category.color || 'blue'}
+                      onChange={(event) => updateTemplateDraft((draft) => { draft.categories[categoryIndex].color = event.target.value; })}
+                    >
+                      <option value="blue">蓝色</option>
+                      <option value="green">绿色</option>
+                      <option value="red">红色</option>
+                      <option value="purple">紫色</option>
+                      <option value="orange">橙色</option>
+                    </select>
+                    <button
+                      className="template-icon-danger"
+                      type="button"
+                      title="删除分类"
+                      aria-label={`删除${category.name || '分类'}`}
+                      onClick={() => updateTemplateDraft((draft) => { draft.categories.splice(categoryIndex, 1); })}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </header>
+
+                  <div className="template-task-list">
+                    {(category.tasks || []).map((task, taskIndex) => (
+                      <div className="template-task-row" key={task.id || taskIndex}>
+                        <input
+                          aria-label={`${category.name || '分类'}第${taskIndex + 1}项任务`}
+                          value={task.title || ''}
+                          placeholder="每日固定任务名称"
+                          onChange={(event) => updateTemplateDraft((draft) => { draft.categories[categoryIndex].tasks[taskIndex].title = event.target.value; })}
+                        />
+                        <select
+                          aria-label={`${task.title || '任务'}重要度`}
+                          value={task.importance || 'normal'}
+                          onChange={(event) => updateTemplateDraft((draft) => { draft.categories[categoryIndex].tasks[taskIndex].importance = event.target.value; })}
+                        >
+                          <option value="normal">普通</option>
+                          <option value="important">重要</option>
+                        </select>
+                        {category.name === '好习惯' ? (
+                          <label className="template-habit-points">
+                            <input
+                              type="number"
+                              min="0"
+                              aria-label={`${task.title || '好习惯'}积分`}
+                              value={task.habitPoints ?? pointConfig.habit}
+                              onChange={(event) => updateTemplateDraft((draft) => { draft.categories[categoryIndex].tasks[taskIndex].habitPoints = event.target.value; })}
+                            />
+                            <span>分</span>
+                          </label>
+                        ) : <span className="template-task-type">每日固定</span>}
+                        <button
+                          className="template-icon-danger"
+                          type="button"
+                          title="删除任务"
+                          aria-label={`删除${task.title || '任务'}`}
+                          onClick={() => updateTemplateDraft((draft) => { draft.categories[categoryIndex].tasks.splice(taskIndex, 1); })}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="template-add-task"
+                    type="button"
+                    onClick={() => updateTemplateDraft((draft) => {
+                      draft.categories[categoryIndex].tasks ||= [];
+                      draft.categories[categoryIndex].tasks.push({
+                        id: createId('template-task'),
+                        title: '',
+                        type: 'daily',
+                        checkMode: 'daily',
+                        importance: 'normal',
+                        startDay: 1,
+                        endDay: 31,
+                        ...(category.name === '好习惯' ? { habitPoints: pointConfig.habit } : {}),
+                      });
+                    })}
+                  >
+                    + 添加每日任务
+                  </button>
+                </section>
+              ))}
+            </div>
+
+            <button
+              className="template-add-category"
+              type="button"
+              onClick={() => updateTemplateDraft((draft) => {
+                draft.categories ||= [];
+                draft.categories.push({
+                  id: createId('template-category'),
+                  name: '新分类',
+                  color: 'blue',
+                  badge: '新',
+                  tasks: [],
+                });
+              })}
+            >
+              + 添加分类
+            </button>
+
+            <footer>
+              <button className="template-delete" type="button" onClick={deleteManagedTemplate}><Trash2 size={15} />删除模板</button>
+              <button className="ghost" type="button" onClick={() => setTemplateManagerDialog(null)}>取消</button>
+              <button type="button" onClick={saveManagedTemplate}><Save size={15} />保存修改</button>
+            </footer>
+          </div>
+        </section>
+      )}
+
+      {newMonthDialog && (
+        <section className="settings-mask" role="dialog" aria-modal="true" aria-label="新增月份清单">
+          <div className="book-dialog-panel new-month-dialog-panel">
+            <header>
+              <div>
+                <h2>新增月份清单</h2>
+                <p>可以创建空白清单，也可以复用已保存模板中的每日固定任务和好习惯。</p>
+              </div>
+            </header>
+            <div className="book-dialog-fields">
+              <label>
+                <span>月份</span>
+                <input
+                  autoFocus
+                  type="month"
+                  value={newMonthDialog.monthKey}
+                  onChange={(event) => setNewMonthDialog((current) => ({ ...current, monthKey: event.target.value }))}
+                />
+              </label>
+              <label>
+                <span>创建方式</span>
+                <select
+                  value={newMonthDialog.templateId}
+                  onChange={(event) => setNewMonthDialog((current) => ({ ...current, templateId: event.target.value }))}
+                >
+                  <option value="">空白月份清单</option>
+                  {(state.templates || []).map((template) => {
+                    const taskCount = (template.categories || []).reduce((sum, category) => sum + (category.tasks?.length || 0), 0);
+                    return <option key={template.id} value={template.id}>从模板新建：{template.name}（{taskCount}项任务）</option>;
+                  })}
+                </select>
+              </label>
+            </div>
+            <div className="new-month-template-note">
+              模板只包含每日固定任务；阶段任务、临时任务、打卡记录和备注不会复制。
+            </div>
+            <footer>
+              <button className="ghost" type="button" onClick={() => setNewMonthDialog(null)}>取消</button>
+              <button type="button" onClick={confirmAddMonth}>创建月份清单</button>
             </footer>
           </div>
         </section>

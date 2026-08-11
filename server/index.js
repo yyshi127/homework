@@ -2,6 +2,7 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import { validateAppState } from './state-validation.js';
 
 const PORT = Number(process.env.PORT || 8090);
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
@@ -20,7 +21,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS app_state (
     key TEXT PRIMARY KEY,
     state_json TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS ai_config (
@@ -30,14 +32,42 @@ db.exec(`
   );
 `);
 
-const getState = db.prepare('SELECT state_json, updated_at FROM app_state WHERE key = ?');
-const upsertState = db.prepare(`
-  INSERT INTO app_state (key, state_json, updated_at)
-  VALUES (@key, @state_json, @updated_at)
-  ON CONFLICT(key) DO UPDATE SET
-    state_json = excluded.state_json,
-    updated_at = excluded.updated_at
+const appStateColumns = db.pragma('table_info(app_state)');
+if (!appStateColumns.some((column) => column.name === 'version')) {
+  db.exec('ALTER TABLE app_state ADD COLUMN version INTEGER NOT NULL DEFAULT 0');
+}
+
+const getState = db.prepare('SELECT state_json, updated_at, version FROM app_state WHERE key = ?');
+const insertState = db.prepare(`
+  INSERT INTO app_state (key, state_json, updated_at, version)
+  VALUES (@key, @state_json, @updated_at, 1)
 `);
+const updateState = db.prepare(`
+  UPDATE app_state
+  SET state_json = @state_json,
+      updated_at = @updated_at,
+      version = version + 1
+  WHERE key = @key AND version = @expected_version
+`);
+const saveStateWithVersion = db.transaction(({ stateJson, expectedVersion, updatedAt }) => {
+  const current = getState.get(STATE_KEY);
+  if (!current) {
+    if (expectedVersion !== 0) return { conflict: true, currentVersion: 0 };
+    insertState.run({ key: STATE_KEY, state_json: stateJson, updated_at: updatedAt });
+    return { conflict: false, version: 1 };
+  }
+
+  const currentVersion = Number(current.version || 0);
+  if (currentVersion !== expectedVersion) return { conflict: true, currentVersion };
+  const result = updateState.run({
+    key: STATE_KEY,
+    state_json: stateJson,
+    updated_at: updatedAt,
+    expected_version: expectedVersion,
+  });
+  if (result.changes !== 1) return { conflict: true, currentVersion: Number(getState.get(STATE_KEY)?.version || 0) };
+  return { conflict: false, version: currentVersion + 1 };
+});
 const getAiConfigRow = db.prepare('SELECT config_json, updated_at FROM ai_config WHERE key = ?');
 const upsertAiConfig = db.prepare(`
   INSERT INTO ai_config (key, config_json, updated_at)
@@ -48,7 +78,19 @@ const upsertAiConfig = db.prepare(`
 `);
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+const stateEventClients = new Set();
+app.use('/api/grade-homework', express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '5mb' }));
+
+function sendStateEvent(response, event) {
+  response.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+function broadcastStateEvent(event) {
+  for (const response of stateEventClients) {
+    sendStateEvent(response, event);
+  }
+}
 
 const DEFAULT_AI_CONFIG = {
   activeProvider: 'aliyun',
@@ -115,30 +157,75 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/state', (_req, res) => {
   const row = getState.get(STATE_KEY);
   if (!row) {
-    res.json({ state: null, updatedAt: null });
+    res.json({ state: null, updatedAt: null, version: 0 });
     return;
   }
 
   try {
-    res.json({ state: JSON.parse(row.state_json), updatedAt: row.updated_at });
+    res.json({ state: JSON.parse(row.state_json), updatedAt: row.updated_at, version: Number(row.version || 0) });
   } catch {
     res.status(500).json({ error: '数据库中的状态数据无法解析' });
   }
 });
 
+app.get('/api/state/events', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders?.();
+  stateEventClients.add(res);
+
+  const row = getState.get(STATE_KEY);
+  sendStateEvent(res, {
+    version: Number(row?.version || 0),
+    updatedAt: row?.updated_at || null,
+    sourceClientId: '',
+  });
+
+  const heartbeat = setInterval(() => res.write(': keepalive\n\n'), 20_000);
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    stateEventClients.delete(res);
+  });
+});
+
 app.put('/api/state', (req, res) => {
-  if (!req.body || typeof req.body.state !== 'object' || Array.isArray(req.body.state)) {
-    res.status(400).json({ error: 'state 必须是对象' });
+  const expectedVersion = req.body?.expectedVersion;
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 0) {
+    res.status(428).json({ code: 'STATE_VERSION_REQUIRED', error: '保存状态时必须提供有效版本号' });
+    return;
+  }
+
+  const validationErrors = validateAppState(req.body?.state);
+  if (validationErrors.length) {
+    res.status(400).json({ code: 'INVALID_STATE', error: validationErrors[0], details: validationErrors });
     return;
   }
 
   const updatedAt = new Date().toISOString();
-  upsertState.run({
-    key: STATE_KEY,
-    state_json: JSON.stringify(req.body.state),
-    updated_at: updatedAt,
+  const result = saveStateWithVersion({
+    stateJson: JSON.stringify(req.body.state),
+    expectedVersion,
+    updatedAt,
   });
-  res.json({ ok: true, updatedAt });
+  if (result.conflict) {
+    res.status(409).json({
+      code: 'STATE_CONFLICT',
+      error: '数据已被其他设备更新，请刷新后重试',
+      currentVersion: result.currentVersion,
+    });
+    return;
+  }
+  broadcastStateEvent({
+    version: result.version,
+    updatedAt,
+    sourceClientId: typeof req.body?.clientId === 'string' ? req.body.clientId.slice(0, 100) : '',
+    state: req.body.state,
+  });
+  res.json({ ok: true, updatedAt, version: result.version });
 });
 
 app.get('/api/ai-config', (_req, res) => {
@@ -759,6 +846,14 @@ app.post('/api/grade-homework', async (req, res) => {
   } catch (error) {
     res.status(502).json({ error: error?.message || 'AI 批改失败，请稍后再试' });
   }
+});
+
+app.use((error, _req, res, next) => {
+  if (error?.type === 'entity.too.large') {
+    res.status(413).json({ code: 'PAYLOAD_TOO_LARGE', error: '提交的数据超过大小限制' });
+    return;
+  }
+  next(error);
 });
 
 app.listen(PORT, '127.0.0.1', () => {

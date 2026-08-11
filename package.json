@@ -1,10 +1,17 @@
 {
+  "name": "little-growth-planet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A family-focused homework, reading, and habit-building system for primary-school children.",
+  "license": "AGPL-3.0-or-later",
+  "repository": "https://github.com/yyshi127/homework",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

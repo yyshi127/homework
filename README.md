@@ -2,6 +2,9 @@
 
 [English](#english-version) | [中文](#中文说明)
 
+[![CI](https://github.com/yyshi127/homework/actions/workflows/ci.yml/badge.svg)](https://github.com/yyshi127/homework/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+
 ## English Version
 
 Little Growth Planet is a homework, reading, and habit-building system designed for families with primary-school children. Parents can arrange daily tasks, assess completion quality, manage reading plans, build a positive feedback loop through points and rewards, and review long-term progress through monthly records and Excel exports.
@@ -110,7 +113,8 @@ The project supports self-hosting and local SQLite storage, allowing families to
 ├── server/
 │   └── index.js                # API, SQLite, and AI review services
 ├── docs/
-│   └── HANDOFF.md              # Maintenance and deployment handoff
+│   └── DEPLOYMENT.md           # Public self-hosting and deployment guide
+├── test/                       # State and API regression tests
 ├── data/                       # Local runtime data; not committed
 ├── index.html
 ├── vite.config.js
@@ -197,11 +201,17 @@ Alibaba Cloud and Baidu homework-review settings can be maintained through the a
 
 ## Documentation
 
-See the [handoff guide](docs/HANDOFF.md) for maintenance, deployment, database backup, and release procedures.
+See the [deployment guide](docs/DEPLOYMENT.md) for self-hosting, database backup, and release guidance.
+
+## Contributing
+
+Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before contributing and report security problems through the process described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-No open-source license is currently declared. Copying, modification, and redistribution are not granted by default. Contact the repository owner for commercial use.
+Copyright (c) 2026 yyshi127 and contributors.
+
+This project is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE). You may use, modify, and redistribute it, including commercially, provided that you comply with the license. Modified versions offered over a network must also make their corresponding source code available under the same license.
 
 ---
 
@@ -313,7 +323,8 @@ No open-source license is currently declared. Copying, modification, and redistr
 ├── server/
 │   └── index.js                # API、SQLite 与 AI 批改服务
 ├── docs/
-│   └── HANDOFF.md              # 项目维护和部署交接说明
+│   └── DEPLOYMENT.md           # 公开的自托管与部署指南
+├── test/                       # 状态与 API 回归测试
 ├── data/                       # 本地运行数据，不提交仓库
 ├── index.html
 ├── vite.config.js
@@ -400,8 +411,14 @@ npm run build
 
 ## 文档
 
-项目维护、服务器部署、数据库备份和发布流程请参阅 [交接文档](docs/HANDOFF.md)。
+自托管、数据库备份和发布说明请参阅[部署文档](docs/DEPLOYMENT.md)。
+
+## 参与贡献
+
+欢迎提交 Issue 和 Pull Request。参与前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按照 [SECURITY.md](SECURITY.md) 中的流程私下报告。
 
 ## 许可
 
-本仓库目前未声明开源许可证，默认不授予复制、修改或再分发许可。商业使用请联系仓库所有者。
+Copyright (c) 2026 yyshi127 及项目贡献者。
+
+本项目采用 [GNU Affero General Public License v3.0 或更高版本](LICENSE)开源。允许使用、修改、再分发和商业使用，但必须遵守许可证；通过网络提供修改版服务时，也需要以相同许可证公开对应源代码。

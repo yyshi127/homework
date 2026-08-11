@@ -1,4 +1,8 @@
-# 小小成长星球
+# 小小成长星球 | Little Growth Planet
+
+[中文](#中文说明) | [English](#english-version)
+
+## 中文说明
 
 一套面向小学生家庭的作业、阅读与习惯培养系统。家长可以安排每日任务、记录完成质量、管理阅读计划，通过积分和奖励建立持续反馈，并使用月度记录与 Excel 导出回顾孩子的成长过程。
 
@@ -198,3 +202,206 @@ npm run build
 ## 许可
 
 本仓库目前未声明开源许可证，默认不授予复制、修改或再分发许可。商业使用请联系仓库所有者。
+
+---
+
+## English Version
+
+Little Growth Planet is a homework, reading, and habit-building system designed for families with primary-school children. Parents can arrange daily tasks, assess completion quality, manage reading plans, build a positive feedback loop through points and rewards, and review long-term progress through monthly records and Excel exports.
+
+The frontend is built with React and Vite. A Node.js and Express API handles application services, while SQLite stores the data. The project also includes optional AI-assisted homework review and mistake collection.
+
+## Project Value
+
+### Make daily execution easier than planning
+
+Many families already have homework lists and habit plans. The real challenge is following them consistently every day. The system brings study, reading, and daily-life tasks into one clear view. Children complete tasks one by one, while parents only need to confirm the completion quality and add notes when necessary, reducing repeated reminders and fragmented record keeping.
+
+### Replace constant reminders with positive feedback
+
+The system connects task completion, quality assessment, points, and reward redemption into a complete feedback loop. Children can see how each effort contributes to their points and visible growth, while parents can define rewards that fit their own family.
+
+### Turn reading goals into trackable plans
+
+The reading module records more than whether a child has read today. It manages books, planned dates, daily page ranges, actual progress, and completion rewards. Parents can identify delays early, and children can look back on the books they have completed over time.
+
+### Preserve progress for long-term review
+
+Unlike paper charts and scattered spreadsheets, the system stores daily status, completion quality, notes, reading records, points, and reward redemptions in one place. Monthly overviews and formatted Excel exports help parents identify which routines are sustainable, where interruptions occur, and how the next plan should be adjusted.
+
+### Cover study, reading, and daily-life habits together
+
+The system is not limited to homework. It can also track organization, routines, chores, and other daily habits. A shared task and points model avoids the need to maintain several separate sheets or applications.
+
+### Keep data under your control
+
+The project supports self-hosting and local SQLite storage, allowing families to retain control of their check-in and reading data. AI homework review is optional. Daily check-ins, rewards, reading management, and exports remain available without an external AI service.
+
+## Core Features
+
+### Daily Check-in
+
+- Organizes daily tasks by Chinese, Mathematics, English, Reading, Good Habits, and custom categories.
+- Supports recurring daily tasks, date-range tasks, and temporary tasks that appear only on a selected date.
+- Records four states for standard tasks: not checked in, completed, excellent, and outstanding.
+- Supports task-specific habit points and daily notes.
+- Shows total tasks, completed tasks, incomplete tasks, and points earned today.
+- Displays a growth tree stage based on the day's completion progress.
+
+### Monthly Overview
+
+- Presents each task and day in a monthly matrix.
+- Distinguishes recurring, date-range, reading, and temporary tasks.
+- Displays daily points and cumulative monthly points.
+- Supports controlled correction and saving of historical records.
+
+### Points and Rewards
+
+- Summarizes today's, monthly, cumulative, and available points.
+- Allows point values to be configured for excellent work, outstanding work, habits, and reading completion.
+- Includes multiple reward categories and supports creating, editing, and deleting rewards.
+- Redeems rewards with points and preserves the complete redemption history.
+
+### Reading Plans
+
+- Manages monthly reading plans and a long-term personal library.
+- Stores book category, total pages, planned dates, and reward points.
+- Defines daily page ranges and records actual reading progress.
+- Filters books by reading, completed, and not started.
+- Awards points after a reading plan is completed and keeps historical reading records.
+
+### Learning Tools
+
+- Uploads homework images for AI-assisted review in Chinese, Mathematics, or English.
+- Displays a score, review summary, learning suggestions, mistakes, and explanations.
+- Shows question-level annotations on the original image.
+- Adds mistakes to a mistake book with filtering, mastery status, deletion, and printable worksheets.
+- Supports Alibaba Cloud Model Studio and Baidu Intelligent Homework Review, with an OpenAI-compatible fallback configured through environment variables.
+
+### Settings
+
+- Manages monthly goals, task categories, colors, and active date ranges.
+- Configures standard tasks, required tasks, date-range tasks, and habit points.
+- Saves recurring monthly tasks as templates and uses templates to create new months quickly.
+- Edits the child's avatar, name, gender, birthday, grade, and school.
+
+### Excel Export
+
+- Exports records by month or year.
+- Creates one worksheet per month for annual exports.
+- Filters tasks by all, completed, or incomplete status.
+- Lists category, task, status, completion quality, and notes separately for each day.
+- Arranges dates horizontally by calendar week and applies the configured category colors for clear viewing and printing.
+
+## Technology Stack
+
+- React
+- Vite
+- Node.js
+- Express
+- SQLite / better-sqlite3
+- Lucide React
+
+## Project Structure
+
+```text
+.
+├── src/
+│   ├── App.jsx                 # Pages, state, and core business logic
+│   ├── styles.css              # Global and responsive styles
+│   └── assets/                 # Growth tree, reward, and UI assets
+├── server/
+│   └── index.js                # API, SQLite, and AI review services
+├── docs/
+│   └── HANDOFF.md              # Maintenance and deployment handoff
+├── data/                       # Local runtime data; not committed
+├── index.html
+├── vite.config.js
+└── package.json
+```
+
+## Local Development
+
+### Requirements
+
+- Node.js 20 or later
+- npm
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+On Windows PowerShell, you can also use:
+
+```powershell
+npm.cmd install
+```
+
+### Start the API
+
+```bash
+npm run server
+```
+
+The API listens on `127.0.0.1:8090` by default. The default SQLite database is stored at `data/homework.sqlite`.
+
+### Start the Frontend
+
+```bash
+npm run dev
+```
+
+Open the local URL printed by Vite.
+
+> The `/api` proxy target in `vite.config.js` must match the API environment you intend to use. For fully local development, set the proxy target to `http://127.0.0.1:8090` to avoid writing development data to another environment.
+
+### Build
+
+```bash
+npm run build
+```
+
+Production assets are generated in `dist/`.
+
+## Server Configuration
+
+The API supports the following environment variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `8090` | API listening port |
+| `DATA_DIR` | `./data` | Runtime data directory |
+| `DB_PATH` | `./data/homework.sqlite` | SQLite database path |
+| `OPENAI_API_KEY` | Empty | OpenAI API key |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model name |
+
+Alibaba Cloud and Baidu homework-review settings can be maintained through the application's AI configuration interface. Sensitive keys are stored by the server and are never returned to the frontend in full.
+
+## API Overview
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Service health check |
+| `GET` | `/api/state` | Load application state |
+| `PUT` | `/api/state` | Save application state |
+| `GET` | `/api/ai-config` | Read AI configuration status |
+| `PUT` | `/api/ai-config` | Save AI configuration |
+| `POST` | `/api/grade-homework` | Review a homework image |
+
+## Data and Security
+
+- The current version uses a single-family data model. Application state and AI configuration use the fixed `main` data key.
+- The repository does not currently include user authentication, family tenant isolation, or public Internet access control.
+- Do not expose the service publicly without authentication or reverse-proxy access protection.
+- Databases, AI credentials, child profiles, and uploaded homework images must not be committed to Git.
+- Before turning the project into a multi-family online service, implement authentication, tenant isolation, guardian consent, and data export and deletion controls.
+
+## Documentation
+
+See the [handoff guide](docs/HANDOFF.md) for maintenance, deployment, database backup, and release procedures.
+
+## License
+
+No open-source license is currently declared. Copying, modification, and redistribution are not granted by default. Contact the repository owner for commercial use.

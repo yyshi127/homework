@@ -1,0 +1,69 @@
+name: Seed roadmap issues
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/roadmap-issues/**"
+      - ".github/workflows/seed-roadmap-issues.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Ensure roadmap labels exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh label create bug --description "Something is not working" --color D73A4A --force
+          gh label create enhancement --description "New feature or improvement" --color A2EEEF --force
+          gh label create security --description "Security and privacy improvements" --color D73A4A --force
+          gh label create testing --description "Automated test coverage" --color 1D76DB --force
+          gh label create accessibility --description "Accessibility and keyboard usability" --color 0E8A16 --force
+          gh label create "good first issue" --description "Approachable for a first contribution" --color 7057FF --force
+
+      - name: Create missing roadmap issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          create_issue() {
+            local title="$1"
+            local body_file="$2"
+            local labels="$3"
+
+            if gh issue list --state all --limit 100 --json title --jq '.[].title' | grep -Fxq "$title"; then
+              echo "Issue already exists: $title"
+              return
+            fi
+
+            gh issue create --title "$title" --body-file "$body_file" --label "$labels"
+          }
+
+          create_issue \
+            "Add an authentication reference for Internet-facing deployments" \
+            ".github/roadmap-issues/authentication-reference.md" \
+            "security,enhancement"
+          create_issue \
+            "Add a guided SQLite backup and restore workflow" \
+            ".github/roadmap-issues/backup-restore.md" \
+            "enhancement"
+          create_issue \
+            "Add regression tests for monthly and annual Excel exports" \
+            ".github/roadmap-issues/excel-export-tests.md" \
+            "testing,enhancement"
+          create_issue \
+            "Improve keyboard focus and accessible labels in primary workflows" \
+            ".github/roadmap-issues/keyboard-accessibility.md" \
+            "accessibility,good first issue"

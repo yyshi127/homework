@@ -20,6 +20,8 @@ tmp/
 !/README.md
 !/CONTRIBUTING.md
 !/SECURITY.md
+!/CHANGELOG.md
+!/ROADMAP.md
 /*.py
 docs/HANDOFF.md
 docs/BASE44-*.md
@@ -42,6 +44,8 @@ imagegen*/
 !src/assets/*.jpeg
 !src/assets/*.webp
 !src/assets/*.gif
+!docs/images/
+!docs/images/*.png
 ~$*
 
 # Environment and editor files

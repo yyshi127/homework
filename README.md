@@ -4,12 +4,19 @@
 
 [![CI](https://github.com/yyshi127/homework/actions/workflows/ci.yml/badge.svg)](https://github.com/yyshi127/homework/actions/workflows/ci.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/yyshi127/homework)](https://github.com/yyshi127/homework/releases/latest)
 
 ## English Version
 
 Little Growth Planet is a homework, reading, and habit-building system designed for families with primary-school children. Parents can arrange daily tasks, assess completion quality, manage reading plans, build a positive feedback loop through points and rewards, and review long-term progress through monthly records and Excel exports.
 
 The frontend is built with React and Vite. A Node.js and Express API handles application services, while SQLite stores the data. The project also includes optional AI-assisted homework review and mistake collection.
+
+## Product Preview
+
+![Little Growth Planet monthly overview](docs/images/monthly-overview.png)
+
+The monthly overview keeps homework, reading, and daily-life habits visible in one calendar. See the [full screenshot gallery](docs/SCREENSHOTS.md) for daily check-in, points and rewards, reading plans, and optional learning tools.
 
 ## Project Value
 
@@ -201,7 +208,7 @@ Alibaba Cloud and Baidu homework-review settings can be maintained through the a
 
 ## Documentation
 
-See the [deployment guide](docs/DEPLOYMENT.md) for self-hosting, database backup, and release guidance.
+See the [deployment guide](docs/DEPLOYMENT.md), [roadmap](ROADMAP.md), [changelog](CHANGELOG.md), and [screenshot gallery](docs/SCREENSHOTS.md).
 
 ## Contributing
 
@@ -220,6 +227,12 @@ This project is licensed under the [GNU Affero General Public License v3.0 or la
 一套面向小学生家庭的作业、阅读与习惯培养系统。家长可以安排每日任务、记录完成质量、管理阅读计划，通过积分和奖励建立持续反馈，并使用月度记录与 Excel 导出回顾孩子的成长过程。
 
 项目采用 React + Vite 构建前端，Node.js + Express 提供 API，SQLite 保存业务数据，同时支持 AI 作业批改和错题整理。
+
+## 界面预览
+
+![小小成长星球月度总览](docs/images/monthly-overview.png)
+
+月度总览将作业、阅读和生活习惯集中到同一张日历中。可查看[完整界面截图](docs/SCREENSHOTS.md)，了解今日打卡、积分奖励、阅读计划和可选的学习工具。
 
 ## 项目价值
 
@@ -411,7 +424,7 @@ npm run build
 
 ## 文档
 
-自托管、数据库备份和发布说明请参阅[部署文档](docs/DEPLOYMENT.md)。
+可查看[部署文档](docs/DEPLOYMENT.md)、[开发路线图](ROADMAP.md)、[版本日志](CHANGELOG.md)和[完整界面截图](docs/SCREENSHOTS.md)。
 
 ## 参与贡献
 

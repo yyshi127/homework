@@ -1,0 +1,15 @@
+http://43.167.166.35, :8088 {
+	encode zstd gzip
+	root * /opt/little-growth-planet/current/dist
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8090 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

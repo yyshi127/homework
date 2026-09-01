@@ -1,0 +1,25 @@
+[Unit]
+Description=Little Growth Planet API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=homework
+Group=homework
+WorkingDirectory=/opt/little-growth-planet/current
+Environment=NODE_ENV=production
+Environment=PORT=8090
+Environment=DATA_DIR=/var/lib/little-growth-planet
+Environment=DB_PATH=/var/lib/little-growth-planet/homework.sqlite
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/little-growth-planet
+
+[Install]
+WantedBy=multi-user.target

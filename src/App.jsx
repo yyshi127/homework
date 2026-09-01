@@ -726,6 +726,18 @@ function temporaryTaskTitleFromNote(note) {
   return note.split('｜')[0]?.trim() || '';
 }
 
+function temporaryTaskDisplayTitle(month, taskId, preferredDay) {
+  const notes = month?.notes?.[taskId] || {};
+  const preferredTitle = temporaryTaskTitleFromNote(notes[preferredDay]);
+  if (preferredTitle) return preferredTitle;
+  const firstRecordedDay = Object.keys(notes)
+    .map(Number)
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)
+    .find((day) => temporaryTaskTitleFromNote(notes[day]));
+  return temporaryTaskTitleFromNote(notes[firstRecordedDay]) || TEMPORARY_TASK_TITLE;
+}
+
 function temporaryTaskRemarkFromNote(note) {
   if (typeof note !== 'string') return '';
   const parts = note.split('｜');
@@ -789,7 +801,7 @@ function buildTaskRows(month) {
     return tasks.map((task, itemIndex) => {
         const linkedBook = task.bookId ? month.readingBooks?.find((book) => book.id === task.bookId) : null;
         const effectiveType = linkedBook ? 'reading' : task.type;
-        const typeLabel = effectiveType === 'temporary' ? '临时' : effectiveType === 'stage' || effectiveType === 'reading' ? '阶段' : '每日';
+        const typeLabel = effectiveType === 'temporary' ? '当日任务' : effectiveType === 'stage' || effectiveType === 'reading' ? '阶段任务' : '每日固定';
         const taskRow = {
           id: linkedBook?.id || task.id,
           categoryId: subject.id,
@@ -934,6 +946,10 @@ function createLocalCacheState(current) {
     learningTools: normalizeLearningTools(current.learningTools),
     snapshots: [],
   };
+}
+
+function databaseStateFingerprint(current) {
+  return JSON.stringify(createLocalCacheState(current));
 }
 
 function normalizeLearningTools(value = {}) {
@@ -1421,12 +1437,16 @@ function App() {
   const localSaveTimerRef = useRef(null);
   const databaseSaveTimerRef = useRef(null);
   const databaseVersionRef = useRef(0);
+  const currentStateFingerprint = useMemo(() => databaseStateFingerprint(state), [state]);
+  const currentStateFingerprintRef = useRef(currentStateFingerprint);
+  const lastSavedStateFingerprintRef = useRef('');
   const databaseWriteChainRef = useRef(Promise.resolve());
   const databaseSyncRequestRef = useRef(null);
   const syncClientIdRef = useRef(globalThis.crypto?.randomUUID?.() || `client-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const saveAfterTextBlurRef = useRef(false);
   const saveToastTimerRef = useRef(null);
   const manualSavePendingRef = useRef(false);
+  currentStateFingerprintRef.current = currentStateFingerprint;
   const [activePanel, setActivePanel] = useState(null);
   const [activeView, setActiveView] = useState(initialActiveView);
   const [categoryDraft, setCategoryDraft] = useState('语文');
@@ -1605,6 +1625,9 @@ function App() {
       databaseSaveTimerRef.current = null;
     }
     stateRef.current = loadedState;
+    const loadedStateFingerprint = databaseStateFingerprint(loadedState);
+    currentStateFingerprintRef.current = loadedStateFingerprint;
+    lastSavedStateFingerprintRef.current = loadedStateFingerprint;
     databaseVersionRef.current = Number(payload.version || 0);
     setState(loadedState);
     setMonthIndex(selectedMonthIndex >= 0 ? selectedMonthIndex : findCurrentMonthIndex(loadedState.months || []));
@@ -1623,8 +1646,8 @@ function App() {
       .then((payload) => {
         if (Number(payload.version || 0) <= databaseVersionRef.current) return false;
         if (hasUnsavedChangesRef.current || manualSavePendingRef.current) {
-          setDatabaseStatus('其他设备有新修改，当前操作尚未保存');
-          showSaveToast('其他设备有新修改，请先处理当前未保存内容', 'error');
+          setDatabaseStatus('另一个页面或设备有新修改，当前操作尚未保存');
+          showSaveToast('服务器数据已变化，请先处理当前未保存内容', 'error');
           return false;
         }
         return applyDatabasePayload(payload, { notify: true });
@@ -1638,12 +1661,22 @@ function App() {
 
   const queueDatabaseSave = (nextState) => {
     const stateSnapshot = structuredClone(createLocalCacheState(nextState));
+    const savedFingerprint = JSON.stringify(stateSnapshot);
     const operation = databaseWriteChainRef.current
       .catch(() => undefined)
       .then(async () => {
+        if (savedFingerprint === lastSavedStateFingerprintRef.current) {
+          return {
+            ok: true,
+            version: databaseVersionRef.current,
+            skipped: true,
+            savedFingerprint,
+          };
+        }
         const payload = await saveDatabaseState(stateSnapshot, databaseVersionRef.current, syncClientIdRef.current);
         databaseVersionRef.current = Number(payload.version || 0);
-        return payload;
+        lastSavedStateFingerprintRef.current = savedFingerprint;
+        return { ...payload, savedFingerprint };
       });
     databaseWriteChainRef.current = operation;
     return operation;
@@ -1692,14 +1725,19 @@ function App() {
     if (databaseSaveTimerRef.current) window.clearTimeout(databaseSaveTimerRef.current);
     databaseSaveTimerRef.current = window.setTimeout(async () => {
       try {
-        await queueDatabaseSave(stateRef.current);
-        markUnsavedChanges(false);
-        setDatabaseStatus('已自动保存到数据库');
-        showSaveToast('已保存到数据库');
+        const result = await queueDatabaseSave(stateRef.current);
+        if (currentStateFingerprintRef.current === result.savedFingerprint) {
+          markUnsavedChanges(false);
+          setDatabaseStatus('已自动保存到数据库');
+          if (!result.skipped) showSaveToast('已保存到数据库');
+        } else {
+          markUnsavedChanges(true);
+          setDatabaseStatus('检测到新的修改，正在继续保存...');
+        }
       } catch (error) {
         const conflict = error?.code === 'STATE_CONFLICT';
-        setDatabaseStatus(conflict ? '其他设备已先保存，当前修改未覆盖服务器数据' : '数据库保存失败，修改暂存在本机');
-        showSaveToast(conflict ? '其他设备已先保存，当前修改尚未保存' : '数据库保存失败', 'error');
+        setDatabaseStatus(conflict ? '服务器数据版本已变化，当前修改未覆盖服务器数据' : '数据库保存失败，修改暂存在本机');
+        showSaveToast(conflict ? '另一个页面或设备已先保存，当前修改尚未保存' : '数据库保存失败', 'error');
       }
     }, saveDelay);
 
@@ -1777,6 +1815,10 @@ function App() {
         loadingFromDatabase.current = true;
         if (payload.state?.months || payload.state?.checks) {
           const loadedState = sanitizeLoadedState(payload.state);
+          const loadedStateFingerprint = databaseStateFingerprint(loadedState);
+          stateRef.current = loadedState;
+          currentStateFingerprintRef.current = loadedStateFingerprint;
+          lastSavedStateFingerprintRef.current = loadedStateFingerprint;
           databaseVersionRef.current = Number(payload.version || 0);
           setState(loadedState);
           setMonthIndex(findCurrentMonthIndex(loadedState.months || []));
@@ -1819,8 +1861,8 @@ function App() {
         if (payload.sourceClientId === syncClientIdRef.current) return;
         if (Number(payload.version || 0) <= databaseVersionRef.current) return;
         if (hasUnsavedChangesRef.current || manualSavePendingRef.current) {
-          setDatabaseStatus('其他设备有新修改，当前操作尚未保存');
-          showSaveToast('其他设备有新修改，请先处理当前未保存内容', 'error');
+          setDatabaseStatus('另一个页面或设备有新修改，当前操作尚未保存');
+          showSaveToast('服务器数据已变化，请先处理当前未保存内容', 'error');
           return;
         }
         if (payload.state) {
@@ -3104,15 +3146,20 @@ function App() {
     }
     setDatabaseStatus('正在保存到 SQLite...');
     try {
-      await queueDatabaseSave(nextState);
-      markUnsavedChanges(false);
-      setDatabaseStatus(successMessage);
-      showSaveToast(successMessage.replace(' SQLite', '数据库'));
+      const result = await queueDatabaseSave(nextState);
+      if (currentStateFingerprintRef.current === result.savedFingerprint) {
+        markUnsavedChanges(false);
+        setDatabaseStatus(successMessage);
+        showSaveToast(successMessage.replace(' SQLite', '数据库'));
+      } else {
+        markUnsavedChanges(true);
+        setDatabaseStatus('本次内容已保存，另有新的修改尚未保存');
+      }
       return true;
     } catch (error) {
       const conflict = error?.code === 'STATE_CONFLICT';
-      setDatabaseStatus(conflict ? '其他设备已先保存，当前修改未覆盖服务器数据' : '数据库保存失败，修改暂存在本机');
-      showSaveToast(conflict ? '其他设备已先保存，当前修改尚未保存' : '数据库保存失败', 'error');
+      setDatabaseStatus(conflict ? '服务器数据版本已变化，当前修改未覆盖服务器数据' : '数据库保存失败，修改暂存在本机');
+      showSaveToast(conflict ? '另一个页面或设备已先保存，当前修改尚未保存' : '数据库保存失败', 'error');
       return false;
     }
   };
@@ -4490,7 +4537,7 @@ ${colorStyles}
                     <td className="plan-cell">
                       <p>
                         {row.importance === 'important' && <Flag className="important-mark" size={15} fill="currentColor" title="重要任务" />}
-                        {row.item}
+                        {row.typeKey === 'temporary' ? temporaryTaskDisplayTitle(month, row.id, selectedCheckDay) : row.item}
                       </p>
                     </td>
                     {(row.typeKey === 'stage' || row.typeKey === 'reading') && row.checkMode === 'stage' ? (() => {

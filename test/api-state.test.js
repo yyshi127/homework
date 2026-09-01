@@ -75,7 +75,7 @@ const validState = {
   snapshots: [],
 };
 
-test('state API rejects stale and malformed writes', { timeout: 20_000 }, async () => {
+test('state API deduplicates repeated saves and rejects real conflicts', { timeout: 20_000 }, async () => {
   const port = await availablePort();
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'homework-api-test-'));
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -116,10 +116,12 @@ test('state API rejects stale and malformed writes', { timeout: 20_000 }, async 
     const events = createSseReader(eventResponse.body);
     assert.equal((await events.next()).version, 0);
 
+    const firstState = structuredClone(validState);
+    firstState.months[0].goal = '第一次保存';
     const firstResponse = await fetch(`${baseUrl}/api/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: validState, expectedVersion: 0, clientId: 'computer-test' }),
+      body: JSON.stringify({ state: firstState, expectedVersion: 0, clientId: 'computer-test' }),
     });
     assert.equal(firstResponse.status, 200);
     assert.equal((await firstResponse.json()).version, 1);
@@ -128,30 +130,61 @@ test('state API rejects stale and malformed writes', { timeout: 20_000 }, async 
     assert.equal(savedEvent.sourceClientId, 'computer-test');
     assert.match(savedEvent.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
 
-    const staleResponse = await fetch(`${baseUrl}/api/state`, {
+    const repeatedResponse = await fetch(`${baseUrl}/api/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: validState, expectedVersion: 0 }),
+      body: JSON.stringify({ state: firstState, expectedVersion: 0, clientId: 'computer-test' }),
     });
-    assert.equal(staleResponse.status, 409);
-    assert.deepEqual(await staleResponse.json(), {
+    assert.equal(repeatedResponse.status, 200);
+    assert.deepEqual(await repeatedResponse.json().then(({ ok, version, unchanged }) => ({ ok, version, unchanged })), {
+      ok: true,
+      version: 1,
+      unchanged: true,
+    });
+
+    const foreignState = structuredClone(firstState);
+    foreignState.months[0].goal = '手机端修改';
+    const conflictResponse = await fetch(`${baseUrl}/api/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: foreignState, expectedVersion: 0, clientId: 'phone-test' }),
+    });
+    assert.equal(conflictResponse.status, 409);
+    assert.deepEqual(await conflictResponse.json(), {
       code: 'STATE_CONFLICT',
-      error: '数据已被其他设备更新，请刷新后重试',
+      error: '服务器数据版本已变化，请同步后重试',
       currentVersion: 1,
     });
+
+    const recoveredState = structuredClone(firstState);
+    recoveredState.months[0].goal = '同一页面继续保存';
+    const recoveredResponse = await fetch(`${baseUrl}/api/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: recoveredState, expectedVersion: 0, clientId: 'computer-test' }),
+    });
+    assert.equal(recoveredResponse.status, 200);
+    assert.deepEqual(await recoveredResponse.json().then(({ version, recoveredOwnWrite }) => ({ version, recoveredOwnWrite })), {
+      version: 2,
+      recoveredOwnWrite: true,
+    });
+    const recoveredEvent = await events.next();
+    assert.equal(recoveredEvent.version, 2);
+    assert.equal(recoveredEvent.sourceClientId, 'computer-test');
 
     const malformedState = structuredClone(validState);
     malformedState.months[0].checks = [];
     const malformedResponse = await fetch(`${baseUrl}/api/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: malformedState, expectedVersion: 1 }),
+      body: JSON.stringify({ state: malformedState, expectedVersion: 2 }),
     });
     assert.equal(malformedResponse.status, 400);
     assert.equal((await malformedResponse.json()).code, 'INVALID_STATE');
 
     const current = await fetch(`${baseUrl}/api/state`).then((response) => response.json());
-    assert.equal(current.version, 1);
+    assert.equal(current.version, 2);
+    assert.equal(current.state.months[0].goal, '同一页面继续保存');
   } finally {
     eventController.abort();
     child.kill();

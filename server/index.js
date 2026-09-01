@@ -22,7 +22,8 @@ db.exec(`
     key TEXT PRIMARY KEY,
     state_json TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    version INTEGER NOT NULL DEFAULT 0
+    version INTEGER NOT NULL DEFAULT 0,
+    client_id TEXT NOT NULL DEFAULT ''
   );
 
   CREATE TABLE IF NOT EXISTS ai_config (
@@ -36,37 +37,48 @@ const appStateColumns = db.pragma('table_info(app_state)');
 if (!appStateColumns.some((column) => column.name === 'version')) {
   db.exec('ALTER TABLE app_state ADD COLUMN version INTEGER NOT NULL DEFAULT 0');
 }
+if (!appStateColumns.some((column) => column.name === 'client_id')) {
+  db.exec("ALTER TABLE app_state ADD COLUMN client_id TEXT NOT NULL DEFAULT ''");
+}
 
-const getState = db.prepare('SELECT state_json, updated_at, version FROM app_state WHERE key = ?');
+const getState = db.prepare('SELECT state_json, updated_at, version, client_id FROM app_state WHERE key = ?');
 const insertState = db.prepare(`
-  INSERT INTO app_state (key, state_json, updated_at, version)
-  VALUES (@key, @state_json, @updated_at, 1)
+  INSERT INTO app_state (key, state_json, updated_at, version, client_id)
+  VALUES (@key, @state_json, @updated_at, 1, @client_id)
 `);
 const updateState = db.prepare(`
   UPDATE app_state
   SET state_json = @state_json,
       updated_at = @updated_at,
+      client_id = @client_id,
       version = version + 1
   WHERE key = @key AND version = @expected_version
 `);
-const saveStateWithVersion = db.transaction(({ stateJson, expectedVersion, updatedAt }) => {
+const saveStateWithVersion = db.transaction(({ stateJson, expectedVersion, updatedAt, clientId }) => {
   const current = getState.get(STATE_KEY);
   if (!current) {
     if (expectedVersion !== 0) return { conflict: true, currentVersion: 0 };
-    insertState.run({ key: STATE_KEY, state_json: stateJson, updated_at: updatedAt });
+    insertState.run({ key: STATE_KEY, state_json: stateJson, updated_at: updatedAt, client_id: clientId });
     return { conflict: false, version: 1 };
   }
 
   const currentVersion = Number(current.version || 0);
-  if (currentVersion !== expectedVersion) return { conflict: true, currentVersion };
+  if (current.state_json === stateJson) {
+    return { conflict: false, version: currentVersion, unchanged: true };
+  }
+  const recoveredOwnWrite = currentVersion !== expectedVersion && clientId && current.client_id === clientId;
+  if (currentVersion !== expectedVersion && !recoveredOwnWrite) {
+    return { conflict: true, currentVersion };
+  }
   const result = updateState.run({
     key: STATE_KEY,
     state_json: stateJson,
     updated_at: updatedAt,
-    expected_version: expectedVersion,
+    client_id: clientId,
+    expected_version: recoveredOwnWrite ? currentVersion : expectedVersion,
   });
   if (result.changes !== 1) return { conflict: true, currentVersion: Number(getState.get(STATE_KEY)?.version || 0) };
-  return { conflict: false, version: currentVersion + 1 };
+  return { conflict: false, version: currentVersion + 1, recoveredOwnWrite };
 });
 const getAiConfigRow = db.prepare('SELECT config_json, updated_at FROM ai_config WHERE key = ?');
 const upsertAiConfig = db.prepare(`
@@ -83,12 +95,18 @@ app.use('/api/grade-homework', express.json({ limit: '10mb' }));
 app.use(express.json({ limit: '5mb' }));
 
 function sendStateEvent(response, event) {
-  response.write(`data: ${JSON.stringify(event)}\n\n`);
+  if (response.destroyed || response.writableEnded) return false;
+  try {
+    response.write(`data: ${JSON.stringify(event)}\n\n`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function broadcastStateEvent(event) {
   for (const response of stateEventClients) {
-    sendStateEvent(response, event);
+    if (!sendStateEvent(response, event)) stateEventClients.delete(response);
   }
 }
 
@@ -185,11 +203,18 @@ app.get('/api/state/events', (req, res) => {
     sourceClientId: '',
   });
 
-  const heartbeat = setInterval(() => res.write(': keepalive\n\n'), 20_000);
-  req.on('close', () => {
+  const heartbeat = setInterval(() => {
+    if (!sendStateEvent(res, { heartbeat: true })) {
+      clearInterval(heartbeat);
+      stateEventClients.delete(res);
+    }
+  }, 20_000);
+  const cleanup = () => {
     clearInterval(heartbeat);
     stateEventClients.delete(res);
-  });
+  };
+  req.on('close', cleanup);
+  res.on('error', cleanup);
 });
 
 app.put('/api/state', (req, res) => {
@@ -206,26 +231,36 @@ app.put('/api/state', (req, res) => {
   }
 
   const updatedAt = new Date().toISOString();
+  const clientId = typeof req.body?.clientId === 'string' ? req.body.clientId.slice(0, 100) : '';
   const result = saveStateWithVersion({
     stateJson: JSON.stringify(req.body.state),
     expectedVersion,
     updatedAt,
+    clientId,
   });
   if (result.conflict) {
     res.status(409).json({
       code: 'STATE_CONFLICT',
-      error: '数据已被其他设备更新，请刷新后重试',
+      error: '服务器数据版本已变化，请同步后重试',
       currentVersion: result.currentVersion,
     });
     return;
   }
-  broadcastStateEvent({
+  if (!result.unchanged) {
+    broadcastStateEvent({
+      version: result.version,
+      updatedAt,
+      sourceClientId: clientId,
+      state: req.body.state,
+    });
+  }
+  res.json({
+    ok: true,
+    updatedAt: result.unchanged ? getState.get(STATE_KEY)?.updated_at || updatedAt : updatedAt,
     version: result.version,
-    updatedAt,
-    sourceClientId: typeof req.body?.clientId === 'string' ? req.body.clientId.slice(0, 100) : '',
-    state: req.body.state,
+    unchanged: Boolean(result.unchanged),
+    recoveredOwnWrite: Boolean(result.recoveredOwnWrite),
   });
-  res.json({ ok: true, updatedAt, version: result.version });
 });
 
 app.get('/api/ai-config', (_req, res) => {

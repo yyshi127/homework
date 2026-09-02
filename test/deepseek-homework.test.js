@@ -146,6 +146,85 @@ test('derives image annotations and mistake details from the same wrong question
   assert.equal(result.mistakes[0].solutionSteps.length, 3);
 });
 
+test('infers mathematics from recognized exercises when the model leaves the subject undecided', () => {
+  const result = normalizeDeepSeekResult(sampleResult({
+    detectedSubject: '无法判断',
+    subjectConfidence: '低',
+  }));
+
+  assert.equal(result.detectedSubject, '数学');
+  assert.equal(result.subjectConfidence, '中');
+});
+
+test('infers Chinese from language exercise content when the model leaves the subject undecided', () => {
+  const result = normalizeDeepSeekResult(sampleResult({
+    detectedSubject: '无法判断',
+    subjectConfidence: '低',
+    detectedTitle: '词语搭配练习',
+    questions: [{
+      order: 1,
+      printedNumber: '二.1',
+      questionText: '根据词义填空（填序号）',
+      studentAnswer: '②',
+      gradingContext: '近义词、反义词和词语搭配',
+      verdict: 'correct',
+      correctAnswer: '②',
+      shortComment: '',
+      explanation: '',
+      area: { left: 5, top: 20, width: 80, height: 12 },
+    }],
+  }));
+
+  assert.equal(result.detectedSubject, '语文');
+  assert.equal(result.subjectConfidence, '中');
+});
+
+test('infers English from a readable English exercise when the model leaves the subject undecided', () => {
+  const result = normalizeDeepSeekResult(sampleResult({
+    detectedSubject: '无法判断',
+    subjectConfidence: '低',
+    detectedTitle: 'Choose the correct word',
+    questions: [{
+      order: 1,
+      printedNumber: '1',
+      questionText: 'This is an apple.',
+      studentAnswer: 'apple',
+      gradingContext: '',
+      verdict: 'correct',
+      correctAnswer: 'apple',
+      shortComment: '',
+      explanation: '',
+      area: { left: 5, top: 20, width: 80, height: 12 },
+    }],
+  }));
+
+  assert.equal(result.detectedSubject, '英语');
+  assert.equal(result.subjectConfidence, '中');
+});
+
+test('keeps the subject undecided when recognized content has no reliable subject evidence', () => {
+  const result = normalizeDeepSeekResult(sampleResult({
+    detectedSubject: '无法判断',
+    subjectConfidence: '低',
+    detectedTitle: '练习',
+    questions: [{
+      order: 1,
+      printedNumber: '1',
+      questionText: '请完成下面各题',
+      studentAnswer: '',
+      gradingContext: '',
+      verdict: 'uncertain',
+      correctAnswer: '',
+      shortComment: '',
+      explanation: '',
+      area: { left: 5, top: 20, width: 80, height: 12 },
+    }],
+  }));
+
+  assert.equal(result.detectedSubject, '无法判断');
+  assert.equal(result.subjectConfidence, '低');
+});
+
 test('keeps only the final answer after the model corrects itself', () => {
   const result = normalizeDeepSeekResult(sampleResult({
     questions: [{
@@ -675,6 +754,8 @@ test('direct grading request makes the model extract and judge from the original
   assert.equal(request.instructions.includes('不能把“选择第①项”误解成只选择题目中的物品①'), true);
   assert.equal(request.instructions.includes('correctAnswer 只写复核后的最终答案'), true);
   assert.equal(request.text.format.schema.properties.questions.items.required.includes('verdict'), true);
+  assert.equal('summary' in request.text.format.schema.properties, false);
+  assert.equal('suggestions' in request.text.format.schema.properties, false);
 });
 
 test('grading request uses the recognized text without resending the image', () => {
@@ -880,6 +961,37 @@ test('retries when the model returns no questions', async () => {
   assert.equal(result.recognizedQuestionCount, 4);
   assert.deepEqual(result.attempts.map(({ status, code }) => [status, code || '']), [
     ['failed', 'NO_QUESTIONS'],
+    ['success', ''],
+  ]);
+});
+
+test('uses a faster compact request after an incomplete direct grading response', async () => {
+  const requests = [];
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    requests.push(request);
+    const payload = requests.length === 1
+      ? { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } }
+      : completedPayload();
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(payload),
+    };
+  };
+
+  const result = await callDeepSeekHomeworkReview({
+    apiKey: 'test-key',
+    imageData: 'data:image/jpeg;base64,AA==',
+    fetchImpl,
+    sleep: async () => {},
+  });
+
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests.map((request) => request.reasoning.effort), ['low', 'none']);
+  assert.deepEqual(requests.map((request) => request.max_output_tokens), [12000, 8000]);
+  assert.deepEqual(result.attempts.map(({ status, code }) => [status, code || '']), [
+    ['failed', 'INCOMPLETE_RESPONSE'],
     ['success', ''],
   ]);
 });

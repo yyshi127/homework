@@ -3203,7 +3203,7 @@ function App() {
       let payload = jobPayload?.detectedSubject ? jobPayload : null;
       let consecutivePollFailures = 0;
       let restartedAfterMissing = false;
-      const pollingDeadline = Date.now() + 210000;
+      const pollingDeadline = Date.now() + 135000;
       while (!payload) {
         if (jobPayload?.status === 'completed') {
           payload = jobPayload.result;
@@ -3217,7 +3217,7 @@ function App() {
         setGradingStage(jobPayload?.stage || 'queued');
         if (Date.now() >= pollingDeadline) {
           void fetch(`${API_GRADE_HOMEWORK_URL}/${encodeURIComponent(requestId)}`, { method: 'DELETE', keepalive: true }).catch(() => {});
-          throw new Error('AI 批改等待超过 210 秒，任务已停止，请裁切到单页后重试');
+          throw new Error('AI 批改等待超过 135 秒，任务已停止，请裁切到单页后重试');
         }
         await waitForRequest(1400, controller.signal);
         try {
@@ -3246,7 +3246,7 @@ function App() {
       if (!payload) throw new Error('批改任务已完成，但没有返回可用结果');
 
       if (!LEARNING_SUBJECTS.includes(payload.detectedSubject)) {
-        throw new Error('AI 无法可靠识别学科，请拍正整页并确保文字和作答清晰');
+        throw new Error('AI 只识别到模糊或被遮挡的内容，无法判断学科；请直接上传作业原图，或重新拍摄清晰的整页照片');
       }
       const detectedSubject = payload.detectedSubject;
       const detectedTitle = String(payload.detectedTitle || '').trim();

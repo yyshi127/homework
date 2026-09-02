@@ -133,7 +133,7 @@ const DIRECT_GRADING_INSTRUCTIONS = `你是一名严谨的小学作业批改老�
 要求：
 1. 自动识别学科，detectedSubject 只能是“语文”“数学”“英语”“无法判断”。只要能看清至少一道练习，就必须根据题型和文字内容判断学科，不能因为没有页眉、图片是截图或周围带有应用界面而返回“无法判断”；只有完全看不清任何可作答内容时才使用“无法判断”。
 2. 先找到图片中面积最大的作业纸、练习册或题目区域，忽略其周围的应用界面、聊天文字、按钮、边框和已有批改标记。再从上到下、从左到右清点该区域内所有独立答题点。每个小问、填空、口算式或选择题单独列为一个 question；同一道应用题有两个问号或两处作答时必须拆成两题，同一行有多道口算时也必须逐题列出。order 从 1 连续递增，printedNumber 保留完整层级题号。
-3. studentAnswer 只记录原图中学生真实书写、圈选或连线的答案，绝不能把印刷答案当成学生作答，也不能因为字迹较淡就判为空白。wrong、blank 或 uncertain 的 questionText 必须完整抄录本小题题干，gradingContext 必须包含判分所需的共同说明、词库、短文、表格数据和全部选项；correct 的 questionText 只保留题号、答题句或算式等最短核对内容，gradingContext 返回空字符串，禁止为每道正确题重复整段材料。
+3. studentAnswer 只记录原图中学生真实书写、圈选或连线的答案，绝不能把印刷答案当成学生作答，也不能因为字迹较淡就判为空白。wrong、blank 或 uncertain 的 questionText 必须完整抄录本小题题干，gradingContext 必须包含判分所需的共同说明、词库、短文、表格数据和全部选项；correct 的 questionText 只保留题号、答题句或算式等最短核对内容，普通题的 gradingContext 返回空字符串，但依赖选项、词库或表格才能复核的题必须保留最少必要数据，禁止重复无关材料。
 4. 读取一道题后立即独立求出正确答案并与原图作答比较。数学题必须实际验算每条算式，尤其逐位核对运算符、每个数字和等号右侧得数；不能因为学生写满了答案就默认正确。选择题先确认学生圈选的是第几个选项，再比较该选项完整内容。
 5. verdict 只能是 correct、wrong、blank、uncertain。学生未作答用 blank；图片确实不足以判断时用 uncertain，不能编造。correct 和 uncertain 的分析字段留空；wrong 和 blank 必须给出 correctAnswer、简短批语、具体错误原因、知识点、错误类型、2-6 步清晰解题过程和方法总结。correctAnswer 只写复核后的最终答案，不能写推理、自检、候选答案或更正过程。
 6. area 使用整张原图的百分比坐标 0-100，从本题题号或题干开始，完整覆盖题干、作答和选项，并在下一题之前结束，不能框到相邻题目。
@@ -281,12 +281,55 @@ function choiceSelection(question) {
   return selected ? { selected, options, answerToken } : null;
 }
 
+function parseCurrencyJiao(value) {
+  const text = cleanText(value, 80);
+  const yuan = text.match(/(\d+(?:\.\d+)?)\s*元(?:\s*(\d+(?:\.\d+)?)\s*角)?/);
+  if (yuan) return Math.round(Number(yuan[1]) * 10 + Number(yuan[2] || 0));
+  const jiao = text.match(/(\d+(?:\.\d+)?)\s*角/);
+  return jiao ? Math.round(Number(jiao[1])) : null;
+}
+
+function formatCurrencyJiao(value) {
+  if (!Number.isFinite(value)) return '';
+  const yuan = Math.floor(value / 10);
+  const jiao = value % 10;
+  if (!yuan) return `${jiao}角`;
+  return jiao ? `${yuan}元${jiao}角` : `${yuan}元`;
+}
+
+function exactAmountChoice(question, options) {
+  const source = cleanMultilineText([question.questionText, question.gradingContext].filter(Boolean).join('\n'), 5000);
+  const targetMatch = source.match(/(\d+(?:\.\d+)?)\s*元(?:\s*(\d+(?:\.\d+)?)\s*角)?\s*钱?\s*(?:正好|恰好)/);
+  if (!targetMatch) return null;
+  const targetJiao = Math.round(Number(targetMatch[1]) * 10 + Number(targetMatch[2] || 0));
+  const markers = [...source.matchAll(/[①②③④⑤⑥⑦⑧⑨⑩]/g)];
+  const prices = new Map();
+  for (const [index, marker] of markers.entries()) {
+    if (prices.has(marker[0])) continue;
+    const segment = source.slice(marker.index + marker[0].length, markers[index + 1]?.index ?? source.length);
+    const price = parseCurrencyJiao(segment);
+    if (Number.isFinite(price)) prices.set(marker[0], price);
+  }
+  if (prices.size < 2) return null;
+
+  const candidates = options.flatMap((option) => {
+    const items = option.text.match(/[①②③④⑤⑥⑦⑧⑨⑩]/g) || [];
+    if (!items.length || items.some((item) => !prices.has(item))) return [];
+    return [{ ...option, items, totalJiao: items.reduce((sum, item) => sum + prices.get(item), 0) }];
+  });
+  const exactMatches = candidates.filter((candidate) => candidate.totalJiao === targetJiao);
+  if (exactMatches.length !== 1) return null;
+  return { correct: exactMatches[0], prices, targetJiao };
+}
+
 function normalizeChoiceDecision(question) {
   const selection = choiceSelection(question);
   if (!selection) return question;
   const { selected, options, answerToken } = selection;
   const rawCorrectAnswer = cleanCorrectAnswer(question.correctAnswer);
-  const correctLetter = rawCorrectAnswer.match(/^([A-D])(?:\b|[.．、:：\s（(])/i)?.[1]?.toUpperCase()
+  const exactAmount = exactAmountChoice(question, options);
+  const correctLetter = exactAmount?.correct.letter
+    || rawCorrectAnswer.match(/^([A-D])(?:\b|[.．、:：\s（(])/i)?.[1]?.toUpperCase()
     || rawCorrectAnswer.match(/选项\s*([A-D])/i)?.[1]?.toUpperCase()
     || options.find((option) => comparableAnswer(rawCorrectAnswer).includes(comparableAnswer(option.text)))?.letter
     || '';
@@ -296,7 +339,8 @@ function normalizeChoiceDecision(question) {
   const questionText = cleanMultilineText(question.questionText, 2000)
     .replace(new RegExp(`[（(]\\s*${answerToken}\\s*[）)]`), '（ ）');
   const normalizedQuestion = { ...question, questionText, correctAnswer, displayAnswer: answer };
-  if (question.verdict === 'wrong' && correctLetter === selected.letter) {
+  if (correctLetter === selected.letter) {
+    if (question.verdict !== 'wrong') return normalizedQuestion;
     return {
       ...normalizedQuestion,
       verdict: 'correct',
@@ -307,6 +351,30 @@ function normalizeChoiceDecision(question) {
       errorType: '',
       solutionSteps: [],
       explanation: '',
+    };
+  }
+  if (exactAmount && correctLetter) {
+    const correctItems = exactAmount.correct.items
+      .map((item) => `${item}（${formatCurrencyJiao(exactAmount.prices.get(item))}）`);
+    const selectedItems = (selected.text.match(/[①②③④⑤⑥⑦⑧⑨⑩]/g) || [])
+      .filter((item) => exactAmount.prices.has(item));
+    const selectedTotal = selectedItems.length
+      ? selectedItems.reduce((sum, item) => sum + exactAmount.prices.get(item), 0)
+      : null;
+    return {
+      ...normalizedQuestion,
+      verdict: 'wrong',
+      correctAnswer,
+      shortComment: `应选 ${correctLetter}，不是 ${selected.letter}`,
+      errorReason: `学生选择了 ${answer}${Number.isFinite(selectedTotal) ? `，总价是${formatCurrencyJiao(selectedTotal)}` : ''}，不等于${formatCurrencyJiao(exactAmount.targetJiao)}；正确选项是 ${correctAnswer}。`,
+      knowledgePoint: '人民币单位换算',
+      errorType: '计算或拼写错误',
+      solutionSteps: [
+        `先把目标金额统一换算：${formatCurrencyJiao(exactAmount.targetJiao)} = ${exactAmount.targetJiao}角。`,
+        `${correctItems.join(' + ')}合计${exactAmount.targetJiao}角。`,
+        `合计金额正好符合题意，所以选择 ${correctLetter}。`,
+      ],
+      explanation: '先统一人民币单位，再分别计算各组选项的总价，选择与目标金额相等的一组。',
     };
   }
   if (question.verdict !== 'wrong' || !correctLetter) return normalizedQuestion;

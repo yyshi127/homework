@@ -200,6 +200,32 @@ test('maps option letters when the model writes the answer content before 选项
   assert.equal(result.mistakes[0].question.includes('（①）'), false);
 });
 
+test('uses the complete option list when another field contains only B through D', () => {
+  const result = normalizeDeepSeekResult(sampleResult({ questions: [
+    {
+      order: 1,
+      printedNumber: '2',
+      questionText: '10元钱正好可以买下面的（①）。①9元2角 ②2元5角 ③8角 ④5元 A.①④ B.②④ C.②③ D.①③',
+      studentAnswer: '①',
+      gradingContext: '价格选项为A.①④ B.②④ C.②③ D.①③，要求组合正好为10元。',
+      verdict: 'wrong',
+      correctAnswer: 'D（①③）',
+      shortComment: '单选①不对。',
+      errorReason: '只挑选了物品①。',
+      knowledgePoint: '元角换算',
+      errorType: '审题错误',
+      solutionSteps: ['统一单位。', '计算各组合。'],
+      explanation: '①和③合计10元。',
+      area: { left: 5, top: 30, width: 80, height: 16 },
+    },
+  ] }));
+
+  assert.equal(result.mistakes[0].answer, 'A. ①④');
+  assert.equal(result.mistakes[0].correctAnswer, 'D. ①③');
+  assert.equal(result.mistakes[0].shortComment, '应选 D，不是 A');
+  assert.equal(result.mistakes[0].errorReason, '学生选择了 A. ①④，正确答案是 D. ①③。需要按题目条件比较完整选项。');
+});
+
 test('removes a false choice error when the selected option matches the correct answer', () => {
   const raw = sampleResult({ questions: [
     {

@@ -240,10 +240,11 @@ function choiceSelection(question) {
       : -1;
   if (selectedIndex < 0) return null;
 
+  const selectedLetter = String.fromCharCode(65 + selectedIndex);
   const options = [question.gradingContext, question.questionText]
     .map(letteredOptions)
-    .find((items) => items.length >= 2) || [];
-  const selected = options.find((option) => option.letter === String.fromCharCode(65 + selectedIndex));
+    .find((items) => items.length >= 2 && items.some((option) => option.letter === selectedLetter)) || [];
+  const selected = options.find((option) => option.letter === selectedLetter);
   return selected ? { selected, options, answerToken } : null;
 }
 
@@ -252,7 +253,7 @@ function normalizeChoiceDecision(question) {
   if (!selection) return question;
   const { selected, options, answerToken } = selection;
   const rawCorrectAnswer = cleanCorrectAnswer(question.correctAnswer);
-  const correctLetter = rawCorrectAnswer.match(/^([A-D])(?:\b|[.．、:：\s])/i)?.[1]?.toUpperCase()
+  const correctLetter = rawCorrectAnswer.match(/^([A-D])(?:\b|[.．、:：\s（(])/i)?.[1]?.toUpperCase()
     || rawCorrectAnswer.match(/选项\s*([A-D])/i)?.[1]?.toUpperCase()
     || options.find((option) => comparableAnswer(rawCorrectAnswer).includes(comparableAnswer(option.text)))?.letter
     || '';

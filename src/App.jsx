@@ -1051,6 +1051,7 @@ function normalizeLearningTools(value = {}) {
       annotationQuality: ['precise', 'approximate', 'none'].includes(review.annotationQuality)
         ? review.annotationQuality
         : normalizeReviewAnnotations(review.imageAnnotations).length ? 'approximate' : 'none',
+      gradingWarning: review.gradingWarning || '',
       localizationWarning: review.localizationWarning || '',
       summary: review.summary || '',
       suggestions: normalizeReviewSuggestions(review.suggestions),
@@ -1225,8 +1226,7 @@ function homeworkGradingStatusText(stage = '', seconds = 0) {
   const stageText = {
     queued: '正在等待批改',
     vision: '正在识别题目',
-    verification: '正在核对学生答案',
-    grading: '正在识别并逐题批改',
+    grading: '正在逐题判分并生成解析',
     localization: '正在精确定位错题',
     cancelling: '正在取消批改',
   }[stage];
@@ -1685,6 +1685,7 @@ function App() {
   const [isPreparingHomeworkImage, setIsPreparingHomeworkImage] = useState(false);
   const [gradingError, setGradingError] = useState('');
   const homeworkImageRef = useRef(DEFAULT_GRADER_DRAFT.imageData);
+  const homeworkDetailImagesRef = useRef([]);
   const homeworkLocalizationImageRef = useRef('');
   const gradingRequestRef = useRef(null);
   const gradingRequestIdRef = useRef('');
@@ -2970,6 +2971,45 @@ function App() {
         context.fillStyle = '#fff';
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const sliceStarts = [0, 0.27, 0.54];
+        const detailImages = sliceStarts.map((start) => {
+          const portrait = canvas.height >= canvas.width;
+          const area = portrait
+            ? { left: 0, top: start * 100, width: 100, height: 46 }
+            : { left: start * 100, top: 0, width: 46, height: 100 };
+          const sourceX = Math.round(canvas.width * area.left / 100);
+          const sourceY = Math.round(canvas.height * area.top / 100);
+          const sourceWidth = Math.min(canvas.width - sourceX, Math.round(canvas.width * area.width / 100));
+          const sourceHeight = Math.min(canvas.height - sourceY, Math.round(canvas.height * area.height / 100));
+          const detailScale = Math.min(2, 2048 / Math.max(sourceWidth, sourceHeight));
+          const detailCanvas = document.createElement('canvas');
+          detailCanvas.width = Math.max(16, Math.round(sourceWidth * detailScale));
+          detailCanvas.height = Math.max(16, Math.round(sourceHeight * detailScale));
+          const detailContext = detailCanvas.getContext('2d');
+          detailContext.fillStyle = '#fff';
+          detailContext.fillRect(0, 0, detailCanvas.width, detailCanvas.height);
+          detailContext.imageSmoothingEnabled = true;
+          detailContext.imageSmoothingQuality = 'high';
+          detailContext.drawImage(
+            canvas,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            detailCanvas.width,
+            detailCanvas.height,
+          );
+          return {
+            area: {
+              ...area,
+              width: sourceWidth / canvas.width * 100,
+              height: sourceHeight / canvas.height * 100,
+            },
+            imageData: detailCanvas.toDataURL('image/jpeg', 0.9),
+          };
+        });
         const localizationCanvas = document.createElement('canvas');
         localizationCanvas.width = canvas.width;
         localizationCanvas.height = canvas.height;
@@ -3004,6 +3044,7 @@ function App() {
         URL.revokeObjectURL(objectUrl);
         resolve({
           imageData: canvas.toDataURL('image/jpeg', 0.88),
+          detailImages,
           localizationImageData: localizationCanvas.toDataURL('image/jpeg', 0.86),
         });
       } catch (error) {
@@ -3113,6 +3154,7 @@ function App() {
     if (!file) return;
     if (isGradingHomework) cancelHomeworkGrading();
     homeworkImageRef.current = '';
+    homeworkDetailImagesRef.current = [];
     homeworkLocalizationImageRef.current = '';
     setLatestReview(null);
     setShowPreviousReview(false);
@@ -3120,12 +3162,14 @@ function App() {
     setIsPreparingHomeworkImage(true);
     setGraderDraft((current) => ({ ...current, imageData: '', imageName: file.name }));
     try {
-      const { imageData, localizationImageData } = await readHomeworkImage(file);
+      const { imageData, detailImages, localizationImageData } = await readHomeworkImage(file);
       homeworkImageRef.current = imageData;
+      homeworkDetailImagesRef.current = detailImages;
       homeworkLocalizationImageRef.current = localizationImageData;
       setGraderDraft((current) => ({ ...current, imageData, imageName: file.name }));
     } catch (error) {
       homeworkImageRef.current = '';
+      homeworkDetailImagesRef.current = [];
       homeworkLocalizationImageRef.current = '';
       setGraderDraft((current) => ({ ...current, imageData: '', imageName: '' }));
       setGradingError(error?.message || '图片上传失败，请重新拍照');
@@ -3137,6 +3181,7 @@ function App() {
 
   const generateHomeworkReview = async () => {
     const currentImageData = homeworkImageRef.current || graderDraft.imageData;
+    const currentDetailImages = homeworkDetailImagesRef.current;
     const currentLocalizationImageData = homeworkLocalizationImageRef.current;
     if (isPreparingHomeworkImage) {
       showAppAlert('图片还在处理中，请等预览出现后再批改', { tone: 'warning' });
@@ -3156,6 +3201,7 @@ function App() {
       title: graderDraft.title.trim(),
       note: graderDraft.note.trim(),
       imageData: currentImageData,
+      detailImages: currentDetailImages,
       localizationImageData: currentLocalizationImageData,
     });
     gradingRequestRef.current = controller;
@@ -3167,7 +3213,6 @@ function App() {
       const responseError = (response, payload) => {
         const stageLabel = {
           vision: '题目识别',
-          verification: '答案复核',
           grading: '逐题判分',
           localization: '错题定位',
         }[payload?.stage];
@@ -3298,6 +3343,7 @@ function App() {
         recognizedQuestionCount: Number(payload.recognizedQuestionCount || 0),
         uncertainQuestionCount: Number(payload.uncertainQuestionCount || 0),
         annotationQuality: ['precise', 'approximate', 'none'].includes(payload.annotationQuality) ? payload.annotationQuality : 'approximate',
+        gradingWarning: payload.gradingWarning || '',
         localizationWarning: payload.localizationWarning || '',
         score: Number(payload.score ?? Math.max(72, 96 - selectedMistakes.length * 8)),
         summary: payload.summary || `已完成${term}${detectedSubject}作业批改，发现 ${selectedMistakes.length} 个需要订正的地方。`,
@@ -5821,6 +5867,7 @@ ${colorStyles}
                           return;
                         }
                         homeworkImageRef.current = '';
+                        homeworkDetailImagesRef.current = [];
                         homeworkLocalizationImageRef.current = '';
                         setGraderDraft(DEFAULT_GRADER_DRAFT);
                         setLatestReview(null);
@@ -5873,6 +5920,7 @@ ${colorStyles}
                             <h4>{review.detectedTitle || review.title}</h4>
                             <p>{review.summary}</p>
                             {review.recognizedQuestionCount > 0 && <small>识别 {review.recognizedQuestionCount} 题{review.uncertainQuestionCount > 0 ? `，${review.uncertainQuestionCount} 题无法可靠判断` : ''}</small>}
+                            {review.gradingWarning && <small>质量提示：{review.gradingWarning}</small>}
                           </div>
                           {reviewImageUrl && (
                             <>

@@ -215,6 +215,7 @@ test('homework grading runs as an idempotent background job with precise localiz
   const baseUrl = `http://127.0.0.1:${apiPort}`;
   const modelUrl = `http://127.0.0.1:${deepSeekPort}`;
   const modelCalls = [];
+  const modelRequests = [];
   const recognition = {
     detectedSubject: '数学',
     subjectConfidence: '高',
@@ -241,12 +242,6 @@ test('homework grading runs as an idempotent background job with precise localiz
       explanation: '加法表示把两部分合在一起。',
     }],
   };
-  const directGrading = {
-    ...recognition,
-    summary: '共识别1题，发现1道错题。',
-    suggestions: ['订正后再练一道同类题。'],
-    questions: recognition.questions.map((question) => ({ ...question, ...grading.decisions[0] })),
-  };
   const localization = {
     locations: [{ order: 1, box: { x1: 70, y1: 260, x2: 820, y2: 420 } }],
   };
@@ -256,10 +251,16 @@ test('homework grading runs as an idempotent background job with precise localiz
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
       const request = JSON.parse(body);
-      const name = request.text.format.name;
+      modelRequests.push(request);
+      const inputText = request.input?.[0]?.content?.find(({ type }) => type === 'input_text')?.text;
+      const input = request.text.format.name || !inputText ? {} : JSON.parse(inputText);
+      const name = request.text.format.name
+        || (Array.isArray(input.targets)
+          ? 'homework_mistake_localization'
+          : 'unknown');
       modelCalls.push(name);
-      const result = name === 'homework_direct_grading'
-        ? directGrading
+      const result = name === 'homework_text_grading'
+        ? grading
         : name === 'homework_mistake_localization'
           ? localization
           : recognition;
@@ -292,11 +293,31 @@ test('homework grading runs as an idempotent background job with precise localiz
     requestId,
     term: '二年级上学期',
     imageData: 'data:image/jpeg;base64,/9j/2Q==',
+    detailImages: [{
+      imageData: 'data:image/jpeg;base64,/9j/2Q==',
+      area: { left: 0, top: 0, width: 100, height: 46 },
+    }],
     localizationImageData: 'data:image/jpeg;base64,/9j/2Q==',
   };
 
   try {
     await waitForServer(baseUrl);
+    const invalidDetailResponse = await fetch(`${baseUrl}/api/grade-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...requestBody,
+        requestId: 'invalid-detail-image-test',
+        detailImages: [{
+          imageData: 'data:image/jpeg;base64,/9j/2Q==',
+          area: { left: 0, top: 0, width: 0, height: 46 },
+        }],
+      }),
+    });
+    assert.equal(invalidDetailResponse.status, 400);
+    assert.equal((await invalidDetailResponse.json()).code, 'INVALID_DETAIL_IMAGES');
+    assert.equal(modelCalls.length, 0);
+
     const startResponse = await fetch(`${baseUrl}/api/grade-homework`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -317,11 +338,13 @@ test('homework grading runs as an idempotent background job with precise localiz
     }
     assert.equal(job.status, 'completed');
     assert.equal(job.result.annotationQuality, 'precise');
-    assert.deepEqual(job.result.imageAnnotations[0].area, { left: 6, top: 23, width: 77, height: 19.5 });
+    assert.deepEqual(job.result.imageAnnotations[0].area, { left: 6.5, top: 25.5, width: 76, height: 17 });
     assert.deepEqual(modelCalls, [
-      'homework_direct_grading',
+      'homework_image_recognition',
+      'homework_text_grading',
       'homework_mistake_localization',
     ]);
+    assert.equal(modelRequests[0].input[0].content[3].image_url, requestBody.detailImages[0].imageData);
 
     const repeatedResponse = await fetch(`${baseUrl}/api/grade-homework`, {
       method: 'POST',
@@ -330,7 +353,7 @@ test('homework grading runs as an idempotent background job with precise localiz
     });
     assert.equal(repeatedResponse.status, 200);
     assert.equal((await repeatedResponse.json()).status, 'completed');
-    assert.equal(modelCalls.length, 2);
+    assert.equal(modelCalls.length, 3);
 
     const conflictResponse = await fetch(`${baseUrl}/api/grade-homework`, {
       method: 'POST',

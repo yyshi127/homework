@@ -4,17 +4,14 @@ import {
   DeepSeekHomeworkError,
   callDeepSeekHomeworkReview,
   constrainQuestionAreas,
-  createDeepSeekDirectGradingRequest,
   createDeepSeekGradingRequest,
   createDeepSeekLocalizationRequest,
   createDeepSeekRequest,
-  createDeepSeekVerificationRequest,
   deriveQuestionAnnotationArea,
   deriveQuestionCropArea,
   extractDeepSeekOutput,
   mergeDeepSeekGrading,
   mergeDeepSeekLocalization,
-  mergeDeepSeekVerification,
   normalizeDeepSeekRecognition,
   normalizeDeepSeekResult,
 } from '../server/deepseek-homework.js';
@@ -123,6 +120,21 @@ function sampleGrading(overrides = {}) {
     })),
     ...overrides,
   };
+}
+
+function deepSeekRequestName(request) {
+  if (request?.text?.format?.name) return request.text.format.name;
+  const inputText = request?.input?.[0]?.content?.find(({ type }) => type === 'input_text')?.text;
+  if (!inputText) return '';
+  const input = JSON.parse(inputText);
+  if (Array.isArray(input.targets)) return 'homework_mistake_localization';
+  return '';
+}
+
+function sampleResponseForRequest(request) {
+  const name = deepSeekRequestName(request);
+  if (name === 'homework_text_grading') return sampleGrading();
+  return sampleRecognition();
 }
 
 test('derives image annotations and mistake details from the same wrong questions', () => {
@@ -466,90 +478,6 @@ test('removes numbering that the model repeats inside solution steps', () => {
   assert.deepEqual(result.mistakes[0].solutionSteps, ['先算个位：8 + 7 = 15。', '个位写5，向十位进1。']);
 });
 
-test('uses the verification box without expanding it into a neighboring question', () => {
-  const recognition = normalizeDeepSeekRecognition(sampleRecognition());
-  const verification = sampleRecognition();
-  verification.questions[1].area = { left: 4, top: 24, width: 80, height: 10 };
-
-  const verified = mergeDeepSeekVerification(recognition, verification);
-  const result = mergeDeepSeekGrading(verified, sampleGrading());
-
-  assert.deepEqual(result.imageAnnotations[0].area, { left: 4, top: 24, width: 80, height: 10 });
-});
-
-test('verification can add an answer point missed by the first image pass', () => {
-  const recognition = normalizeDeepSeekRecognition(sampleRecognition());
-  const verification = sampleRecognition();
-  verification.questions.push({
-    order: 5,
-    printedNumber: '5',
-    questionText: '98 - 9 =',
-    studentAnswer: '9',
-    gradingContext: '',
-    area: { left: 5, top: 84, width: 40, height: 8 },
-  });
-
-  const verified = mergeDeepSeekVerification(recognition, verification);
-
-  assert.equal(verified.questions.length, 5);
-  assert.equal(verified.questions[4].questionText, '98 - 9 =');
-  assert.equal(verified.questions[4].studentAnswer, '9');
-});
-
-test('verification can split a grouped question into separate numbered answer points', () => {
-  const recognition = normalizeDeepSeekRecognition({
-    detectedSubject: '数学',
-    subjectConfidence: '高',
-    detectedTitle: '口算练习',
-    questions: [{
-      order: 1,
-      printedNumber: '5',
-      questionText: '口算两题',
-      studentAnswer: '9，20',
-      gradingContext: '',
-      area: { left: 5, top: 70, width: 80, height: 12 },
-    }],
-  });
-  const verification = {
-    detectedSubject: '数学',
-    subjectConfidence: '高',
-    detectedTitle: '口算练习',
-    questions: [
-      { order: 1, printedNumber: '5(1)', questionText: '98 - 9 =', studentAnswer: '9', gradingContext: '', area: { left: 5, top: 70, width: 35, height: 6 } },
-      { order: 2, printedNumber: '5(2)', questionText: '12 + 8 =', studentAnswer: '20', gradingContext: '', area: { left: 45, top: 70, width: 35, height: 6 } },
-    ],
-  };
-
-  const verified = mergeDeepSeekVerification(recognition, verification);
-
-  assert.deepEqual(verified.questions.map((question) => question.printedNumber), ['5(1)', '5(2)']);
-});
-
-test('rejects verification output when the question numbers shift', () => {
-  const recognition = normalizeDeepSeekRecognition(sampleRecognition());
-  const verification = sampleRecognition();
-  verification.questions[1].printedNumber = '99';
-
-  assert.throws(
-    () => mergeDeepSeekVerification(recognition, verification),
-    (error) => error.code === 'INVALID_VERIFICATION',
-  );
-});
-
-test('uses the dedicated verification answer and keeps only line questions uncertain', () => {
-  const recognition = normalizeDeepSeekRecognition(sampleRecognition());
-  const verification = sampleRecognition();
-  verification.questions[0].studentAnswer = '21';
-  verification.questions[1].questionText = '想一想，连一连。';
-  const verified = mergeDeepSeekVerification(recognition, verification);
-  const result = mergeDeepSeekGrading(verified, sampleGrading());
-
-  assert.equal(verified.questions[0].studentAnswer, '21');
-  assert.equal(verified.questions[0].visualUncertain, false);
-  assert.equal(result.uncertainQuestionCount, 2);
-  assert.deepEqual(result.mistakes.map((item) => item.correctAnswer), ['20', '32']);
-});
-
 test('rejects missing decisions and contradictory wrong verdicts', () => {
   const recognition = normalizeDeepSeekRecognition(sampleRecognition());
   assert.throws(
@@ -721,6 +649,10 @@ test('extracts the first complete JSON value when the model appends extra output
 test('vision request auto-detects subject without asking the image pass to grade answers', () => {
   const request = createDeepSeekRequest({
     imageData: 'data:image/jpeg;base64,AA==',
+    detailImages: [{
+      imageData: 'data:image/jpeg;base64,DETAIL',
+      area: { left: 0, top: 25, width: 100, height: 46 },
+    }],
     term: '二年级上学期',
     title: '第3页',
     subject: '数学',
@@ -729,85 +661,42 @@ test('vision request auto-detects subject without asking the image pass to grade
 
   assert.equal(request.model, 'deepseek-v4-flash-vision-exp');
   assert.equal(request.input[0].content[1].detail, 'original');
+  assert.equal(request.input[0].content[2].text.includes('Y=25%-71%'), true);
+  assert.equal(request.input[0].content[3].image_url, 'data:image/jpeg;base64,DETAIL');
   assert.equal(request.text.format.strict, true);
   assert.equal(request.text.format.name, 'homework_image_recognition');
   assert.equal(request.reasoning.effort, 'none');
   assert.equal(request.max_output_tokens, 8000);
   assert.equal(userInput.includes('数学'), false);
   assert.equal(request.instructions.includes('不判断答案对错'), true);
+  assert.equal(request.instructions.includes('面积最大的作业纸'), true);
 });
 
-test('direct grading request makes the model extract and judge from the original image', () => {
-  const request = createDeepSeekDirectGradingRequest({
-    imageData: 'data:image/jpeg;base64,ORIGINAL',
-    term: '二年级上学期',
-  });
-
-  assert.equal(request.text.format.name, 'homework_direct_grading');
-  assert.equal(request.text.format.strict, true);
-  assert.equal(request.input[0].content[1].image_url, 'data:image/jpeg;base64,ORIGINAL');
-  assert.equal(request.input[0].content[1].detail, 'original');
-  assert.equal(request.reasoning.effort, 'low');
-  assert.equal(request.max_output_tokens, 12000);
-  assert.equal(request.instructions.includes('同一次处理中完成完整提题'), true);
-  assert.equal(request.instructions.includes('数学题必须实际验算每条算式'), true);
-  assert.equal(request.instructions.includes('不能把“选择第①项”误解成只选择题目中的物品①'), true);
-  assert.equal(request.instructions.includes('correctAnswer 只写复核后的最终答案'), true);
-  assert.equal(request.text.format.schema.properties.questions.items.required.includes('verdict'), true);
-  assert.equal('summary' in request.text.format.schema.properties, false);
-  assert.equal('suggestions' in request.text.format.schema.properties, false);
-});
-
-test('grading request uses the recognized text without resending the image', () => {
-  const recognition = normalizeDeepSeekRecognition(sampleRecognition());
-  const request = createDeepSeekGradingRequest({ recognition, term: '二年级上学期' });
-
-  assert.equal(request.model, 'deepseek-v4-flash-vision-exp');
-  assert.equal(request.reasoning.effort, 'high');
-  assert.equal(request.max_output_tokens, 10000);
-  assert.equal(request.text.format.name, 'homework_textbook_grading');
-  assert.equal(request.text.format.schema.properties.decisions.items.required.includes('knowledgePoint'), true);
-  assert.equal(request.text.format.schema.properties.decisions.items.required.includes('errorType'), true);
-  assert.equal(request.input.includes('38 + 27 ='), true);
-  assert.equal(request.input.includes('data:image'), false);
-  assert.equal(request.instructions.includes('studentAnswer 为“①”表示选择 A'), true);
-});
-
-test('Chinese grading uses low reasoning and deduplicates shared reading context', () => {
+test('grading request judges recognized text once and deduplicates shared context', () => {
   const rawRecognition = sampleRecognition();
   rawRecognition.detectedSubject = '语文';
   rawRecognition.questions[0].gradingContext = '小明先读短文，再回答问题。';
   rawRecognition.questions[1].gradingContext = '小明先读短文，再回答问题。';
   const recognition = normalizeDeepSeekRecognition(rawRecognition);
-  const request = createDeepSeekGradingRequest({ recognition, term: '二年级上学期' });
+  const request = createDeepSeekGradingRequest({
+    recognition,
+    term: '二年级上学期',
+  });
   const gradingInput = JSON.parse(request.input);
 
-  assert.equal(request.reasoning.effort, 'low');
-  assert.equal(request.max_output_tokens, 8000);
+  assert.equal(request.reasoning.effort, 'high');
+  assert.equal(request.max_output_tokens, 12000);
+  assert.equal(request.text.format.name, 'homework_text_grading');
+  assert.equal(request.text.format.strict, true);
   assert.deepEqual(gradingInput.sharedContexts, [{ id: 'context-1', text: '小明先读短文，再回答问题。' }]);
   assert.deepEqual(gradingInput.questions.slice(0, 2).map((question) => question.gradingContextRef), ['context-1', 'context-1']);
   assert.equal(request.input.match(/小明先读短文，再回答问题。/g)?.length, 1);
+  assert.equal(gradingInput.questions.every((question) => question.studentAnswer !== undefined), true);
+  assert.equal(request.input.includes('data:image/'), false);
+  assert.equal(request.instructions.includes('绝不能改写 studentAnswer'), true);
 });
 
-test('verification request resends the image and audits the page for missed answer points', () => {
-  const recognition = normalizeDeepSeekRecognition(sampleRecognition());
-  const request = createDeepSeekVerificationRequest({
-    recognition,
-    imageData: 'data:image/jpeg;base64,AA==',
-  });
-
-  assert.equal(request.reasoning.effort, 'none');
-  assert.equal(request.max_output_tokens, 8000);
-  assert.equal(request.text.format.name, 'verified_homework_recognition');
-  assert.equal(request.input[0].content[1].image_url, 'data:image/jpeg;base64,AA==');
-  assert.equal(request.instructions.includes('不判断答案对错'), true);
-  assert.equal(request.instructions.includes('沿可见线条追踪'), true);
-  assert.equal(request.instructions.includes('在文中画出/圈出'), true);
-  assert.equal(request.instructions.includes('第一次漏掉的小题必须补入'), true);
-  assert.equal(request.instructions.includes('每一道分别列出'), true);
-});
-
-test('localization request sends only wrong questions with a strict 0-1000 box schema', () => {
+test('localization request sends only wrong questions using compact JSON output', () => {
   const recognition = normalizeDeepSeekRecognition(sampleRecognition());
   const request = createDeepSeekLocalizationRequest({
     recognition,
@@ -816,8 +705,7 @@ test('localization request sends only wrong questions with a strict 0-1000 box s
   });
   const targets = JSON.parse(request.input[0].content[0].text).targets;
 
-  assert.equal(request.text.format.name, 'homework_mistake_localization');
-  assert.equal(request.text.format.strict, true);
+  assert.deepEqual(request.text.format, { type: 'json_object' });
   assert.deepEqual(targets.map((target) => target.order), [2, 3]);
   assert.equal(targets[0].previousQuestion.includes('12 + 8'), true);
   assert.equal(targets[0].nextQuestion.includes('50 - 18'), true);
@@ -825,9 +713,10 @@ test('localization request sends only wrong questions with a strict 0-1000 box s
   assert.equal(request.input[0].content[1].image_url, 'data:image/jpeg;base64,GRID');
   assert.equal(request.instructions.includes('0 到 1000'), true);
   assert.equal(request.instructions.includes('蓝色坐标网格'), true);
+  assert.equal(request.instructions.includes('不要输出格式说明'), true);
 });
 
-test('replaces approximate mistake positions with grid-localized coordinates', () => {
+test('combines recognition and grid localization before the next question boundary', () => {
   const recognition = normalizeDeepSeekRecognition(sampleRecognition());
   const result = mergeDeepSeekGrading(recognition, sampleGrading());
   const localized = mergeDeepSeekLocalization(result, {
@@ -838,8 +727,50 @@ test('replaces approximate mistake positions with grid-localized coordinates', (
   });
 
   assert.equal(localized.annotationQuality, 'precise');
-  assert.deepEqual(localized.imageAnnotations[0].area, { left: 7.5, top: 35.3, width: 73.9, height: 17.7 });
-  assert.deepEqual(localized.mistakes[0].cropArea, { left: 6.5, top: 34.3, width: 75.9, height: 19.7 });
+  assert.deepEqual(localized.imageAnnotations[0].area, { left: 6, top: 26, width: 74.9, height: 17.6 });
+  assert.deepEqual(localized.mistakes[0].cropArea, { left: 5, top: 25, width: 76.9, height: 19.6 });
+});
+
+test('keeps a localized question inside its detected column', () => {
+  const recognition = normalizeDeepSeekRecognition({
+    detectedSubject: '语文',
+    subjectConfidence: '高',
+    detectedTitle: '词语连线',
+    questions: [
+      { order: 1, printedNumber: '一(1)', questionText: '左侧连线题', studentAnswer: '甲—乙', gradingContext: '甲；乙；丙；丁', area: { left: 5, top: 18, width: 45, height: 12 } },
+      { order: 2, printedNumber: '一(2)', questionText: '右侧连线题', studentAnswer: '丙—丁', gradingContext: '甲；乙；丙；丁', area: { left: 50, top: 18, width: 45, height: 12 } },
+      { order: 3, printedNumber: '二.1', questionText: '下一道填空题', studentAnswer: '答案', gradingContext: '', area: { left: 5, top: 34, width: 70, height: 5 } },
+    ],
+  });
+  const result = mergeDeepSeekGrading(recognition, {
+    decisions: [
+      { order: 1, verdict: 'wrong', correctAnswer: '甲—丁', shortComment: '连线错误', errorReason: '词语搭配错误。', knowledgePoint: '词语搭配', errorType: '知识点错误', solutionSteps: ['先理解左侧词语。', '再连接正确搭配。'], explanation: '根据词义完成搭配。' },
+      { order: 2, verdict: 'correct', correctAnswer: '丙—丁', shortComment: '', errorReason: '', knowledgePoint: '', errorType: '', solutionSteps: [], explanation: '' },
+      { order: 3, verdict: 'correct', correctAnswer: '答案', shortComment: '', errorReason: '', knowledgePoint: '', errorType: '', solutionSteps: [], explanation: '' },
+    ],
+  });
+  const localized = mergeDeepSeekLocalization(result, {
+    locations: [{ order: 1, box: { x1: 109, y1: 125, x2: 744, y2: 181 } }],
+  });
+
+  assert.deepEqual(localized.imageAnnotations[0].area, { left: 5, top: 12, width: 44.8, height: 18 });
+  assert.ok(localized.imageAnnotations[0].area.left + localized.imageAnnotations[0].area.width < 50);
+});
+
+test('clips a localized mistake box before the next question begins', () => {
+  const recognition = normalizeDeepSeekRecognition(sampleRecognition());
+  const result = mergeDeepSeekGrading(recognition, sampleGrading());
+  const localized = mergeDeepSeekLocalization(result, {
+    locations: [
+      { order: 2, box: { x1: 85, y1: 383, x2: 804, y2: 650 } },
+      { order: 3, box: { x1: 90, y1: 400, x2: 850, y2: 520 } },
+    ],
+  });
+
+  const current = localized.questions.find(({ order }) => order === 2).area;
+  const next = localized.questions.find(({ order }) => order === 3).area;
+  assert.ok(current.top + current.height <= next.top - 0.4);
+  assert.deepEqual(localized.imageAnnotations.find(({ order }) => order === 2).area, current);
 });
 
 test('rejects missing and out-of-range localization boxes', () => {
@@ -866,17 +797,15 @@ test('runs the dedicated localization stage when a grid image is supplied', asyn
   const fetchImpl = async (_url, options) => {
     calls += 1;
     const request = JSON.parse(options.body);
-    const name = request.text.format.name;
-    const result = name === 'homework_direct_grading'
-      ? sampleResult()
-      : name === 'homework_mistake_localization'
+    const name = deepSeekRequestName(request);
+    const result = name === 'homework_mistake_localization'
         ? {
             locations: [
               { order: 2, box: { x1: 85, y1: 383, x2: 804, y2: 525 } },
               { order: 3, box: { x1: 90, y1: 600, x2: 850, y2: 720 } },
             ],
           }
-        : sampleRecognition();
+        : sampleResponseForRequest(request);
     return {
       ok: true,
       status: 200,
@@ -892,17 +821,17 @@ test('runs the dedicated localization stage when a grid image is supplied', asyn
     sleep: async () => {},
   });
 
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.equal(result.annotationQuality, 'precise');
-  assert.deepEqual(result.attempts.map((attempt) => attempt.stage), ['grading', 'localization']);
+  assert.deepEqual(result.attempts.map((attempt) => attempt.stage), ['vision', 'grading', 'localization']);
 });
 
 test('retries an invalid localization result before using approximate boxes', async () => {
   let localizationCalls = 0;
   const fetchImpl = async (_url, options) => {
     const request = JSON.parse(options.body);
-    const name = request.text.format.name;
-    let result = sampleResult();
+    const name = deepSeekRequestName(request);
+    let result = sampleResponseForRequest(request);
     if (name === 'homework_mistake_localization') {
       localizationCalls += 1;
       result = localizationCalls === 1
@@ -932,6 +861,7 @@ test('retries an invalid localization result before using approximate boxes', as
   assert.equal(result.annotationQuality, 'precise');
   assert.equal(localizationCalls, 2);
   assert.deepEqual(result.attempts.map(({ stage, status }) => `${stage}:${status}`), [
+    'vision:success',
     'grading:success',
     'localization:failed',
     'localization:success',
@@ -940,9 +870,15 @@ test('retries an invalid localization result before using approximate boxes', as
 
 test('retries when the model returns no questions', async () => {
   let calls = 0;
-  const fetchImpl = async () => {
+  let visionCalls = 0;
+  const fetchImpl = async (_url, options) => {
     calls += 1;
-    const result = calls === 1 ? sampleResult({ questions: [] }) : sampleResult();
+    const request = JSON.parse(options.body);
+    const name = deepSeekRequestName(request);
+    if (name === 'homework_image_recognition') visionCalls += 1;
+    const result = name === 'homework_image_recognition'
+      ? (visionCalls === 1 ? sampleRecognition({ questions: [] }) : sampleRecognition())
+      : sampleResponseForRequest(request);
     return {
       ok: true,
       status: 200,
@@ -957,22 +893,29 @@ test('retries when the model returns no questions', async () => {
     sleep: async () => {},
   });
 
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.equal(result.recognizedQuestionCount, 4);
-  assert.deepEqual(result.attempts.map(({ status, code }) => [status, code || '']), [
-    ['failed', 'NO_QUESTIONS'],
-    ['success', ''],
+  assert.deepEqual(result.attempts.map(({ stage, status, code }) => [stage, status, code || '']), [
+    ['vision', 'failed', 'NO_QUESTIONS'],
+    ['vision', 'success', ''],
+    ['grading', 'success', ''],
   ]);
 });
 
-test('uses a faster compact request after an incomplete direct grading response', async () => {
-  const requests = [];
+test('retries incomplete high-accuracy grading once in fast mode', async () => {
+  const gradingRequests = [];
   const fetchImpl = async (_url, options) => {
     const request = JSON.parse(options.body);
-    requests.push(request);
-    const payload = requests.length === 1
-      ? { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } }
-      : completedPayload();
+    const name = deepSeekRequestName(request);
+    let payload;
+    if (name === 'homework_text_grading') {
+      gradingRequests.push(request);
+      payload = gradingRequests.length === 1
+        ? { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } }
+        : completedPayload(sampleGrading());
+    } else {
+      payload = completedPayload(sampleResponseForRequest(request));
+    }
     return {
       ok: true,
       status: 200,
@@ -987,12 +930,14 @@ test('uses a faster compact request after an incomplete direct grading response'
     sleep: async () => {},
   });
 
-  assert.equal(requests.length, 2);
-  assert.deepEqual(requests.map((request) => request.reasoning.effort), ['low', 'none']);
-  assert.deepEqual(requests.map((request) => request.max_output_tokens), [12000, 8000]);
-  assert.deepEqual(result.attempts.map(({ status, code }) => [status, code || '']), [
-    ['failed', 'INCOMPLETE_RESPONSE'],
-    ['success', ''],
+  assert.equal(gradingRequests.length, 2);
+  assert.deepEqual(gradingRequests.map((request) => request.reasoning.effort), ['high', 'low']);
+  assert.deepEqual(gradingRequests.map((request) => request.max_output_tokens), [12000, 10000]);
+  assert.match(result.gradingWarning, /快速模式重试/);
+  assert.deepEqual(result.attempts.map(({ stage, status, code }) => [stage, status, code || '']), [
+    ['vision', 'success', ''],
+    ['grading', 'failed', 'INCOMPLETE_RESPONSE'],
+    ['grading', 'success', ''],
   ]);
 });
 
@@ -1009,7 +954,7 @@ test('retries a 429 response and keeps the failed attempt in metadata', async ()
       };
     }
     const request = JSON.parse(options.body);
-    const result = request.text.format.name === 'homework_direct_grading' ? sampleResult() : sampleRecognition();
+    const result = sampleResponseForRequest(request);
     return {
       ok: true,
       status: 200,
@@ -1024,9 +969,9 @@ test('retries a 429 response and keeps the failed attempt in metadata', async ()
     sleep: async () => {},
   });
 
-  assert.equal(calls, 2);
-  assert.deepEqual(result.attempts.map((item) => item.status), ['failed', 'success']);
-  assert.deepEqual(result.attempts.map((item) => item.stage), ['grading', 'grading']);
+  assert.equal(calls, 3);
+  assert.deepEqual(result.attempts.map((item) => item.status), ['failed', 'success', 'success']);
+  assert.deepEqual(result.attempts.map((item) => item.stage), ['vision', 'vision', 'grading']);
   assert.equal(result.attempts[0].httpStatus, 429);
 });
 
@@ -1055,7 +1000,7 @@ test('times out while reading an unfinished response body and does not retry', a
       sleep: async () => {},
       timeoutMs: 10,
     }),
-    (error) => error.code === 'TIMEOUT' && error.stage === 'grading',
+    (error) => error.code === 'TIMEOUT' && error.stage === 'vision',
   );
   assert.equal(calls, 1);
 });

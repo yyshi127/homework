@@ -844,9 +844,45 @@ function inspectGradingImage(imageData, label, required = true) {
   return { bytes };
 }
 
-function gradingFingerprint({ imageData, localizationImageData, term, title, note }) {
+function inspectGradingDetailImages(value) {
+  if (value === undefined || value === null) return { items: [], bytes: 0 };
+  if (!Array.isArray(value) || value.length > 3) {
+    return { status: 400, code: 'INVALID_DETAIL_IMAGES', error: '作业高清局部图格式无效' };
+  }
+  const items = [];
+  let bytes = 0;
+  for (const item of value) {
+    const inspection = inspectGradingImage(item?.imageData, '作业高清局部图');
+    if (inspection.error) return inspection;
+    const rawArea = item?.area;
+    const area = {
+      left: Number(rawArea?.left),
+      top: Number(rawArea?.top),
+      width: Number(rawArea?.width),
+      height: Number(rawArea?.height),
+    };
+    const validArea = Object.values(area).every(Number.isFinite)
+      && area.left >= 0
+      && area.top >= 0
+      && area.width > 0
+      && area.height > 0
+      && area.left + area.width <= 100.01
+      && area.top + area.height <= 100.01;
+    if (!validArea) {
+      return { status: 400, code: 'INVALID_DETAIL_IMAGES', error: '作业高清局部图范围无效' };
+    }
+    bytes += inspection.bytes;
+    items.push({ imageData: item.imageData, area });
+  }
+  if (bytes > 5 * 1024 * 1024) {
+    return { status: 413, code: 'IMAGE_TOO_LARGE', error: '作业高清局部图处理后总计不能超过 5 MB' };
+  }
+  return { items, bytes };
+}
+
+function gradingFingerprint({ imageData, detailImages, localizationImageData, term, title, note }) {
   const hash = createHash('sha256');
-  for (const value of [imageData, localizationImageData, term, title, note]) {
+  for (const value of [imageData, JSON.stringify(detailImages || []), localizationImageData, term, title, note]) {
     hash.update(String(value || ''), 'utf8');
     hash.update('\0');
   }
@@ -924,7 +960,7 @@ function finishGradingJob(job, status, values = {}) {
 async function executeGradingJob(job) {
   const startedAt = Date.now();
   const options = job.runOptions;
-  console.info(`[deepseek-homework] requestId=${job.requestId} start imageBytes=${job.imageBytes} localizationBytes=${job.localizationBytes}`);
+  console.info(`[deepseek-homework] requestId=${job.requestId} start imageBytes=${job.imageBytes} detailBytes=${job.detailBytes} localizationBytes=${job.localizationBytes}`);
   try {
     const result = await callDeepSeekHomeworkReview({
       ...options,
@@ -968,7 +1004,7 @@ function startQueuedGradingJobs() {
   }
 }
 
-function createGradingJob({ requestId, fingerprint, runOptions, imageBytes, localizationBytes }) {
+function createGradingJob({ requestId, fingerprint, runOptions, imageBytes, detailBytes, localizationBytes }) {
   let resolveCompletion;
   const completion = new Promise((resolve) => {
     resolveCompletion = resolve;
@@ -983,6 +1019,7 @@ function createGradingJob({ requestId, fingerprint, runOptions, imageBytes, loca
     createdAt: now,
     updatedAt: now,
     imageBytes,
+    detailBytes,
     localizationBytes,
     runOptions,
     controller: new AbortController(),
@@ -1001,6 +1038,7 @@ function createGradingJob({ requestId, fingerprint, runOptions, imageBytes, loca
 app.post('/api/grade-homework', async (req, res) => {
   const {
     imageData,
+    detailImages = [],
     localizationImageData = '',
     term = '二年级上学期',
     title = '',
@@ -1011,9 +1049,18 @@ app.post('/api/grade-homework', async (req, res) => {
     res.status(imageInspection.status).json({ code: imageInspection.code, error: imageInspection.error });
     return;
   }
+  const detailInspection = inspectGradingDetailImages(detailImages);
+  if (detailInspection.error) {
+    res.status(detailInspection.status).json({ code: detailInspection.code, error: detailInspection.error });
+    return;
+  }
   const localizationInspection = inspectGradingImage(localizationImageData, '错题定位图片', false);
   if (localizationInspection.error) {
     res.status(localizationInspection.status).json({ code: localizationInspection.code, error: localizationInspection.error });
+    return;
+  }
+  if (imageInspection.bytes + detailInspection.bytes + localizationInspection.bytes > 10 * 1024 * 1024) {
+    res.status(413).json({ code: 'IMAGE_TOO_LARGE', error: '作业图片处理后总计不能超过 10 MB' });
     return;
   }
   const aiConfig = readAiConfig();
@@ -1031,6 +1078,7 @@ app.post('/api/grade-homework', async (req, res) => {
   }
   const normalizedInput = {
     imageData,
+    detailImages: detailInspection.items,
     localizationImageData,
     term: String(term || '').slice(0, 100),
     title: String(title || '').slice(0, 160),
@@ -1052,6 +1100,7 @@ app.post('/api/grade-homework', async (req, res) => {
       requestId,
       fingerprint,
       imageBytes: imageInspection.bytes,
+      detailBytes: detailInspection.bytes,
       localizationBytes: localizationInspection.bytes,
       runOptions: {
         apiKey,

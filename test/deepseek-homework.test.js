@@ -738,7 +738,7 @@ test('keeps a localized question inside its detected column', () => {
     detectedTitle: '词语连线',
     questions: [
       { order: 1, printedNumber: '一(1)', questionText: '左侧连线题', studentAnswer: '甲—乙', gradingContext: '甲；乙；丙；丁', area: { left: 5, top: 18, width: 45, height: 12 } },
-      { order: 2, printedNumber: '一(2)', questionText: '右侧连线题', studentAnswer: '丙—丁', gradingContext: '甲；乙；丙；丁', area: { left: 50, top: 18, width: 45, height: 12 } },
+      { order: 2, printedNumber: '一(2)', questionText: '右侧连线题', studentAnswer: '丙—丁', gradingContext: '甲；乙；丙；丁', area: { left: 50, top: 24, width: 45, height: 12 } },
       { order: 3, printedNumber: '二.1', questionText: '下一道填空题', studentAnswer: '答案', gradingContext: '', area: { left: 5, top: 34, width: 70, height: 5 } },
     ],
   });

@@ -305,6 +305,15 @@ function verticalOverlapRatio(first, second) {
   return smallerHeight > 0 ? Math.max(0, bottom - top) / smallerHeight : 0;
 }
 
+function areasAppearSideBySide(first, second) {
+  const firstCenter = first.left + first.width / 2;
+  const secondCenter = second.left + second.width / 2;
+  const centerDistance = Math.abs(firstCenter - secondCenter);
+  const topDistance = Math.abs(first.top - second.top);
+  const rowTolerance = Math.max(5, Math.min(12, (first.height + second.height) / 2));
+  return centerDistance >= 20 && topDistance <= rowTolerance;
+}
+
 function mergeLocalizedArea(question, localizedArea, questions) {
   const original = normalizeArea(question.area);
   const localized = normalizeArea(localizedArea);
@@ -318,7 +327,8 @@ function mergeLocalizedArea(question, localizedArea, questions) {
   let rightLimit = 100;
 
   for (const candidate of questions) {
-    if (candidate === question || verticalOverlapRatio(original, candidate.area) < 0.5) continue;
+    if (candidate === question
+      || (verticalOverlapRatio(original, candidate.area) < 0.5 && !areasAppearSideBySide(original, candidate.area))) continue;
     const candidateCenter = candidate.area.left + candidate.area.width / 2;
     const boundary = (originalCenter + candidateCenter) / 2;
     if (candidateCenter < originalCenter) leftLimit = Math.max(leftLimit, boundary + 0.2);
@@ -346,6 +356,7 @@ export function constrainQuestionAreas(questions, referenceQuestions = questions
       candidateIndex > index
       && candidate.area.top > reference.area.top + 0.5
       && horizontalOverlapRatio(reference.area, candidate.area) >= 0.35
+      && !areasAppearSideBySide(reference.area, candidate.area)
     ));
     if (nextIndex < 0) return question;
 

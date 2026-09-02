@@ -220,6 +220,17 @@ function cleanCorrectAnswer(value) {
   return conclusion || answer;
 }
 
+function letteredOptions(value) {
+  const source = cleanMultilineText(value, 5000).replace(/\n/g, ' ');
+  const optionPattern = /(?:^|[\s：:；;，,。！？!?、])([A-D])\s*[.．、:：)]\s*/gi;
+  const matches = [...source.matchAll(optionPattern)];
+  if (matches.length < 2) return [];
+  return matches.map((match, index) => ({
+    letter: match[1].toUpperCase(),
+    text: cleanText(source.slice(match.index + match[0].length, matches[index + 1]?.index ?? source.length), 300),
+  })).filter((option) => option.text);
+}
+
 function choiceSelection(question) {
   const answerToken = cleanText(question.studentAnswer, 40).replace(/[\s()（）]/g, '');
   const selectedIndex = ['①', '②', '③', '④'].indexOf(answerToken) >= 0
@@ -229,27 +240,31 @@ function choiceSelection(question) {
       : -1;
   if (selectedIndex < 0) return null;
 
-  const source = cleanMultilineText(`${question.questionText || ''}\n${question.gradingContext || ''}`, 5000)
-    .replace(/\n/g, ' ');
-  const optionPattern = /(?:^|[\s：:；;])([A-D])\s*[.．、:：)]\s*/gi;
-  const matches = [...source.matchAll(optionPattern)];
-  if (matches.length < 2) return null;
-  const options = matches.map((match, index) => ({
-    letter: match[1].toUpperCase(),
-    text: cleanText(source.slice(match.index + match[0].length, matches[index + 1]?.index ?? source.length), 300),
-  }));
+  const options = [question.gradingContext, question.questionText]
+    .map(letteredOptions)
+    .find((items) => items.length >= 2) || [];
   const selected = options.find((option) => option.letter === String.fromCharCode(65 + selectedIndex));
-  return selected?.text ? selected : null;
+  return selected ? { selected, options, answerToken } : null;
 }
 
 function normalizeChoiceDecision(question) {
-  const selected = choiceSelection(question);
-  if (!selected) return question;
-  const correctLetter = cleanCorrectAnswer(question.correctAnswer).match(/^([A-D])(?:\b|[.．、:：\s])/i)?.[1]?.toUpperCase() || '';
+  const selection = choiceSelection(question);
+  if (!selection) return question;
+  const { selected, options, answerToken } = selection;
+  const rawCorrectAnswer = cleanCorrectAnswer(question.correctAnswer);
+  const correctLetter = rawCorrectAnswer.match(/^([A-D])(?:\b|[.．、:：\s])/i)?.[1]?.toUpperCase()
+    || rawCorrectAnswer.match(/选项\s*([A-D])/i)?.[1]?.toUpperCase()
+    || options.find((option) => comparableAnswer(rawCorrectAnswer).includes(comparableAnswer(option.text)))?.letter
+    || '';
   const answer = `${selected.letter}. ${selected.text}`;
+  const correctOption = options.find((option) => option.letter === correctLetter);
+  const correctAnswer = correctOption ? `${correctOption.letter}. ${correctOption.text}` : rawCorrectAnswer;
+  const questionText = cleanMultilineText(question.questionText, 2000)
+    .replace(new RegExp(`[（(]\\s*${answerToken}\\s*[）)]`), '（ ）');
+  const normalizedQuestion = { ...question, questionText, correctAnswer, displayAnswer: answer };
   if (question.verdict === 'wrong' && correctLetter === selected.letter) {
     return {
-      ...question,
+      ...normalizedQuestion,
       verdict: 'correct',
       correctAnswer: answer,
       shortComment: '',
@@ -260,15 +275,14 @@ function normalizeChoiceDecision(question) {
       explanation: '',
     };
   }
-  if (question.verdict !== 'wrong' || !correctLetter) return { ...question, displayAnswer: answer };
+  if (question.verdict !== 'wrong' || !correctLetter) return normalizedQuestion;
   const reasonUnderstandsSelection = new RegExp(`(?:选择了?|选了|作答为)\\s*${selected.letter}`, 'i').test(question.errorReason);
   return {
-    ...question,
-    displayAnswer: answer,
+    ...normalizedQuestion,
     shortComment: `应选 ${correctLetter}，不是 ${selected.letter}`,
     errorReason: reasonUnderstandsSelection
       ? question.errorReason
-      : `学生选择了 ${answer}，正确答案是 ${question.correctAnswer}。需要按题目条件比较完整选项。`,
+      : `学生选择了 ${answer}，正确答案是 ${correctAnswer}。需要按题目条件比较完整选项。`,
   };
 }
 

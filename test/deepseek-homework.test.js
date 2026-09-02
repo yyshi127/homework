@@ -170,7 +170,34 @@ test('keeps only the final answer after the model corrects itself', () => {
   assert.equal(result.mistakes[0].answer, 'A. ①④');
   assert.equal(result.mistakes[0].shortComment, '应选 D，不是 A');
   assert.equal(result.mistakes[0].errorReason, '学生选择了 A. ①④，正确答案是 D. ①③。需要按题目条件比较完整选项。');
+  assert.equal(result.mistakes[0].question.includes('（①）'), false);
   assert.equal(result.summary, '共批改 1 个作答点，发现 1 道错题。');
+});
+
+test('maps option letters when the model writes the answer content before 选项D', () => {
+  const result = normalizeDeepSeekResult(sampleResult({ questions: [
+    {
+      order: 1,
+      printedNumber: '2',
+      questionText: '10元钱正好可以买下面的（①）。选项：①橡皮9元2角，②本子2元5角，③羽毛球8角，④水壶5元。A.①④ B.②④ C.②③ D.①③',
+      studentAnswer: '①',
+      gradingContext: '人民币单位换算（1元=10角）及组合购物。',
+      verdict: 'wrong',
+      correctAnswer: '①③（或选项D）',
+      shortComment: '只选了一个物品。',
+      errorReason: '只关注了单个物品。',
+      knowledgePoint: '元角换算',
+      errorType: '审题错误',
+      solutionSteps: ['统一换算成角。', '逐项计算组合价格。'],
+      explanation: '①和③正好合计10元。',
+      area: { left: 5, top: 30, width: 80, height: 16 },
+    },
+  ] }));
+
+  assert.equal(result.mistakes[0].answer, 'A. ①④');
+  assert.equal(result.mistakes[0].correctAnswer, 'D. ①③');
+  assert.equal(result.mistakes[0].shortComment, '应选 D，不是 A');
+  assert.equal(result.mistakes[0].question.includes('（①）'), false);
 });
 
 test('removes a false choice error when the selected option matches the correct answer', () => {

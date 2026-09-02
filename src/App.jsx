@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  Archive,
   BookOpen,
   BadgePlus,
   CalendarDays,
@@ -14,6 +15,7 @@ import {
   Crown,
   Download,
   Dumbbell,
+  EyeOff,
   FileText,
   Flag,
   Gamepad2,
@@ -30,7 +32,10 @@ import {
   PiggyBank,
   PlusCircle,
   Printer,
+  RotateCcw,
+  Search,
   Settings,
+  SlidersHorizontal,
   Sparkles,
   Star,
   Target,
@@ -41,9 +46,23 @@ import {
   Wrench,
   Save,
   Trash2,
+  Undo2,
+  X,
 } from 'lucide-react';
 import './styles.css';
-import { calculateRewardWallet, createTaskTemplate, mergeCatalogItems } from './state-utils.js';
+import {
+  MISTAKE_ERROR_TYPES,
+  calculateRewardWallet,
+  createTaskTemplate,
+  filterMistakes,
+  filterIgnoredReviewAnnotations,
+  getMistakeKnowledgePointCounts,
+  mistakeCollectionKey,
+  mergeCatalogItems,
+  normalizeMistakeErrorType,
+  normalizeMistakeKnowledgePoint,
+  normalizeReviewMistakeDecision,
+} from './state-utils.js';
 import mascotImage from './assets/child-mascot.png';
 import growthSeedImage from './assets/growth-tree/seed.png';
 import growthSproutImage from './assets/growth-tree/sprout.png';
@@ -67,6 +86,7 @@ const API_STATE_URL = '/api/state';
 const API_STATE_EVENTS_URL = '/api/state/events';
 const API_GRADE_HOMEWORK_URL = '/api/grade-homework';
 const API_AI_CONFIG_URL = '/api/ai-config';
+const API_MISTAKE_IMAGES_URL = '/api/mistake-images';
 const STATUS_ORDER = ['empty', 'done', 'excellent', 'super'];
 const VALID_VIEWS = ['today', 'home', 'rewards', 'books', 'tools', 'settings'];
 const TEMPORARY_TASK_TITLE = '临时打卡任务';
@@ -130,10 +150,10 @@ const NAV_ITEMS = [
 
 const LEARNING_SUBJECTS = ['语文', '数学', '英语'];
 const LEARNING_TERMS = ['二年级上学期', '二年级下学期', '一年级下学期', '三年级上学期'];
+const MISTAKE_PAGE_SIZE = 30;
 
 const DEFAULT_GRADER_DRAFT = {
   term: '二年级上学期',
-  subject: '数学',
   title: '',
   note: '',
   imageData: '',
@@ -141,19 +161,13 @@ const DEFAULT_GRADER_DRAFT = {
 };
 
 const DEFAULT_AI_CONFIG_DRAFT = {
-  activeProvider: 'aliyun',
-  aliyun: {
+  activeProvider: 'deepseek',
+  deepseek: {
     apiKey: '',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    model: 'qwen3-vl-plus',
+    baseUrl: 'https://api.deepseek.com',
+    model: 'deepseek-v4-flash-vision-exp',
     configured: false,
-  },
-  baidu: {
-    apiKey: '',
-    secretKey: '',
-    configured: false,
-    pollIntervalMs: 6000,
-    timeoutMs: 60000,
+    keySource: 'none',
   },
 };
 
@@ -897,6 +911,71 @@ async function saveAiConfig(config) {
   return payload;
 }
 
+function loadBrowserImage(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('原题图片读取失败'));
+    image.src = source;
+  });
+}
+
+function cropQuestionImage(image, rawArea) {
+  const area = normalizePercentArea(rawArea);
+  if (!area) return '';
+  const left = Math.max(0, area.left - 5);
+  const top = Math.max(0, area.top - 4);
+  const right = Math.min(100, area.left + area.width + 20);
+  const bottom = Math.min(100, area.top + area.height + 0.6);
+  const sourceX = Math.round(image.naturalWidth * left / 100);
+  const sourceY = Math.round(image.naturalHeight * top / 100);
+  const sourceWidth = Math.max(1, Math.round(image.naturalWidth * (right - left) / 100));
+  const sourceHeight = Math.max(1, Math.round(image.naturalHeight * (bottom - top) / 100));
+  const scale = Math.min(1, 1200 / sourceWidth, 800 / sourceHeight);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(16, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(16, Math.round(sourceHeight * scale));
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.86);
+}
+
+async function uploadMistakeQuestionImage(imageData) {
+  const response = await fetch(API_MISTAKE_IMAGES_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageData }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.url) throw new Error(payload.error || '原题截图保存失败');
+  return payload.url;
+}
+
+async function attachQuestionImages(sourceImageData, mistakes) {
+  if (!sourceImageData || !mistakes.some((mistake) => !mistake.questionImageUrl && (mistake.cropArea || mistake.area))) return mistakes;
+  let image;
+  try {
+    image = await loadBrowserImage(sourceImageData);
+  } catch {
+    return mistakes;
+  }
+  return Promise.all(mistakes.map(async (mistake) => {
+    const cropArea = mistake.cropArea || mistake.area;
+    if (mistake.questionImageUrl || !cropArea) return mistake;
+    try {
+      const crop = cropQuestionImage(image, cropArea);
+      if (!crop) return mistake;
+      return { ...mistake, questionImageUrl: await uploadMistakeQuestionImage(crop) };
+    } catch {
+      return mistake;
+    }
+  }));
+}
+
 function sanitizeLoadedState(saved) {
   const next = structuredClone(saved);
   if (!next.months) {
@@ -965,7 +1044,14 @@ function normalizeLearningTools(value = {}) {
       score: Number(review.score || 0),
       provider: review.provider || '',
       detectedSubject: LEARNING_SUBJECTS.includes(review.detectedSubject) ? review.detectedSubject : '',
+      subjectConfidence: ['高', '中', '低'].includes(review.subjectConfidence) ? review.subjectConfidence : '',
       detectedTitle: review.detectedTitle || '',
+      recognizedQuestionCount: Number(review.recognizedQuestionCount || 0),
+      uncertainQuestionCount: Number(review.uncertainQuestionCount || 0),
+      annotationQuality: ['precise', 'approximate', 'none'].includes(review.annotationQuality)
+        ? review.annotationQuality
+        : normalizeReviewAnnotations(review.imageAnnotations).length ? 'approximate' : 'none',
+      localizationWarning: review.localizationWarning || '',
       summary: review.summary || '',
       suggestions: normalizeReviewSuggestions(review.suggestions),
       imageAnnotations: normalizeReviewAnnotations(review.imageAnnotations),
@@ -978,46 +1064,68 @@ function normalizeLearningTools(value = {}) {
 }
 
 function normalizeMistake(mistake = {}, fallbackSubject = '数学') {
+  const mastered = Boolean(mistake.mastered);
   return {
     id: mistake.id || createId('mistake'),
     reviewId: mistake.reviewId || '',
     term: mistake.term || '二年级上学期',
     subject: LEARNING_SUBJECTS.includes(mistake.subject) ? mistake.subject : fallbackSubject,
     isWrong: mistake.isWrong !== false,
-    question: mistake.question || '未命名错题',
+    order: Number(mistake.order || 0),
+    questionNumber: String(mistake.questionNumber || mistake.printedNumber || ''),
+    question: String(mistake.question || '未命名错题').trim(),
     answer: mistake.answer || '',
     correctAnswer: mistake.correctAnswer || '',
+    shortComment: mistake.shortComment || '',
+    errorReason: mistake.errorReason || mistake.shortComment || '',
+    knowledgePoint: normalizeMistakeKnowledgePoint(mistake.knowledgePoint),
+    errorType: normalizeMistakeErrorType(mistake.errorType),
+    reviewDecision: normalizeReviewMistakeDecision(mistake.reviewDecision),
+    solutionSteps: normalizeSolutionSteps(mistake.solutionSteps, mistake.explanation),
     explanation: mistake.explanation || '',
     questionImageUrl: mistake.questionImageUrl || '',
+    area: normalizePercentArea(mistake.area),
+    cropArea: normalizePercentArea(mistake.cropArea),
     sourceTitle: mistake.sourceTitle || 'AI作业批改',
     createdAt: mistake.createdAt || new Date().toISOString(),
-    mastered: Boolean(mistake.mastered),
+    mastered,
+    archivedAt: mastered ? (mistake.archivedAt || '') : '',
+  };
+}
+
+function normalizePercentArea(rawArea = {}) {
+  const area = Array.isArray(rawArea)
+    ? { left: rawArea[0], top: rawArea[1], width: rawArea[2], height: rawArea[3] }
+    : rawArea;
+  const leftValue = Number(area?.left);
+  const topValue = Number(area?.top);
+  const widthValue = Number(area?.width);
+  const heightValue = Number(area?.height);
+  if (![leftValue, topValue, widthValue, heightValue].every(Number.isFinite) || widthValue <= 0 || heightValue <= 0) return null;
+  const left = Math.max(0, Math.min(99, leftValue));
+  const top = Math.max(0, Math.min(99, topValue));
+  return {
+    left,
+    top,
+    width: Math.max(1, Math.min(100 - left, widthValue)),
+    height: Math.max(1, Math.min(100 - top, heightValue)),
   };
 }
 
 function normalizeReviewAnnotations(items = []) {
   return (Array.isArray(items) ? items : [])
     .map((item, index) => {
-      const rawArea = item?.area || {};
-      const area = Array.isArray(rawArea)
-        ? { left: rawArea[0], top: rawArea[1], width: rawArea[2], height: rawArea[3] }
-        : rawArea;
-      const left = Number(area.left);
-      const top = Number(area.top);
-      const width = Number(area.width);
-      const height = Number(area.height);
-      if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+      const area = normalizePercentArea(item?.area);
+      if (!area) return null;
       const status = item.status === 'wrong' ? 'wrong' : item.status === 'correct' ? 'correct' : 'pending';
       return {
         order: Number(item.order || index + 1),
+        questionNumber: String(item.questionNumber || item.printedNumber || item.order || index + 1),
         status,
         label: item.label || (status === 'correct' ? '✓' : status === 'wrong' ? '错' : String(item.order || index + 1)),
-        area: {
-          left: Math.max(0, Math.min(100, left)),
-          top: Math.max(0, Math.min(100, top)),
-          width: Math.max(1, Math.min(100, width)),
-          height: Math.max(1, Math.min(100, height)),
-        },
+        comment: String(item.comment || '').trim(),
+        correctAnswer: String(item.correctAnswer || '').trim(),
+        area,
       };
     })
     .filter(Boolean)
@@ -1041,6 +1149,7 @@ function buildFallbackAnnotations(mistakes = []) {
     const top = 16 + (index * Math.min(64 / count, 13));
     return {
       order,
+      questionNumber: String(mistake.questionNumber || order),
       status: 'wrong',
       label: '错',
       area: {
@@ -1060,10 +1169,20 @@ function normalizeReviewSuggestions(value) {
   return [];
 }
 
+function normalizeSolutionSteps(value, fallback = '') {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items
+    .map((item) => String(item || '').trim().replace(/^(?:步骤\s*)?(?:\d{1,2}\.\s+|\d{1,2}\s*[、:：）)]\s*|[（(]\d{1,2}[）)]\s*)/, '').trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  if (normalized.length) return normalized;
+  const fallbackText = String(fallback || '').trim();
+  return fallbackText ? [fallbackText] : [];
+}
+
 function questionNumberKey(text = '') {
   const value = String(text || '').trim();
-  const match = value.match(/(?:第\s*)?([0-9０-９一二三四五六七八九十]+)\s*(?:题|[.．、])/);
-  return match ? `no-${match[1]}` : value.replace(/\s+/g, '').slice(0, 36);
+  return value.toLowerCase().replace(/\s+/g, '').slice(0, 180);
 }
 
 function normalizeReviewMistakes(items = []) {
@@ -1084,19 +1203,98 @@ function normalizeReviewMistakes(items = []) {
 }
 
 function aiConfigStatusText(config = {}) {
-  if (config.activeProvider === 'baidu') {
-    return config.baidu?.configured ? '当前启用：百度智能作业批改' : '当前选择百度，但百度未配置，无法批改';
-  }
-  return config.aliyun?.configured ? '当前启用：阿里 qwen3-vl-plus' : '当前选择阿里，但未配置 Key，会使用演示批改';
+  if (!config.deepseek?.configured) return 'DeepSeek 未配置，暂时无法进行 AI 批改';
+  const sourceLabel = config.deepseek.keySource === 'file'
+    ? '本机密钥文件'
+    : config.deepseek.keySource === 'environment'
+      ? '服务器环境变量'
+      : '已保存密钥';
+  return `当前启用：DeepSeek Vision（${sourceLabel}）`;
 }
 
 function aiConfigDraftFromPublic(config = {}) {
   return {
     ...DEFAULT_AI_CONFIG_DRAFT,
     ...config,
-    aliyun: { ...DEFAULT_AI_CONFIG_DRAFT.aliyun, ...(config.aliyun || {}), apiKey: '' },
-    baidu: { ...DEFAULT_AI_CONFIG_DRAFT.baidu, ...(config.baidu || {}), apiKey: '', secretKey: '' },
+    activeProvider: 'deepseek',
+    deepseek: { ...DEFAULT_AI_CONFIG_DRAFT.deepseek, ...(config.deepseek || {}), apiKey: '' },
   };
+}
+
+function homeworkGradingStatusText(stage = '', seconds = 0) {
+  const stageText = {
+    queued: '正在等待批改',
+    vision: '正在识别题目',
+    verification: '正在核对学生答案',
+    grading: '正在逐题生成解析',
+    localization: '正在精确定位错题',
+    cancelling: '正在取消批改',
+  }[stage];
+  if (stageText) return stageText;
+  if (seconds < 15) return '正在识别题目';
+  if (seconds < 40) return '正在核对学生答案';
+  return '正在逐题生成解析';
+}
+
+function waitForRequest(milliseconds, signal) {
+  return new Promise((resolve, reject) => {
+    const finish = () => {
+      signal?.removeEventListener('abort', cancel);
+      resolve();
+    };
+    const timer = window.setTimeout(finish, milliseconds);
+    const cancel = () => {
+      window.clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
+      const error = new Error('批改已取消');
+      error.name = 'AbortError';
+      reject(error);
+    };
+    if (signal?.aborted) cancel();
+    else signal?.addEventListener('abort', cancel, { once: true });
+  });
+}
+
+async function readJsonResponse(response) {
+  const responseText = await response.text();
+  if (!responseText) throw new Error('批改服务连接中断，请重新点击生成批改结果');
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    throw new Error('AI 返回格式异常，请重新批改');
+  }
+}
+
+async function fetchWithRequestTimeout(url, options = {}, timeoutMs = 20000) {
+  const timeoutController = new AbortController();
+  const callerSignal = options.signal;
+  let timedOut = false;
+  const abortFromCaller = () => timeoutController.abort();
+  if (callerSignal?.aborted) timeoutController.abort();
+  else callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    timeoutController.abort();
+  }, timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: timeoutController.signal });
+  } catch (error) {
+    if (timedOut && !callerSignal?.aborted) {
+      const timeoutError = new Error('网络请求超时');
+      timeoutError.name = 'TimeoutError';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+    callerSignal?.removeEventListener('abort', abortFromCaller);
+  }
+}
+
+function formatMistakeDate(value = '') {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '时间未记录';
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function normalizeMonth(month) {
@@ -1479,17 +1677,36 @@ function App() {
   const [graderDraft, setGraderDraft] = useState(DEFAULT_GRADER_DRAFT);
   const [latestReview, setLatestReview] = useState(null);
   const [showPreviousReview, setShowPreviousReview] = useState(true);
+  const [reviewMistakeActionId, setReviewMistakeActionId] = useState('');
+  const reviewMistakeActionRef = useRef('');
   const [isGradingHomework, setIsGradingHomework] = useState(false);
   const [gradingElapsedSeconds, setGradingElapsedSeconds] = useState(0);
+  const [gradingStage, setGradingStage] = useState('');
   const [isPreparingHomeworkImage, setIsPreparingHomeworkImage] = useState(false);
   const [gradingError, setGradingError] = useState('');
   const homeworkImageRef = useRef(DEFAULT_GRADER_DRAFT.imageData);
+  const homeworkLocalizationImageRef = useRef('');
+  const gradingRequestRef = useRef(null);
+  const gradingRequestIdRef = useRef('');
   const [aiConfigDraft, setAiConfigDraft] = useState(DEFAULT_AI_CONFIG_DRAFT);
   const [aiConfigDialogOpen, setAiConfigDialogOpen] = useState(false);
-  const [selectedAiProvider, setSelectedAiProvider] = useState(DEFAULT_AI_CONFIG_DRAFT.activeProvider);
   const [aiConfigStatus, setAiConfigStatus] = useState('未读取 AI 配置');
+  const [mistakePage, setMistakePage] = useState('active');
   const [mistakeTermFilter, setMistakeTermFilter] = useState('二年级上学期');
   const [mistakeSubjectFilter, setMistakeSubjectFilter] = useState('全部');
+  const [mistakeKnowledgeFilter, setMistakeKnowledgeFilter] = useState('全部知识点');
+  const [mistakeErrorFilter, setMistakeErrorFilter] = useState('全部错误类型');
+  const [mistakeSourceFilter, setMistakeSourceFilter] = useState('全部来源');
+  const [mistakeSearch, setMistakeSearch] = useState('');
+  const [mistakeSort, setMistakeSort] = useState('newest');
+  const [selectedMistakeId, setSelectedMistakeId] = useState('');
+  const [mistakeVisibleLimit, setMistakeVisibleLimit] = useState(MISTAKE_PAGE_SIZE);
+  const [mistakeFiltersOpen, setMistakeFiltersOpen] = useState(false);
+  const [mistakeDetailOpen, setMistakeDetailOpen] = useState(false);
+  const [mistakeMetadataDraft, setMistakeMetadataDraft] = useState(null);
+  const [archiveUndo, setArchiveUndo] = useState(null);
+  const archiveUndoTimerRef = useRef(null);
+  const mistakeArchiveOperationRef = useRef(new Map());
   const [expandedTodayStageTasks, setExpandedTodayStageTasks] = useState({});
   const [expandedTodayNotes, setExpandedTodayNotes] = useState({});
   const [collapsedTodaySubjects, setCollapsedTodaySubjects] = useState({});
@@ -1760,6 +1977,7 @@ function App() {
 
   useEffect(() => () => {
     if (saveToastTimerRef.current) window.clearTimeout(saveToastTimerRef.current);
+    if (archiveUndoTimerRef.current) window.clearTimeout(archiveUndoTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -1786,7 +2004,6 @@ function App() {
     fetchAiConfig()
       .then((payload) => {
         setAiConfigDraft(aiConfigDraftFromPublic(payload.config || {}));
-        setSelectedAiProvider(payload.config?.activeProvider === 'baidu' ? 'baidu' : 'aliyun');
         setAiConfigStatus(aiConfigStatusText(payload.config || {}));
       })
       .catch(() => {
@@ -2744,7 +2961,7 @@ function App() {
     const image = new Image();
     image.onload = () => {
       try {
-        const maxSize = 1500;
+        const maxSize = 2048;
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(16, Math.round(image.width * scale));
@@ -2753,8 +2970,42 @@ function App() {
         context.fillStyle = '#fff';
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const localizationCanvas = document.createElement('canvas');
+        localizationCanvas.width = canvas.width;
+        localizationCanvas.height = canvas.height;
+        const localizationContext = localizationCanvas.getContext('2d');
+        localizationContext.drawImage(canvas, 0, 0);
+        localizationContext.save();
+        localizationContext.strokeStyle = 'rgba(16, 105, 178, 0.72)';
+        localizationContext.fillStyle = '#075b9a';
+        localizationContext.lineWidth = Math.max(1, Math.round(Math.min(canvas.width, canvas.height) / 1000));
+        const gridFontSize = Math.max(14, Math.min(24, Math.round(canvas.width * 0.014)));
+        localizationContext.font = `600 ${gridFontSize}px Arial, sans-serif`;
+        localizationContext.textBaseline = 'middle';
+        for (let index = 1; index < 10; index += 1) {
+          const x = Math.round(canvas.width * index / 10);
+          const y = Math.round(canvas.height * index / 10);
+          localizationContext.beginPath();
+          localizationContext.moveTo(x, 0);
+          localizationContext.lineTo(x, canvas.height);
+          localizationContext.stroke();
+          localizationContext.beginPath();
+          localizationContext.moveTo(0, y);
+          localizationContext.lineTo(canvas.width, y);
+          localizationContext.stroke();
+          const label = `Y=${index * 100}`;
+          const labelWidth = Math.ceil(localizationContext.measureText(label).width) + 10;
+          localizationContext.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          localizationContext.fillRect(2, y - gridFontSize / 2 - 3, labelWidth, gridFontSize + 6);
+          localizationContext.fillStyle = '#075b9a';
+          localizationContext.fillText(label, 7, y);
+        }
+        localizationContext.restore();
         URL.revokeObjectURL(objectUrl);
-        resolve(canvas.toDataURL('image/jpeg', 0.76));
+        resolve({
+          imageData: canvas.toDataURL('image/jpeg', 0.88),
+          localizationImageData: localizationCanvas.toDataURL('image/jpeg', 0.86),
+        });
       } catch (error) {
         URL.revokeObjectURL(objectUrl);
         reject(error);
@@ -2846,21 +3097,36 @@ function App() {
     await persistState(next, '小朋友信息已保存到 SQLite');
   };
 
+  const cancelHomeworkGrading = () => {
+    const requestId = gradingRequestIdRef.current;
+    if (requestId) {
+      void fetch(`${API_GRADE_HOMEWORK_URL}/${encodeURIComponent(requestId)}`, {
+        method: 'DELETE',
+        keepalive: true,
+      }).catch(() => {});
+    }
+    gradingRequestRef.current?.abort();
+  };
+
   const handleHomeworkImageChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (isGradingHomework) cancelHomeworkGrading();
     homeworkImageRef.current = '';
+    homeworkLocalizationImageRef.current = '';
     setLatestReview(null);
     setShowPreviousReview(false);
     setGradingError('');
     setIsPreparingHomeworkImage(true);
     setGraderDraft((current) => ({ ...current, imageData: '', imageName: file.name }));
     try {
-      const imageData = await readHomeworkImage(file);
+      const { imageData, localizationImageData } = await readHomeworkImage(file);
       homeworkImageRef.current = imageData;
+      homeworkLocalizationImageRef.current = localizationImageData;
       setGraderDraft((current) => ({ ...current, imageData, imageName: file.name }));
     } catch (error) {
       homeworkImageRef.current = '';
+      homeworkLocalizationImageRef.current = '';
       setGraderDraft((current) => ({ ...current, imageData: '', imageName: '' }));
       setGradingError(error?.message || '图片上传失败，请重新拍照');
     } finally {
@@ -2871,6 +3137,7 @@ function App() {
 
   const generateHomeworkReview = async () => {
     const currentImageData = homeworkImageRef.current || graderDraft.imageData;
+    const currentLocalizationImageData = homeworkLocalizationImageRef.current;
     if (isPreparingHomeworkImage) {
       showAppAlert('图片还在处理中，请等预览出现后再批改', { tone: 'warning' });
       return;
@@ -2880,43 +3147,142 @@ function App() {
       return;
     }
     if (isGradingHomework) return;
-    const subject = graderDraft.subject || '数学';
     const term = graderDraft.term || '二年级上学期';
+    const controller = new AbortController();
+    const requestId = createId('grading');
+    const requestBody = JSON.stringify({
+      requestId,
+      term,
+      title: graderDraft.title.trim(),
+      note: graderDraft.note.trim(),
+      imageData: currentImageData,
+      localizationImageData: currentLocalizationImageData,
+    });
+    gradingRequestRef.current = controller;
+    gradingRequestIdRef.current = requestId;
     setIsGradingHomework(true);
+    setGradingStage('queued');
     setGradingError('');
     try {
-      const response = await fetch(API_GRADE_HOMEWORK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          term,
-          subject,
-          title: graderDraft.title.trim(),
-          note: graderDraft.note.trim(),
-          imageData: currentImageData,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || 'AI批改失败，请稍后再试');
+      const responseError = (response, payload) => {
+        const stageLabel = {
+          vision: '题目识别',
+          verification: '答案复核',
+          grading: '逐题判分',
+          localization: '错题定位',
+        }[payload?.stage];
+        const message = payload?.error || 'AI批改失败，请稍后再试';
+        const error = new Error(stageLabel ? `${stageLabel}阶段失败：${message}` : message);
+        error.httpStatus = response.status;
+        error.code = payload?.code || '';
+        return error;
+      };
+      const startJob = async () => {
+        let lastError;
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+          try {
+            const response = await fetchWithRequestTimeout(API_GRADE_HOMEWORK_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: controller.signal,
+              body: requestBody,
+            }, 30000);
+            const payload = await readJsonResponse(response);
+            if (!response.ok) throw responseError(response, payload);
+            return payload;
+          } catch (error) {
+            if (error?.name === 'AbortError' || error?.httpStatus || attempt === 2) throw error;
+            lastError = error;
+            await waitForRequest(900, controller.signal);
+          }
+        }
+        throw lastError || new Error('批改任务提交失败，请检查网络后重试');
+      };
 
-      const detectedSubject = LEARNING_SUBJECTS.includes(payload.detectedSubject) ? payload.detectedSubject : subject;
+      let jobPayload = await startJob();
+      let payload = jobPayload?.detectedSubject ? jobPayload : null;
+      let consecutivePollFailures = 0;
+      let restartedAfterMissing = false;
+      const pollingDeadline = Date.now() + 210000;
+      while (!payload) {
+        if (jobPayload?.status === 'completed') {
+          payload = jobPayload.result;
+          break;
+        }
+        if (jobPayload?.status === 'failed' || jobPayload?.status === 'cancelled') {
+          const error = new Error(jobPayload.error || (jobPayload.status === 'cancelled' ? '批改已取消' : 'AI批改失败，请稍后再试'));
+          error.name = jobPayload.status === 'cancelled' ? 'AbortError' : 'Error';
+          throw error;
+        }
+        setGradingStage(jobPayload?.stage || 'queued');
+        if (Date.now() >= pollingDeadline) {
+          void fetch(`${API_GRADE_HOMEWORK_URL}/${encodeURIComponent(requestId)}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+          throw new Error('AI 批改等待超过 210 秒，任务已停止，请裁切到单页后重试');
+        }
+        await waitForRequest(1400, controller.signal);
+        try {
+          const response = await fetchWithRequestTimeout(`${API_GRADE_HOMEWORK_URL}/${encodeURIComponent(requestId)}`, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+            signal: controller.signal,
+          }, 12000);
+          const nextPayload = await readJsonResponse(response);
+          if (response.status === 404 && !restartedAfterMissing) {
+            restartedAfterMissing = true;
+            jobPayload = await startJob();
+            continue;
+          }
+          if (!response.ok) throw responseError(response, nextPayload);
+          jobPayload = nextPayload;
+          consecutivePollFailures = 0;
+        } catch (error) {
+          if (error?.name === 'AbortError' || error?.httpStatus) throw error;
+          consecutivePollFailures += 1;
+          if (consecutivePollFailures >= 12) {
+            throw new Error('与批改服务的连接多次中断，请检查网络后重试');
+          }
+        }
+      }
+      if (!payload) throw new Error('批改任务已完成，但没有返回可用结果');
+
+      if (!LEARNING_SUBJECTS.includes(payload.detectedSubject)) {
+        throw new Error('AI 无法可靠识别学科，请拍正整页并确保文字和作答清晰');
+      }
+      const detectedSubject = payload.detectedSubject;
       const detectedTitle = String(payload.detectedTitle || '').trim();
       const reviewTitle = detectedTitle || graderDraft.title.trim() || `${term}${detectedSubject}作业批改`;
-      const selectedMistakes = normalizeReviewMistakes(payload.mistakes).map((item) => ({
+      let selectedMistakes = normalizeReviewMistakes(payload.mistakes).map((item) => ({
         id: createId('mistake'),
         term,
         subject: detectedSubject,
         isWrong: item.isWrong !== false,
         order: Number(item.order || 0),
+        questionNumber: String(item.questionNumber || item.printedNumber || ''),
         question: item.question || '未命名错题',
         answer: item.answer || '',
         correctAnswer: item.correctAnswer || '',
+        shortComment: item.shortComment || '',
+        errorReason: item.errorReason || item.shortComment || '',
+        knowledgePoint: normalizeMistakeKnowledgePoint(item.knowledgePoint),
+        errorType: normalizeMistakeErrorType(item.errorType),
+        reviewDecision: 'pending',
+        solutionSteps: normalizeSolutionSteps(item.solutionSteps, item.explanation),
         explanation: item.explanation || '',
         questionImageUrl: item.questionImageUrl || '',
+        area: normalizePercentArea(item.area),
+        cropArea: normalizePercentArea(item.cropArea),
         sourceTitle: reviewTitle,
         createdAt: new Date().toISOString(),
         mastered: false,
+        archivedAt: '',
       }));
+      const [mistakesWithImages, persistedReviewImageUrl] = await Promise.all([
+        attachQuestionImages(currentImageData, selectedMistakes),
+        payload.annotatedImageUrl
+          ? Promise.resolve(payload.annotatedImageUrl)
+          : uploadMistakeQuestionImage(currentImageData),
+      ]);
+      selectedMistakes = mistakesWithImages;
       const nextReview = {
         id: createId('review'),
         term,
@@ -2925,14 +3291,19 @@ function App() {
         note: graderDraft.note.trim(),
         imageData: '',
         imageName: graderDraft.imageName,
-        provider: payload.provider || 'openai',
+        provider: payload.provider || 'deepseek',
         detectedSubject,
+        subjectConfidence: ['高', '中', '低'].includes(payload.subjectConfidence) ? payload.subjectConfidence : '',
         detectedTitle,
+        recognizedQuestionCount: Number(payload.recognizedQuestionCount || 0),
+        uncertainQuestionCount: Number(payload.uncertainQuestionCount || 0),
+        annotationQuality: ['precise', 'approximate', 'none'].includes(payload.annotationQuality) ? payload.annotationQuality : 'approximate',
+        localizationWarning: payload.localizationWarning || '',
         score: Number(payload.score ?? Math.max(72, 96 - selectedMistakes.length * 8)),
-        summary: payload.summary || `已完成${term}${subject}作业批改，发现 ${selectedMistakes.length} 个需要订正的地方。`,
+        summary: payload.summary || `已完成${term}${detectedSubject}作业批改，发现 ${selectedMistakes.length} 个需要订正的地方。`,
         suggestions: normalizeReviewSuggestions(payload.suggestions).length ? normalizeReviewSuggestions(payload.suggestions) : ['订正后建议隔天再练一次同类题，确认真正掌握。'],
         imageAnnotations: normalizeReviewAnnotations(payload.imageAnnotations),
-        annotatedImageUrl: payload.annotatedImageUrl || '',
+        annotatedImageUrl: persistedReviewImageUrl,
         mistakes: selectedMistakes,
         createdAt: new Date().toISOString(),
       };
@@ -2943,38 +3314,109 @@ function App() {
       setLatestReview(nextReview);
       setShowPreviousReview(true);
       setState(next);
-      await persistState(next, payload.provider === 'demo' ? '演示批改结果已保存到 SQLite' : 'AI批改结果已保存到 SQLite');
+      await persistState(next, 'AI批改结果已保存到 SQLite');
     } catch (error) {
-      setGradingError(error?.message || 'AI批改失败，请稍后再试');
+      if (error?.name === 'AbortError' && gradingRequestIdRef.current === requestId) {
+        void fetch(`${API_GRADE_HOMEWORK_URL}/${encodeURIComponent(requestId)}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+      }
+      setGradingError(error?.name === 'AbortError' ? '批改已取消，可以重新点击生成批改结果' : (error?.message || 'AI批改失败，请稍后再试'));
     } finally {
+      if (gradingRequestRef.current === controller) gradingRequestRef.current = null;
+      if (gradingRequestIdRef.current === requestId) gradingRequestIdRef.current = '';
+      setGradingStage('');
       setIsGradingHomework(false);
     }
   };
 
-  const addReviewMistakesToCollection = async (review = latestReview) => {
-    if (!review?.mistakes?.length) return;
-    const next = structuredClone(stateRef.current || state || {});
-    next.learningTools = normalizeLearningTools(next.learningTools);
-    const existingKeys = new Set(next.learningTools.mistakes.map((item) => `${item.reviewId || ''}-${item.question}-${item.correctAnswer}`));
-    const nextMistakes = normalizeReviewMistakes(review.mistakes)
-      .map((mistake) => normalizeMistake({ ...mistake, term: review.term, reviewId: review.id, sourceTitle: review.title }, review.subject))
-      .filter((mistake) => !existingKeys.has(`${mistake.reviewId || ''}-${mistake.question}-${mistake.correctAnswer}`));
-    if (!nextMistakes.length) {
-      showAppAlert('这次批改没有可收录的错题', { tone: 'warning' });
-      return;
+  const setReviewMistakeDecision = async (review, mistake, decision) => {
+    const normalizedDecision = normalizeReviewMistakeDecision(decision);
+    if (!review?.id || !mistake?.id || reviewMistakeActionRef.current) return;
+    const actionId = `${review.id}-${mistake.id}`;
+    reviewMistakeActionRef.current = actionId;
+    setReviewMistakeActionId(actionId);
+
+    let previousDecision = 'pending';
+    let addedMistakeId = '';
+    try {
+      const sourceImageData = review.id === latestReview?.id ? homeworkImageRef.current || graderDraft.imageData : '';
+      const [preparedMistake] = normalizedDecision === 'collected'
+        ? await attachQuestionImages(sourceImageData, [mistake])
+        : [mistake];
+      const next = structuredClone(stateRef.current || state || {});
+      next.learningTools = normalizeLearningTools(next.learningTools);
+      const targetReview = next.learningTools.reviews.find((item) => item.id === review.id);
+      const targetKey = mistakeCollectionKey(mistake, review.id);
+      const targetMistake = targetReview?.mistakes.find((item) => item.id === mistake.id)
+        || targetReview?.mistakes.find((item) => mistakeCollectionKey(item, review.id) === targetKey);
+      if (!targetReview || !targetMistake) throw new Error('没有找到这道批改题，请刷新后重试');
+
+      previousDecision = normalizeReviewMistakeDecision(targetMistake.reviewDecision);
+      targetMistake.reviewDecision = normalizedDecision;
+      if (!targetMistake.questionImageUrl && preparedMistake?.questionImageUrl) {
+        targetMistake.questionImageUrl = preparedMistake.questionImageUrl;
+      }
+
+      if (normalizedDecision === 'collected') {
+        const collectionKey = mistakeCollectionKey(targetMistake, review.id);
+        const alreadyCollected = next.learningTools.mistakes.some((item) => mistakeCollectionKey(item) === collectionKey);
+        if (!alreadyCollected) {
+          const collectedMistake = normalizeMistake({
+            ...targetMistake,
+            ...preparedMistake,
+            id: createId('mistake'),
+            term: review.term,
+            reviewId: review.id,
+            sourceTitle: review.title,
+            reviewDecision: 'pending',
+            mastered: false,
+            archivedAt: '',
+          }, review.subject);
+          addedMistakeId = collectedMistake.id;
+          next.learningTools.mistakes.unshift(collectedMistake);
+        }
+      }
+
+      stateRef.current = next;
+      setState(next);
+      if (latestReview?.id === review.id) setLatestReview(targetReview);
+      const successMessage = normalizedDecision === 'collected'
+        ? '这道错题已收录到 SQLite'
+        : normalizedDecision === 'ignored'
+          ? '这道题已忽略'
+          : '这道题已恢复为待处理';
+      const saved = await persistState(next, successMessage);
+      if (saved) return;
+
+      const rollback = structuredClone(stateRef.current || next);
+      rollback.learningTools = normalizeLearningTools(rollback.learningTools);
+      const rollbackReview = rollback.learningTools.reviews.find((item) => item.id === review.id);
+      const rollbackMistake = rollbackReview?.mistakes.find((item) => item.id === mistake.id)
+        || rollbackReview?.mistakes.find((item) => mistakeCollectionKey(item, review.id) === targetKey);
+      if (rollbackMistake && normalizeReviewMistakeDecision(rollbackMistake.reviewDecision) === normalizedDecision) {
+        rollbackMistake.reviewDecision = previousDecision;
+      }
+      if (addedMistakeId) {
+        rollback.learningTools.mistakes = rollback.learningTools.mistakes.filter((item) => item.id !== addedMistakeId);
+      }
+      stateRef.current = rollback;
+      setState(rollback);
+      if (latestReview?.id === review.id && rollbackReview) setLatestReview(rollbackReview);
+    } catch (error) {
+      showSaveToast(error?.message || '错题处理失败，请重试', 'error');
+    } finally {
+      if (reviewMistakeActionRef.current === actionId) reviewMistakeActionRef.current = '';
+      setReviewMistakeActionId((current) => (current === actionId ? '' : current));
     }
-    next.learningTools.mistakes = [...nextMistakes, ...next.learningTools.mistakes];
-    setState(next);
-    setLearningTab('mistakes');
-    await persistState(next, '错题已收录到 SQLite');
   };
 
   const downloadAnnotatedHomeworkImage = async (review = latestReview) => {
-    const annotations = normalizeReviewAnnotations(review?.imageAnnotations);
-    const fallbackAnnotations = annotations.length ? annotations : buildFallbackAnnotations(review?.mistakes);
+    const reviewMistakes = normalizeReviewMistakes(review?.mistakes);
+    const includedMistakes = reviewMistakes.filter((mistake) => normalizeReviewMistakeDecision(mistake.reviewDecision) !== 'ignored');
+    const annotations = filterIgnoredReviewAnnotations(normalizeReviewAnnotations(review?.imageAnnotations), reviewMistakes);
+    const fallbackAnnotations = annotations.length ? annotations : includedMistakes.length ? buildFallbackAnnotations(includedMistakes) : [];
     const imageUrl = review?.annotatedImageUrl || (review?.id === latestReview?.id ? homeworkImageRef.current || graderDraft.imageData : '');
     if (!imageUrl || !fallbackAnnotations.length) {
-      showAppAlert('当前批改结果还没有可生成图片的作业原图', { tone: 'warning' });
+      showAppAlert(includedMistakes.length ? '当前批改结果还没有可生成图片的作业原图' : '已忽略全部 AI 错题标记', { tone: 'warning' });
       return;
     }
     const image = new Image();
@@ -2991,6 +3433,25 @@ function App() {
       canvas.height = image.naturalHeight || image.height;
       const context = canvas.getContext('2d');
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const wrapCanvasText = (text, maxWidth, maxLines) => {
+        const lines = [];
+        let current = '';
+        for (const character of String(text || '')) {
+          const next = current + character;
+          if (current && context.measureText(next).width > maxWidth) {
+            lines.push(current);
+            current = character;
+            if (lines.length === maxLines) break;
+          } else {
+            current = next;
+          }
+        }
+        if (lines.length < maxLines && current) lines.push(current);
+        if (lines.length === maxLines && String(text || '').length > lines.join('').length) {
+          lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, -1)}…`;
+        }
+        return lines;
+      };
       fallbackAnnotations.forEach((annotation) => {
         const x = annotation.area.left / 100 * canvas.width;
         const y = annotation.area.top / 100 * canvas.height;
@@ -2998,38 +3459,55 @@ function App() {
         const h = annotation.area.height / 100 * canvas.height;
         const wrong = annotation.status === 'wrong';
         const color = wrong ? '#ef4444' : annotation.status === 'correct' ? '#22c55e' : '#f59e0b';
-        const radius = Math.max(22, canvas.width * 0.026);
-        const markerX = Math.min(canvas.width - radius * 1.25, Math.max(radius * 1.25, x + w - radius * 0.2));
-        const markerY = Math.min(canvas.height - radius * 1.25, Math.max(radius * 1.25, y + h * 0.5));
-        const numberX = Math.min(canvas.width - radius, Math.max(radius, x + radius * 0.2));
-        const numberY = Math.min(canvas.height - radius, Math.max(radius, y + radius * 0.2));
+        const lineWidth = Math.max(4, canvas.width * 0.0035);
+        const radius = Math.max(20, canvas.width * 0.021);
+        const badgeX = Math.min(canvas.width - radius, Math.max(radius, x + radius * 0.25));
+        const badgeY = Math.min(canvas.height - radius, Math.max(radius, y + radius * 0.25));
         context.save();
         if (wrong) {
           context.strokeStyle = color;
-          context.lineWidth = Math.max(3, canvas.width * 0.0028);
-          context.globalAlpha = 0.72;
-          context.beginPath();
-          context.moveTo(x + radius * 0.7, markerY);
-          context.lineTo(markerX - radius * 1.15, markerY);
-          context.stroke();
+          context.lineWidth = lineWidth;
+          context.globalAlpha = 0.92;
+          context.strokeRect(x, y, w, h);
         }
-        context.globalAlpha = 0.98;
+        context.globalAlpha = 1;
         context.fillStyle = color;
         context.beginPath();
-        context.arc(markerX, markerY, radius, 0, Math.PI * 2);
+        context.arc(badgeX, badgeY, radius, 0, Math.PI * 2);
         context.fill();
         context.fillStyle = '#fff';
-        context.font = `900 ${Math.round(radius * 1.2)}px Arial`;
+        context.font = `900 ${Math.round(radius * 0.92)}px Arial`;
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.fillText(annotation.label || (wrong ? '错' : '✓'), markerX, markerY);
-        context.fillStyle = color;
-        context.beginPath();
-        context.arc(numberX, numberY, radius * 0.68, 0, Math.PI * 2);
-        context.fill();
-        context.fillStyle = '#fff';
-        context.font = `900 ${Math.round(radius * 0.72)}px Arial`;
-        context.fillText(String(annotation.order), numberX, numberY);
+        context.fillText(String(annotation.questionNumber || annotation.order || annotation.label || '错'), badgeX, badgeY);
+
+        const comment = [annotation.comment, annotation.correctAnswer ? `正确：${annotation.correctAnswer}` : '']
+          .filter(Boolean)
+          .join('  ');
+        if (comment) {
+          const fontSize = Math.max(18, Math.round(canvas.width * 0.017));
+          const padding = Math.max(12, Math.round(fontSize * 0.72));
+          const lineHeight = Math.round(fontSize * 1.42);
+          const boxWidth = Math.min(canvas.width * 0.52, Math.max(canvas.width * 0.28, fontSize * 18));
+          context.font = `700 ${fontSize}px "Microsoft YaHei", Arial`;
+          const lines = wrapCanvasText(comment, boxWidth - padding * 2, 3);
+          const boxHeight = padding * 2 + lineHeight * lines.length;
+          let boxX = x + w + padding;
+          if (boxX + boxWidth > canvas.width - padding) boxX = x - boxWidth - padding;
+          boxX = Math.max(padding, Math.min(canvas.width - boxWidth - padding, boxX));
+          const boxY = Math.max(padding, Math.min(canvas.height - boxHeight - padding, y));
+          context.fillStyle = 'rgba(255, 250, 248, 0.96)';
+          context.fillRect(boxX, boxY, boxWidth, boxHeight);
+          context.strokeStyle = color;
+          context.lineWidth = Math.max(2, lineWidth * 0.62);
+          context.strokeRect(boxX, boxY, boxWidth, boxHeight);
+          context.fillStyle = color;
+          context.textAlign = 'left';
+          context.textBaseline = 'top';
+          lines.forEach((line, lineIndex) => {
+            context.fillText(line, boxX + padding, boxY + padding + lineIndex * lineHeight);
+          });
+        }
         context.restore();
       });
       const link = document.createElement('a');
@@ -3041,36 +3519,147 @@ function App() {
     }
   };
 
-  const toggleMistakeMastered = async (mistakeId) => {
+  const setMistakeArchived = async (mistakeId, mastered, { offerUndo = false } = {}) => {
+    const pendingOperation = mistakeArchiveOperationRef.current.get(mistakeId);
+    if (pendingOperation) await pendingOperation;
+
     const next = structuredClone(stateRef.current || state || {});
     next.learningTools = normalizeLearningTools(next.learningTools);
     const mistake = next.learningTools.mistakes.find((item) => item.id === mistakeId);
-    if (!mistake) return;
-    mistake.mastered = !mistake.mastered;
+    if (!mistake || mistake.mastered === mastered) return true;
+    const previous = { mastered: mistake.mastered, archivedAt: mistake.archivedAt || '' };
+    mistake.mastered = mastered;
+    mistake.archivedAt = mastered ? new Date().toISOString() : '';
+    stateRef.current = next;
     setState(next);
-    await persistState(next, mistake.mastered ? '错题已标记为掌握' : '错题已恢复练习');
+
+    if (mastered && offerUndo) {
+      if (archiveUndoTimerRef.current) window.clearTimeout(archiveUndoTimerRef.current);
+      setArchiveUndo({ mistakeId, question: mistake.questionNumber || mistake.question });
+      archiveUndoTimerRef.current = window.setTimeout(() => {
+        setArchiveUndo(null);
+        archiveUndoTimerRef.current = null;
+      }, 5000);
+    }
+
+    const operation = (async () => {
+      const saved = await persistState(
+        next,
+        mastered ? '错题已归档' : '错题已恢复到待复习',
+        { showToast: !offerUndo },
+      );
+      if (saved) return true;
+
+      const rollback = structuredClone(stateRef.current || next);
+      rollback.learningTools = normalizeLearningTools(rollback.learningTools);
+      const rollbackMistake = rollback.learningTools.mistakes.find((item) => item.id === mistakeId);
+      if (rollbackMistake && rollbackMistake.mastered === mastered) {
+        rollbackMistake.mastered = previous.mastered;
+        rollbackMistake.archivedAt = previous.archivedAt;
+        stateRef.current = rollback;
+        setState(rollback);
+      }
+      if (archiveUndo?.mistakeId === mistakeId || offerUndo) {
+        if (archiveUndoTimerRef.current) window.clearTimeout(archiveUndoTimerRef.current);
+        archiveUndoTimerRef.current = null;
+        setArchiveUndo(null);
+      }
+      return false;
+    })();
+    mistakeArchiveOperationRef.current.set(mistakeId, operation);
+    try {
+      return await operation;
+    } finally {
+      if (mistakeArchiveOperationRef.current.get(mistakeId) === operation) {
+        mistakeArchiveOperationRef.current.delete(mistakeId);
+      }
+    }
+  };
+
+  const undoMistakeArchive = async () => {
+    const mistakeId = archiveUndo?.mistakeId;
+    if (!mistakeId) return;
+    if (archiveUndoTimerRef.current) window.clearTimeout(archiveUndoTimerRef.current);
+    archiveUndoTimerRef.current = null;
+    setArchiveUndo(null);
+    const restored = await setMistakeArchived(mistakeId, false);
+    if (restored) {
+      setMistakePage('active');
+      setSelectedMistakeId(mistakeId);
+    }
+  };
+
+  const startMistakeMetadataEdit = (mistake) => {
+    setMistakeMetadataDraft({
+      id: mistake.id,
+      knowledgePoint: mistake.knowledgePoint,
+      errorType: mistake.errorType,
+    });
+  };
+
+  const saveMistakeMetadata = async () => {
+    if (!mistakeMetadataDraft?.id) return;
+    const next = structuredClone(stateRef.current || state || {});
+    next.learningTools = normalizeLearningTools(next.learningTools);
+    const mistake = next.learningTools.mistakes.find((item) => item.id === mistakeMetadataDraft.id);
+    if (!mistake) return;
+    const previous = { knowledgePoint: mistake.knowledgePoint, errorType: mistake.errorType };
+    mistake.knowledgePoint = normalizeMistakeKnowledgePoint(mistakeMetadataDraft.knowledgePoint);
+    mistake.errorType = normalizeMistakeErrorType(mistakeMetadataDraft.errorType);
+    stateRef.current = next;
+    setState(next);
+    const saved = await persistState(next, '错题分类已保存');
+    if (saved) {
+      setMistakeMetadataDraft(null);
+      if (mistakeKnowledgeFilter === previous.knowledgePoint && mistake.knowledgePoint !== previous.knowledgePoint) {
+        setMistakeKnowledgeFilter('全部知识点');
+      }
+      return;
+    }
+    const rollback = structuredClone(stateRef.current || next);
+    rollback.learningTools = normalizeLearningTools(rollback.learningTools);
+    const rollbackMistake = rollback.learningTools.mistakes.find((item) => item.id === mistakeMetadataDraft.id);
+    if (rollbackMistake) Object.assign(rollbackMistake, previous);
+    stateRef.current = rollback;
+    setState(rollback);
   };
 
   const deleteMistake = async (mistakeId) => {
+    const currentMistakes = normalizeLearningTools(stateRef.current?.learningTools).mistakes;
+    const removedIndex = currentMistakes.findIndex((item) => item.id === mistakeId);
+    if (removedIndex < 0) return;
+    const removedMistake = currentMistakes[removedIndex];
+    const confirmed = await showAppConfirm(
+      `确定永久删除“${removedMistake.questionNumber || removedMistake.question.slice(0, 24)}”吗？删除后无法恢复。`,
+      { title: '永久删除错题', confirmText: '永久删除', tone: 'danger' },
+    );
+    if (!confirmed) return;
     const next = structuredClone(stateRef.current || state || {});
     next.learningTools = normalizeLearningTools(next.learningTools);
     next.learningTools.mistakes = next.learningTools.mistakes.filter((item) => item.id !== mistakeId);
+    stateRef.current = next;
     setState(next);
-    await persistState(next, '错题已删除');
+    setMistakeMetadataDraft(null);
+    const saved = await persistState(next, '错题已删除');
+    if (saved) return;
+    const rollback = structuredClone(stateRef.current || next);
+    rollback.learningTools = normalizeLearningTools(rollback.learningTools);
+    if (!rollback.learningTools.mistakes.some((item) => item.id === mistakeId)) {
+      rollback.learningTools.mistakes.splice(removedIndex, 0, removedMistake);
+      stateRef.current = rollback;
+      setState(rollback);
+    }
   };
 
   const openAiConfigDialog = () => {
-    setSelectedAiProvider(aiConfigDraft.activeProvider === 'baidu' ? 'baidu' : 'aliyun');
     setAiConfigDialogOpen(true);
   };
 
-  const confirmAiConfig = async (enableSelectedProvider = false) => {
+  const confirmAiConfig = async () => {
     setAiConfigStatus('正在保存 AI 配置...');
     try {
-      const nextConfig = enableSelectedProvider ? { ...aiConfigDraft, activeProvider: selectedAiProvider } : aiConfigDraft;
-      const payload = await saveAiConfig(nextConfig);
+      const payload = await saveAiConfig(aiConfigDraft);
       setAiConfigDraft(aiConfigDraftFromPublic(payload.config || {}));
-      setSelectedAiProvider(payload.config?.activeProvider === 'baidu' ? 'baidu' : 'aliyun');
       setAiConfigDialogOpen(false);
       setAiConfigStatus(aiConfigStatusText(payload.config || {}));
     } catch (error) {
@@ -3079,7 +3668,16 @@ function App() {
   };
 
   const printMistakePaper = (subject = mistakeSubjectFilter, term = mistakeTermFilter) => {
-    const selected = mistakeItems.filter((item) => (term === '全部学期' || item.term === term) && (subject === '全部' || item.subject === subject) && !item.mastered);
+    const selected = filterMistakes(mistakeItems, {
+      status: 'active',
+      term,
+      subject,
+      knowledgePoint: mistakeKnowledgeFilter,
+      errorType: mistakeErrorFilter,
+      source: mistakeSourceFilter,
+      search: mistakeSearch,
+      sort: mistakeSort,
+    });
     if (!selected.length) {
       showAppAlert('当前筛选下没有可生成试卷的未掌握错题', { tone: 'warning' });
       return;
@@ -3089,23 +3687,48 @@ function App() {
       showAppAlert('浏览器拦截了打印窗口，请允许弹窗后再试', { tone: 'warning' });
       return;
     }
-    const rowsHtml = selected.map((item, index) => `
+    const escapeHtml = (value) => String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+    const printableImageUrl = (value) => {
+      try {
+        const url = new URL(String(value || ''), window.location.origin);
+        return ['http:', 'https:'].includes(url.protocol) ? escapeHtml(url.href) : '';
+      } catch {
+        return '';
+      }
+    };
+    const rowsHtml = selected.map((item, index) => {
+      const questionImageUrl = printableImageUrl(item.questionImageUrl);
+      const solutionSteps = normalizeSolutionSteps(item.solutionSteps, item.explanation)
+        .map((step) => `<li>${escapeHtml(step)}</li>`)
+        .join('');
+      return `
       <section class="question">
-        <h3>${index + 1}. ${item.question}</h3>
+        ${questionImageUrl ? `<img class="question-image" src="${questionImageUrl}" alt="第 ${index + 1} 题原题" />` : ''}
+        <h3>${index + 1}. ${escapeHtml(item.question).replaceAll('\n', '<br>')}</h3>
         <div class="answer-line">作答：__________________________________________________</div>
         <details>
           <summary>参考答案</summary>
-          <p><strong>${item.correctAnswer}</strong></p>
-          <p>${item.explanation}</p>
+          <p><strong>${escapeHtml(item.correctAnswer)}</strong></p>
+          ${item.errorReason ? `<p>错误原因：${escapeHtml(item.errorReason)}</p>` : ''}
+          ${solutionSteps ? `<ol>${solutionSteps}</ol>` : ''}
+          ${item.explanation ? `<p>方法总结：${escapeHtml(item.explanation).replaceAll('\n', '<br>')}</p>` : ''}
         </details>
       </section>
-    `).join('');
+    `;
+    }).join('');
+    const paperTerm = escapeHtml(term === '全部学期' ? '综合学期' : term);
+    const paperSubject = escapeHtml(subject === '全部' ? '综合' : subject);
     paperWindow.document.write(`
       <!doctype html>
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>${term === '全部学期' ? '综合学期' : term}${subject === '全部' ? '综合' : subject}错题练习卷</title>
+          <title>${paperTerm}${paperSubject}错题练习卷</title>
           <style>
             body { margin: 32px; color: #19333a; font-family: "Microsoft YaHei", sans-serif; }
             header { border-bottom: 3px solid #19333a; padding-bottom: 14px; margin-bottom: 20px; }
@@ -3113,6 +3736,7 @@ function App() {
             .meta { display: flex; gap: 28px; font-size: 15px; }
             .question { break-inside: avoid; padding: 18px 0; border-bottom: 1px dashed #b9c6c8; }
             h3 { margin: 0 0 18px; font-size: 18px; }
+            .question-image { display: block; max-width: 100%; max-height: 110mm; margin: 0 auto 14px; object-fit: contain; }
             .answer-line { margin: 12px 0 18px; color: #53666b; }
             details { color: #6b777a; font-size: 13px; }
             @media print { details { display: none; } body { margin: 18mm; } }
@@ -3120,7 +3744,7 @@ function App() {
         </head>
         <body>
           <header>
-            <h1>${term === '全部学期' ? '综合学期' : term} · ${subject === '全部' ? '综合' : subject}错题练习卷</h1>
+            <h1>${paperTerm} · ${paperSubject}错题练习卷</h1>
             <div class="meta"><span>姓名：__________</span><span>日期：__________</span><span>题数：${selected.length}</span></div>
           </header>
           ${rowsHtml}
@@ -3139,7 +3763,7 @@ function App() {
     }));
   };
 
-  const persistState = async (nextState, successMessage = '已保存到 SQLite') => {
+  const persistState = async (nextState, successMessage = '已保存到 SQLite', options = {}) => {
     if (databaseSaveTimerRef.current) {
       window.clearTimeout(databaseSaveTimerRef.current);
       databaseSaveTimerRef.current = null;
@@ -3150,7 +3774,7 @@ function App() {
       if (currentStateFingerprintRef.current === result.savedFingerprint) {
         markUnsavedChanges(false);
         setDatabaseStatus(successMessage);
-        showSaveToast(successMessage.replace(' SQLite', '数据库'));
+        if (options.showToast !== false) showSaveToast(successMessage.replace(' SQLite', '数据库'));
       } else {
         markUnsavedChanges(true);
         setDatabaseStatus('本次内容已保存，另有新的修改尚未保存');
@@ -3738,15 +4362,63 @@ ${colorStyles}
     other: { label: '未开始', count: readingGroups.other.length, empty: '没有未开始或逾期未完成的书。' },
   };
   const currentReadingBooks = readingGroups[readingTab] || readingGroups.reading;
-  const filteredMistakes = mistakeItems.filter((item) => (
-    (mistakeTermFilter === '全部学期' || item.term === mistakeTermFilter) &&
-    (mistakeSubjectFilter === '全部' || item.subject === mistakeSubjectFilter)
-  ));
-  const printableMistakes = filteredMistakes.filter((item) => !item.mastered);
-  const mistakeStats = LEARNING_SUBJECTS.map((subject) => ({
+  const activeMistakes = mistakeItems.filter((item) => !item.mastered);
+  const archivedMistakes = mistakeItems.filter((item) => item.mastered);
+  const mistakeStatus = mistakePage === 'archived' ? 'archived' : 'active';
+  const mistakeFacetFilters = {
+    status: mistakeStatus,
+    term: mistakeTermFilter,
+    subject: mistakeSubjectFilter,
+    errorType: mistakeErrorFilter,
+    source: mistakeSourceFilter,
+    search: mistakeSearch,
+    sort: mistakeSort,
+  };
+  const mistakeKnowledgeBase = filterMistakes(mistakeItems, mistakeFacetFilters);
+  const mistakeKnowledgeStats = getMistakeKnowledgePointCounts(mistakeKnowledgeBase);
+  const filteredMistakes = filterMistakes(mistakeItems, {
+    ...mistakeFacetFilters,
+    knowledgePoint: mistakeKnowledgeFilter,
+  });
+  const visibleMistakes = filteredMistakes.slice(0, mistakeVisibleLimit);
+  const selectedMistake = filteredMistakes.find((item) => item.id === selectedMistakeId) || filteredMistakes[0] || null;
+  const printableMistakes = filterMistakes(mistakeItems, {
+    ...mistakeFacetFilters,
+    status: 'active',
+    knowledgePoint: mistakeKnowledgeFilter,
+  });
+  const mistakeSourceOptions = [...new Set(
+    (mistakeStatus === 'archived' ? archivedMistakes : activeMistakes).map((item) => item.sourceTitle).filter(Boolean),
+  )].sort((first, second) => first.localeCompare(second, 'zh-CN'));
+  const mistakeTermOptions = [...new Set([
+    ...LEARNING_TERMS,
+    ...mistakeItems.map((item) => item.term).filter(Boolean),
+  ])];
+  const mistakePageSubjectStats = LEARNING_SUBJECTS.map((subject) => ({
     subject,
-    count: mistakeItems.filter((item) => item.subject === subject && (mistakeTermFilter === '全部学期' || item.term === mistakeTermFilter)).length,
+    count: filterMistakes(mistakeItems, {
+      status: mistakeStatus,
+      term: mistakeTermFilter,
+      subject,
+      errorType: mistakeErrorFilter,
+      source: mistakeSourceFilter,
+      search: mistakeSearch,
+    }).length,
   }));
+  const activeMistakeFilterCount = [
+    mistakeTermFilter !== '全部学期',
+    mistakeErrorFilter !== '全部错误类型',
+    mistakeSourceFilter !== '全部来源',
+    mistakeSort !== 'newest',
+  ].filter(Boolean).length;
+
+  useEffect(() => {
+    setMistakeVisibleLimit(MISTAKE_PAGE_SIZE);
+  }, [mistakePage, mistakeTermFilter, mistakeSubjectFilter, mistakeKnowledgeFilter, mistakeErrorFilter, mistakeSourceFilter, mistakeSearch, mistakeSort]);
+
+  useEffect(() => {
+    setMistakeMetadataDraft(null);
+  }, [selectedMistake?.id]);
   const readingStatusLabel = (stats) => {
     if (stats.isComplete && stats.isClaimed) return '已读完';
     if (stats.isComplete) return '已读完';
@@ -5067,8 +5739,8 @@ ${colorStyles}
                   </article>
                   <article>
                     <FileText size={24} />
-                    <strong>{mistakeItems.length}</strong>
-                    <span>道错题</span>
+                    <strong>{activeMistakes.length}</strong>
+                    <span>道待复习</span>
                   </article>
                 </div>
               </div>
@@ -5104,9 +5776,7 @@ ${colorStyles}
                     </label>
                     <label>
                       <span>学科</span>
-                      <select value={graderDraft.subject} onChange={(event) => setGraderDraft((current) => ({ ...current, subject: event.target.value }))}>
-                        {LEARNING_SUBJECTS.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
-                      </select>
+                      <div className="auto-subject-value"><Sparkles size={16} />AI 自动识别</div>
                     </label>
                     <label>
                       <span>作业名称</span>
@@ -5117,22 +5787,50 @@ ${colorStyles}
                       <input value={graderDraft.note} placeholder="可写题目范围、老师要求等" onChange={(event) => setGraderDraft((current) => ({ ...current, note: event.target.value }))} />
                     </label>
                   </div>
-                  <label className="homework-uploader">
-                    <input type="file" accept="image/*" capture="environment" onChange={handleHomeworkImageChange} />
+                  <div className="homework-uploader">
                     {graderDraft.imageData ? (
                       <img src={graderDraft.imageData} alt="作业照片预览" />
                     ) : (
-                      <span><Upload size={34} />点击拍照或上传作业照片</span>
+                      <span><Upload size={34} />请拍照或上传一张清晰的作业图片</span>
                     )}
-                  </label>
+                  </div>
+                  <div className="homework-source-actions">
+                    <label>
+                      <Camera size={18} />
+                      拍照
+                      <input type="file" accept="image/*" capture="environment" onChange={handleHomeworkImageChange} />
+                    </label>
+                    <label>
+                      <Upload size={18} />
+                      上传图片
+                      <input type="file" accept="image/*" onChange={handleHomeworkImageChange} />
+                    </label>
+                  </div>
                   {isPreparingHomeworkImage ? <p className="upload-hint">正在处理图片，请稍等...</p> : graderDraft.imageName && <p className="upload-hint">已压缩：{graderDraft.imageName}</p>}
                   {gradingError && !displayHomeworkReview && <p className="upload-error">{gradingError}</p>}
                   <div className="grader-actions">
                     <button onClick={generateHomeworkReview} disabled={isGradingHomework || isPreparingHomeworkImage}>
                       <Sparkles size={18} />
-                      {isPreparingHomeworkImage ? '正在处理图片...' : isGradingHomework ? `正在批改 ${gradingElapsedSeconds}s...` : '生成批改结果'}
+                      {isPreparingHomeworkImage ? '正在处理图片...' : isGradingHomework ? `${homeworkGradingStatusText(gradingStage, gradingElapsedSeconds)} ${gradingElapsedSeconds}s` : '生成批改结果'}
                     </button>
-                    <button className="ghost" onClick={() => { homeworkImageRef.current = ''; setGraderDraft(DEFAULT_GRADER_DRAFT); setLatestReview(null); setShowPreviousReview(true); setGradingError(''); }} disabled={isGradingHomework || isPreparingHomeworkImage}>重新开始</button>
+                    <button
+                      className="ghost"
+                      onClick={() => {
+                        if (isGradingHomework) {
+                          cancelHomeworkGrading();
+                          return;
+                        }
+                        homeworkImageRef.current = '';
+                        homeworkLocalizationImageRef.current = '';
+                        setGraderDraft(DEFAULT_GRADER_DRAFT);
+                        setLatestReview(null);
+                        setShowPreviousReview(true);
+                        setGradingError('');
+                      }}
+                      disabled={isPreparingHomeworkImage}
+                    >
+                      {isGradingHomework ? '取消批改' : '重新开始'}
+                    </button>
                   </div>
                 </section>
 
@@ -5148,24 +5846,39 @@ ${colorStyles}
                     (() => {
                       const review = displayHomeworkReview;
                       const reviewMistakes = normalizeReviewMistakes(review.mistakes);
+                      const collectedMistakeKeys = new Set(mistakeItems.map((mistake) => mistakeCollectionKey(mistake)));
+                      const decidedReviewMistakes = reviewMistakes.map((mistake) => ({
+                        ...mistake,
+                        reviewDecision: collectedMistakeKeys.has(mistakeCollectionKey(mistake, review.id))
+                          ? 'collected'
+                          : normalizeReviewMistakeDecision(mistake.reviewDecision),
+                      }));
+                      const includedReviewMistakes = decidedReviewMistakes.filter((mistake) => mistake.reviewDecision !== 'ignored');
                       const reviewAnnotations = normalizeReviewAnnotations(review.imageAnnotations);
-                      const visibleAnnotations = reviewAnnotations.length ? reviewAnnotations : buildFallbackAnnotations(review.mistakes);
-                      const isApproximateAnnotations = !reviewAnnotations.length && visibleAnnotations.length > 0;
+                      const visibleAnnotations = reviewAnnotations.length
+                        ? filterIgnoredReviewAnnotations(reviewAnnotations, decidedReviewMistakes)
+                        : includedReviewMistakes.length ? buildFallbackAnnotations(includedReviewMistakes) : [];
+                      const isApproximateAnnotations = review.annotationQuality === 'approximate'
+                        || (!reviewAnnotations.length && includedReviewMistakes.length > 0);
+                      const reviewDecisionCounts = decidedReviewMistakes.reduce((counts, mistake) => ({
+                        ...counts,
+                        [mistake.reviewDecision]: counts[mistake.reviewDecision] + 1,
+                      }), { pending: 0, collected: 0, ignored: 0 });
                       const reviewImageUrl = review.annotatedImageUrl || (review.id === latestReview?.id ? homeworkImageRef.current || graderDraft.imageData : '');
                       return (
                         <>
                           {gradingError && <div className="grading-error">{gradingError}</div>}
-                          {review.provider === 'demo' && <div className="grading-provider-note">当前服务器未配置 AI Key，下面是演示批改结果。</div>}
                           <div className="review-result-overview">
-                            <span>{review.detectedSubject || review.subject}</span>
+                            <span>{review.detectedSubject || review.subject}{review.subjectConfidence ? ` · ${review.subjectConfidence}置信度` : ''}</span>
                             <h4>{review.detectedTitle || review.title}</h4>
                             <p>{review.summary}</p>
+                            {review.recognizedQuestionCount > 0 && <small>识别 {review.recognizedQuestionCount} 题{review.uncertainQuestionCount > 0 ? `，${review.uncertainQuestionCount} 题无法可靠判断` : ''}</small>}
                           </div>
                           {reviewImageUrl && (
                             <>
                               <div className="review-section-title">
-                                <strong>原图批改</strong>
-                                <button className="download-annotated-button" onClick={() => downloadAnnotatedHomeworkImage(review)} disabled={!visibleAnnotations.length} type="button">下载批改图片</button>
+                                <strong>AI 批改图</strong>
+                                <button className="download-annotated-button" onClick={() => downloadAnnotatedHomeworkImage(review)} disabled={!visibleAnnotations.length} type="button">下载批改图</button>
                                 <span>{visibleAnnotations.length} 处{isApproximateAnnotations ? '大致' : ''}标注</span>
                               </div>
                               <div className="annotated-homework">
@@ -5173,7 +5886,7 @@ ${colorStyles}
                                 {visibleAnnotations.length ? visibleAnnotations.map((annotation) => (
                                   <i
                                     key={`${annotation.order}-${annotation.status}`}
-                                    className={`homework-mark ${annotation.status} ${annotation.approximate ? 'approximate' : ''}`}
+                                    className={`homework-mark ${annotation.status} ${annotation.approximate ? 'approximate' : ''} ${annotation.area.width > 45 ? 'wide-area' : ''}`}
                                     style={{
                                       left: `${annotation.area.left}%`,
                                       top: `${annotation.area.top}%`,
@@ -5181,29 +5894,86 @@ ${colorStyles}
                                       height: `${annotation.area.height}%`,
                                     }}
                                   >
-                                    <b>{annotation.order}</b>
+                                    <b>{annotation.questionNumber || annotation.order}</b>
                                     <span>{annotation.label}</span>
+                                    {(annotation.comment || annotation.correctAnswer) && (
+                                      <em className={annotation.area.left + annotation.area.width > 62 ? 'place-left' : ''}>
+                                        {annotation.comment && <small>{annotation.comment}</small>}
+                                        {annotation.correctAnswer && <small>正确：{annotation.correctAnswer}</small>}
+                                      </em>
+                                    )}
                                   </i>
-                                )) : <div className="annotation-empty-note">本次批改没有返回原图坐标，请重新批改或换一张更清晰、拍正的照片。</div>}
-                                {isApproximateAnnotations && <div className="annotation-empty-note">本次使用错题顺序生成大致标注；想要更精确的位置，请拍正整页并确保题目清晰。</div>}
+                                )) : (
+                                  <div className="annotation-empty-note success">
+                                    {decidedReviewMistakes.length && !includedReviewMistakes.length ? '已忽略全部 AI 错题标记。' : '本次没有发现明确错题，原图无需标记。'}
+                                  </div>
+                                )}
+                                {isApproximateAnnotations && <div className="annotation-empty-note">{review.localizationWarning || '本次错题位置仅为大致范围；请以错题明细为准，并可忽略 AI 误判。'}</div>}
                               </div>
                             </>
                           )}
                           <div className="review-section-title">
                             <strong>错题明细</strong>
-                            <span>{reviewMistakes.length} 道</span>
+                            <span>待处理 {reviewDecisionCounts.pending} · 已收录 {reviewDecisionCounts.collected} · 已忽略 {reviewDecisionCounts.ignored}</span>
                           </div>
                           <div className="review-mistake-list">
-                            {reviewMistakes.length ? reviewMistakes.map((mistake) => (
-                              <article key={mistake.id}>
-                                <i className="wrong-stamp">错题</i>
+                            {decidedReviewMistakes.length ? decidedReviewMistakes.map((mistake) => {
+                              const actionId = `${review.id}-${mistake.id}`;
+                              const isCurrentAction = reviewMistakeActionId === actionId;
+                              const actionsDisabled = Boolean(reviewMistakeActionId);
+                              return (
+                              <article className={`review-mistake-item ${mistake.reviewDecision}`} key={mistake.id}>
+                                <i className={`wrong-stamp ${mistake.reviewDecision === 'ignored' ? 'ignored' : ''}`}>
+                                  {mistake.reviewDecision === 'ignored' ? '已忽略' : '错题'}
+                                </i>
                                 {mistake.questionImageUrl && <img className="mistake-question-image" src={mistake.questionImageUrl} alt="原题截图" />}
-                                <b>题目：{mistake.order ? `${mistake.order}. ` : ''}{mistake.question}</b>
-                                <span>小朋友答案：{mistake.answer || '未识别'}</span>
-                                <strong>标准答案：{mistake.correctAnswer}</strong>
-                                <p><em>解题过程：</em>{mistake.explanation}</p>
+                                <b className="review-question-text">题目：{mistake.question}</b>
+                                <div className="review-answer-comparison">
+                                  <div>
+                                    <small>本次作答</small>
+                                    <strong>{mistake.answer || '未识别'}</strong>
+                                  </div>
+                                  <div className="correct-answer">
+                                    <small>正确答案</small>
+                                    <strong>{mistake.correctAnswer}</strong>
+                                  </div>
+                                </div>
+                                <div className="review-analysis-section error-reason">
+                                  <strong>错误原因</strong>
+                                  <p>{mistake.errorReason || mistake.shortComment || mistake.explanation}</p>
+                                </div>
+                                <div className="review-analysis-section solution-process">
+                                  <strong>正确解题过程</strong>
+                                  <ol>
+                                    {normalizeSolutionSteps(mistake.solutionSteps, mistake.explanation).map((step, index) => <li key={`${mistake.id}-step-${index}`}>{step}</li>)}
+                                  </ol>
+                                </div>
+                                {mistake.explanation && <p className="review-method-summary"><em>方法总结：</em>{mistake.explanation}</p>}
+                                <footer className="review-mistake-actions">
+                                  {mistake.reviewDecision === 'pending' ? (
+                                    <>
+                                      <button className="collect-one" onClick={() => setReviewMistakeDecision(review, mistake, 'collected')} disabled={actionsDisabled} type="button">
+                                        <PlusCircle size={17} />
+                                        {isCurrentAction ? '正在收录...' : '收录这道错题'}
+                                      </button>
+                                      <button className="ignore-one" onClick={() => setReviewMistakeDecision(review, mistake, 'ignored')} disabled={actionsDisabled} type="button">
+                                        <EyeOff size={17} />忽略误判
+                                      </button>
+                                    </>
+                                  ) : mistake.reviewDecision === 'collected' ? (
+                                    <span className="review-decision-state collected"><Check size={17} />已收录到错题集</span>
+                                  ) : (
+                                    <>
+                                      <span className="review-decision-state ignored"><EyeOff size={17} />已忽略，不会进入错题集</span>
+                                      <button className="restore-one" onClick={() => setReviewMistakeDecision(review, mistake, 'pending')} disabled={actionsDisabled} type="button">
+                                        <RotateCcw size={16} />{isCurrentAction ? '正在恢复...' : '恢复待处理'}
+                                      </button>
+                                    </>
+                                  )}
+                                </footer>
                               </article>
-                            )) : <div className="review-no-mistake">这次批改没有发现明确错题。</div>}
+                              );
+                            }) : <div className="review-no-mistake">这次批改没有发现明确错题。</div>}
                           </div>
                           <div className="review-section-title">
                             <strong>订正建议</strong>
@@ -5211,79 +5981,359 @@ ${colorStyles}
                           <div className="review-suggestions">
                             {normalizeReviewSuggestions(review.suggestions).map((item) => <span key={item}>{item}</span>)}
                           </div>
-                          <button className="collect-mistakes" onClick={() => addReviewMistakesToCollection(review)}>
-                            <PlusCircle size={18} />
-                            收录到错题集
-                          </button>
+                          {decidedReviewMistakes.length > 0 && (
+                            <div className="review-decision-summary">
+                              <span>共 {decidedReviewMistakes.length} 道</span>
+                              <b>{reviewDecisionCounts.pending} 道待处理</b>
+                              <span>{reviewDecisionCounts.collected} 道已收录</span>
+                              <span>{reviewDecisionCounts.ignored} 道已忽略</span>
+                            </div>
+                          )}
                         </>
                       );
                     })()
                   ) : (
                     <div className="review-empty">
                       <ClipboardCheck size={42} />
-                      <strong>{isGradingHomework ? `AI批改中，已等待 ${gradingElapsedSeconds} 秒` : '上传照片后，这里会显示批改结果'}</strong>
-                      <p>{gradingError || (isGradingHomework ? '真实拍照作业需要高清识别和推理，通常需要 30-120 秒，请先不要重复点击。' : '会列出错题、正确答案、原因和练习建议。')}</p>
+                      <strong>{isGradingHomework ? `${homeworkGradingStatusText(gradingStage, gradingElapsedSeconds)}，已等待 ${gradingElapsedSeconds} 秒` : '上传照片后，这里会显示批改结果'}</strong>
+                      <p>{gradingError || (isGradingHomework ? '服务器会在后台持续处理，网络短暂波动不会中断任务；可以随时点击“取消批改”。' : '会列出错题、正确答案、原因和练习建议。')}</p>
                     </div>
                   )}
                 </section>
               </div>
             ) : (
               <section className="mistake-book-page">
-                <div className="mistake-toolbar">
-                  <div className="term-tabs" aria-label="学期筛选">
-                    {['全部学期', ...LEARNING_TERMS].map((term) => (
-                      <button key={term} className={mistakeTermFilter === term ? 'active' : ''} onClick={() => setMistakeTermFilter(term)} type="button">{term}</button>
-                    ))}
+                <header className="mistake-book-header">
+                  <div>
+                    <p>错题集</p>
+                    <h3>{mistakePage === 'archived' ? '已掌握归档' : '按知识点集中复习薄弱题目'}</h3>
+                    <span>{mistakePage === 'archived' ? '归档题不参与待复习统计和组卷，可以随时恢复。' : '先选学科和知识点，再在右侧查看完整题目与解析。'}</span>
                   </div>
-                  <div className="subject-filter" aria-label="学科筛选">
-                    {['全部', ...LEARNING_SUBJECTS].map((subject) => (
-                      <button key={subject} className={mistakeSubjectFilter === subject ? 'active' : ''} onClick={() => setMistakeSubjectFilter(subject)} type="button">{subject}</button>
-                    ))}
-                  </div>
-                  <button className="print-paper-button" onClick={() => printMistakePaper()}>
-                    <Printer size={18} />
-                    生成试卷打印
+                  {mistakePage === 'active' && (
+                    <button className="print-paper-button" onClick={() => printMistakePaper()} disabled={!printableMistakes.length} type="button">
+                      <Printer size={17} />
+                      生成练习卷
+                      <b>{printableMistakes.length}</b>
+                    </button>
+                  )}
+                </header>
+
+                <div className="mistake-status-tabs" role="tablist" aria-label="错题状态">
+                  <button
+                    className={mistakePage === 'active' ? 'active' : ''}
+                    onClick={() => {
+                      setMistakePage('active');
+                      setMistakeKnowledgeFilter('全部知识点');
+                      setMistakeSourceFilter('全部来源');
+                      setSelectedMistakeId('');
+                      setMistakeDetailOpen(false);
+                    }}
+                    type="button"
+                    role="tab"
+                    aria-selected={mistakePage === 'active'}
+                  >
+                    <FileText size={17} />
+                    待复习
+                    <span>{activeMistakes.length}</span>
+                  </button>
+                  <button
+                    className={mistakePage === 'archived' ? 'active' : ''}
+                    onClick={() => {
+                      setMistakePage('archived');
+                      setMistakeKnowledgeFilter('全部知识点');
+                      setMistakeSourceFilter('全部来源');
+                      setSelectedMistakeId('');
+                      setMistakeDetailOpen(false);
+                    }}
+                    type="button"
+                    role="tab"
+                    aria-selected={mistakePage === 'archived'}
+                  >
+                    <Archive size={17} />
+                    已掌握归档
+                    <span>{archivedMistakes.length}</span>
                   </button>
                 </div>
 
-                <div className="mistake-summary">
-                  {mistakeStats.map((item) => (
-                    <article key={item.subject}>
-                      <span>{item.subject}</span>
-                      <strong>{item.count}</strong>
-                      <em>道错题</em>
-                    </article>
-                  ))}
-                  <article className="paper-ready">
-                    <span>可组卷</span>
-                    <strong>{printableMistakes.length}</strong>
-                    <em>道未掌握</em>
-                  </article>
+                <div className="mistake-primary-filters">
+                  <div className="mistake-subject-filter" role="group" aria-label="学科筛选">
+                    <button
+                      className={mistakeSubjectFilter === '全部' ? 'active' : ''}
+                      onClick={() => {
+                        setMistakeSubjectFilter('全部');
+                        setMistakeKnowledgeFilter('全部知识点');
+                        setSelectedMistakeId('');
+                      }}
+                      type="button"
+                    >
+                      全部 <span>{mistakePageSubjectStats.reduce((sum, item) => sum + item.count, 0)}</span>
+                    </button>
+                    {mistakePageSubjectStats.map((item) => (
+                      <button
+                        key={item.subject}
+                        className={mistakeSubjectFilter === item.subject ? 'active' : ''}
+                        data-subject={item.subject}
+                        onClick={() => {
+                          setMistakeSubjectFilter(item.subject);
+                          setMistakeKnowledgeFilter('全部知识点');
+                          setSelectedMistakeId('');
+                        }}
+                        type="button"
+                      >
+                        {item.subject} <span>{item.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="mistake-search-field">
+                    <Search size={17} />
+                    <input value={mistakeSearch} onChange={(event) => setMistakeSearch(event.target.value)} placeholder="搜索题目、知识点或来源" />
+                    {mistakeSearch && (
+                      <button onClick={() => setMistakeSearch('')} type="button" title="清除搜索" aria-label="清除搜索"><X size={15} /></button>
+                    )}
+                  </label>
+                  <button className="mistake-filter-toggle" onClick={() => setMistakeFiltersOpen(true)} type="button" aria-label="打开筛选">
+                    <SlidersHorizontal size={18} />
+                    筛选
+                    {activeMistakeFilterCount > 0 && <span>{activeMistakeFilterCount}</span>}
+                  </button>
                 </div>
 
-                <div className="mistake-list">
-                  {filteredMistakes.length ? filteredMistakes.map((mistake) => (
-                    <article className={mistake.mastered ? 'mastered' : ''} key={mistake.id}>
-                      <div className="mistake-card-head">
-                        <span>{mistake.term}</span>
-                        <b>{mistake.subject}</b>
+                {mistakeFiltersOpen && <button className="mistake-filter-backdrop" onClick={() => setMistakeFiltersOpen(false)} type="button" aria-label="关闭筛选" />}
+                <div className={`mistake-advanced-filters ${mistakeFiltersOpen ? 'open' : ''}`}>
+                  <header>
+                    <strong>筛选与排序</strong>
+                    <button onClick={() => setMistakeFiltersOpen(false)} type="button" title="关闭筛选" aria-label="关闭筛选"><X size={18} /></button>
+                  </header>
+                  <label>
+                    <span>学期</span>
+                    <select value={mistakeTermFilter} onChange={(event) => {
+                      setMistakeTermFilter(event.target.value);
+                      setMistakeKnowledgeFilter('全部知识点');
+                    }}>
+                      <option value="全部学期">全部学期</option>
+                      {mistakeTermOptions.map((term) => <option key={term} value={term}>{term}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span>来源</span>
+                    <select value={mistakeSourceFilter} onChange={(event) => setMistakeSourceFilter(event.target.value)}>
+                      <option value="全部来源">全部来源</option>
+                      {mistakeSourceOptions.map((source) => <option key={source} value={source}>{source}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span>错误类型</span>
+                    <select value={mistakeErrorFilter} onChange={(event) => setMistakeErrorFilter(event.target.value)}>
+                      <option value="全部错误类型">全部错误类型</option>
+                      {MISTAKE_ERROR_TYPES.map((errorType) => <option key={errorType} value={errorType}>{errorType}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span>排序</span>
+                    <select value={mistakeSort} onChange={(event) => setMistakeSort(event.target.value)}>
+                      <option value="newest">最新在前</option>
+                      <option value="oldest">最早在前</option>
+                    </select>
+                  </label>
+                  <button
+                    className="mistake-clear-filters"
+                    onClick={() => {
+                      setMistakeTermFilter('全部学期');
+                      setMistakeSourceFilter('全部来源');
+                      setMistakeErrorFilter('全部错误类型');
+                      setMistakeSort('newest');
+                      setMistakeKnowledgeFilter('全部知识点');
+                    }}
+                    type="button"
+                  >
+                    清除筛选
+                  </button>
+                </div>
+
+                <div className="mistake-workspace">
+                  <aside className="mistake-knowledge-nav">
+                    <header>
+                      <strong>知识点</strong>
+                      <span>{mistakeKnowledgeBase.length}</span>
+                    </header>
+                    <button
+                      className={mistakeKnowledgeFilter === '全部知识点' ? 'active' : ''}
+                      onClick={() => {
+                        setMistakeKnowledgeFilter('全部知识点');
+                        setSelectedMistakeId('');
+                      }}
+                      type="button"
+                    >
+                      <span>全部知识点</span>
+                      <b>{mistakeKnowledgeBase.length}</b>
+                    </button>
+                    {mistakeKnowledgeStats.map((item) => (
+                      <button
+                        key={item.knowledgePoint}
+                        className={mistakeKnowledgeFilter === item.knowledgePoint ? 'active' : ''}
+                        onClick={() => {
+                          setMistakeKnowledgeFilter(item.knowledgePoint);
+                          setSelectedMistakeId('');
+                        }}
+                        type="button"
+                      >
+                        <span>{item.knowledgePoint}</span>
+                        <b>{item.count}</b>
+                      </button>
+                    ))}
+                  </aside>
+
+                  <section className="mistake-compact-list" aria-label="错题列表">
+                    <header>
+                      <div>
+                        <strong>{mistakeKnowledgeFilter}</strong>
+                        <span>共 {filteredMistakes.length} 道</span>
                       </div>
-                      <h3>{mistake.question}</h3>
-                      <p>原答案：{mistake.answer || '未记录'}</p>
-                      <strong>正确答案：{mistake.correctAnswer}</strong>
-                      <em>{mistake.explanation}</em>
-                      <div className="mistake-card-actions">
-                        <button onClick={() => toggleMistakeMastered(mistake.id)}>{mistake.mastered ? '恢复练习' : '标记掌握'}</button>
-                        <button className="danger" onClick={() => deleteMistake(mistake.id)}>删除</button>
-                      </div>
-                    </article>
-                  )) : (
-                    <div className="mistake-empty">
-                      <FileText size={46} />
-                      <strong>当前筛选下还没有错题</strong>
-                      <p>先去 AI 作业批改里生成结果，然后点击“收录到错题集”。</p>
+                    </header>
+                    <div className="mistake-list-rows">
+                      {visibleMistakes.length ? visibleMistakes.map((mistake) => (
+                        <button
+                          className={`mistake-list-row ${selectedMistake?.id === mistake.id ? 'active' : ''}`}
+                          data-subject={mistake.subject}
+                          key={mistake.id}
+                          onClick={() => {
+                            setSelectedMistakeId(mistake.id);
+                            setMistakeDetailOpen(true);
+                          }}
+                          type="button"
+                        >
+                          {mistake.questionImageUrl ? (
+                            <img src={mistake.questionImageUrl} alt="" loading="lazy" />
+                          ) : (
+                            <span className="mistake-list-placeholder"><FileText size={22} /></span>
+                          )}
+                          <span className="mistake-list-copy">
+                            <span className="mistake-list-tags">
+                              <b>{mistake.subject}</b>
+                              <em>{mistake.knowledgePoint}</em>
+                              <em>{mistake.errorType}</em>
+                            </span>
+                            <strong>{mistake.questionNumber ? `${mistake.questionNumber} ` : ''}{mistake.question}</strong>
+                            <small>{mistake.sourceTitle} · {formatMistakeDate(mistake.mastered ? mistake.archivedAt || mistake.createdAt : mistake.createdAt)}</small>
+                          </span>
+                          <ChevronRight size={17} />
+                        </button>
+                      )) : (
+                        <div className="mistake-empty compact">
+                          {mistakePage === 'archived' ? <Archive size={38} /> : <FileText size={38} />}
+                          <strong>{mistakePage === 'archived' ? '这里还没有已掌握错题' : '当前条件下没有待复习错题'}</strong>
+                          <p>{mistakePage === 'archived' ? '标记掌握后，题目会归档到这里。' : '可以调整学科、知识点或筛选条件。'}</p>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    {visibleMistakes.length < filteredMistakes.length && (
+                      <button className="mistake-load-more" onClick={() => setMistakeVisibleLimit((current) => current + MISTAKE_PAGE_SIZE)} type="button">
+                        加载更多（剩余 {filteredMistakes.length - visibleMistakes.length} 道）
+                      </button>
+                    )}
+                  </section>
+
+                  <article className={`mistake-detail-panel ${mistakeDetailOpen ? 'mobile-open' : ''}`} aria-label="错题详情">
+                    {selectedMistake ? (
+                      <>
+                        <header className="mistake-detail-head">
+                          <div>
+                            <span>{selectedMistake.term}</span>
+                            <h3>{selectedMistake.questionNumber || '错题详情'}</h3>
+                            <p>{selectedMistake.sourceTitle} · {formatMistakeDate(selectedMistake.mastered ? selectedMistake.archivedAt || selectedMistake.createdAt : selectedMistake.createdAt)}</p>
+                          </div>
+                          <div className="mistake-detail-head-actions">
+                            <button onClick={() => startMistakeMetadataEdit(selectedMistake)} type="button" title="修改分类" aria-label="修改分类"><Pencil size={17} /></button>
+                            <button className="mistake-detail-close" onClick={() => setMistakeDetailOpen(false)} type="button" title="关闭详情" aria-label="关闭详情"><X size={19} /></button>
+                          </div>
+                        </header>
+
+                        {mistakeMetadataDraft?.id === selectedMistake.id ? (
+                          <div className="mistake-classification-editor">
+                            <label>
+                              <span>知识点</span>
+                              <input
+                                value={mistakeMetadataDraft.knowledgePoint}
+                                maxLength={40}
+                                onChange={(event) => setMistakeMetadataDraft((current) => ({ ...current, knowledgePoint: event.target.value }))}
+                                placeholder="例如：两位数进位加法"
+                              />
+                            </label>
+                            <label>
+                              <span>错误类型</span>
+                              <select value={mistakeMetadataDraft.errorType} onChange={(event) => setMistakeMetadataDraft((current) => ({ ...current, errorType: event.target.value }))}>
+                                {MISTAKE_ERROR_TYPES.map((errorType) => <option key={errorType} value={errorType}>{errorType}</option>)}
+                              </select>
+                            </label>
+                            <div>
+                              <button className="ghost" onClick={() => setMistakeMetadataDraft(null)} type="button">取消</button>
+                              <button onClick={saveMistakeMetadata} type="button"><Save size={15} />保存分类</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mistake-detail-tags">
+                            <span data-subject={selectedMistake.subject}>{selectedMistake.subject}</span>
+                            <span>{selectedMistake.knowledgePoint}</span>
+                            <span>{selectedMistake.errorType}</span>
+                            {selectedMistake.mastered && <span className="archived"><Archive size={13} />已归档</span>}
+                          </div>
+                        )}
+
+                        <div className="mistake-detail-scroll">
+                          {selectedMistake.questionImageUrl && <img className="mistake-detail-image" src={selectedMistake.questionImageUrl} alt={`${selectedMistake.subject}原题`} />}
+                          <section className="mistake-detail-question">
+                            <span>完整题目</span>
+                            <p>{selectedMistake.question}</p>
+                          </section>
+                          <div className="mistake-answer-summary">
+                            <section>
+                              <span>本次作答</span>
+                              <strong>{selectedMistake.answer || '未记录'}</strong>
+                            </section>
+                            <section>
+                              <span>错误原因</span>
+                              <p>{selectedMistake.errorReason || selectedMistake.shortComment || selectedMistake.explanation || '暂无错误原因'}</p>
+                            </section>
+                          </div>
+                          <details className="mistake-answer-details" key={selectedMistake.id}>
+                            <summary>
+                              <span>展开正确答案与解题过程</span>
+                              <ChevronDown size={18} />
+                            </summary>
+                            <div>
+                              <section className="mistake-detail-section mistake-correct-answer">
+                                <b>正确答案</b>
+                                <strong>{selectedMistake.correctAnswer}</strong>
+                              </section>
+                              <section className="mistake-detail-section mistake-solution-process">
+                                <b>正确解题过程</b>
+                                <ol>
+                                  {normalizeSolutionSteps(selectedMistake.solutionSteps, selectedMistake.explanation).map((step, index) => <li key={`${selectedMistake.id}-book-step-${index}`}>{step}</li>)}
+                                </ol>
+                              </section>
+                              {selectedMistake.explanation && <p className="mistake-method-summary"><em>方法总结：</em>{selectedMistake.explanation}</p>}
+                            </div>
+                          </details>
+                        </div>
+
+                        <footer className="mistake-detail-actions">
+                          {selectedMistake.mastered ? (
+                            <button onClick={() => setMistakeArchived(selectedMistake.id, false)} type="button"><RotateCcw size={17} />恢复到待复习</button>
+                          ) : (
+                            <button onClick={() => setMistakeArchived(selectedMistake.id, true, { offerUndo: true })} type="button"><Archive size={17} />标记掌握并归档</button>
+                          )}
+                          <button className="danger" onClick={() => deleteMistake(selectedMistake.id)} type="button"><Trash2 size={17} />永久删除</button>
+                        </footer>
+                      </>
+                    ) : (
+                      <div className="mistake-detail-empty">
+                        <FileText size={42} />
+                        <strong>选择一道错题查看详情</strong>
+                        <p>完整原题、错误原因和解题过程会显示在这里。</p>
+                        <button className="mistake-detail-close" onClick={() => setMistakeDetailOpen(false)} type="button">返回列表</button>
+                      </div>
+                    )}
+                  </article>
                 </div>
               </section>
             )}
@@ -6187,55 +7237,30 @@ ${colorStyles}
             <header>
               <div>
                 <h2>AI批改配置</h2>
-                <p>先选择要配置的服务；只有点击“保存并启用”才会切换实际批改模型。</p>
+                <p>作业图片由 DeepSeek Vision 自动识别学科、逐题批改并定位错题。</p>
               </div>
             </header>
             <div className="book-dialog-fields ai-config-fields">
-              <div className="ai-provider-switch">
-                <button className={selectedAiProvider === 'aliyun' ? 'active' : ''} onClick={() => setSelectedAiProvider('aliyun')} type="button">阿里 qwen3-vl-plus{aiConfigDraft.activeProvider === 'aliyun' ? ' · 当前启用' : ''}</button>
-                <button className={selectedAiProvider === 'baidu' ? 'active' : ''} onClick={() => setSelectedAiProvider('baidu')} type="button">百度智能作业批改{aiConfigDraft.activeProvider === 'baidu' ? ' · 当前启用' : ''}</button>
-              </div>
-              {selectedAiProvider === 'aliyun' && <section className="ai-config-section">
-                <h3>阿里百炼</h3>
+              <section className="ai-config-section">
+                <h3>DeepSeek Vision</h3>
                 <label>
                   <span>API Key</span>
-                  <input type="password" value={aiConfigDraft.aliyun.apiKey || ''} placeholder={aiConfigDraft.aliyun.configured ? '已配置，留空保持原密钥' : '填写 DashScope API Key'} onChange={(event) => setAiConfigDraft((current) => ({ ...current, aliyun: { ...current.aliyun, apiKey: event.target.value } }))} />
+                  <input type="password" value={aiConfigDraft.deepseek.apiKey || ''} placeholder={aiConfigDraft.deepseek.configured ? '已配置，留空保持当前密钥' : '填写 DeepSeek API Key'} onChange={(event) => setAiConfigDraft((current) => ({ ...current, deepseek: { ...current.deepseek, apiKey: event.target.value } }))} />
                 </label>
                 <label>
                   <span>Base URL</span>
-                  <input value={aiConfigDraft.aliyun.baseUrl || ''} onChange={(event) => setAiConfigDraft((current) => ({ ...current, aliyun: { ...current.aliyun, baseUrl: event.target.value } }))} />
+                  <input value={aiConfigDraft.deepseek.baseUrl || ''} readOnly />
                 </label>
                 <label>
                   <span>模型名</span>
-                  <input value={aiConfigDraft.aliyun.model || ''} onChange={(event) => setAiConfigDraft((current) => ({ ...current, aliyun: { ...current.aliyun, model: event.target.value } }))} />
+                  <input value={aiConfigDraft.deepseek.model || ''} readOnly />
                 </label>
-              </section>}
-              {selectedAiProvider === 'baidu' && <section className="ai-config-section muted">
-                <h3>百度智能作业批改</h3>
-                <label>
-                  <span>API Key</span>
-                  <input value={aiConfigDraft.baidu.apiKey || ''} placeholder={aiConfigDraft.baidu.configured ? '已配置，留空保持原 API Key' : '填写百度 API Key'} onChange={(event) => setAiConfigDraft((current) => ({ ...current, baidu: { ...current.baidu, apiKey: event.target.value } }))} />
-                </label>
-                <label>
-                  <span>Secret Key</span>
-                  <input type="password" value={aiConfigDraft.baidu.secretKey || ''} placeholder={aiConfigDraft.baidu.configured ? '已配置，留空保持原 Secret Key' : '填写百度 Secret Key'} onChange={(event) => setAiConfigDraft((current) => ({ ...current, baidu: { ...current.baidu, secretKey: event.target.value } }))} />
-                </label>
-                <div className="ai-config-two">
-                  <label>
-                    <span>轮询间隔 ms</span>
-                    <input inputMode="numeric" value={aiConfigDraft.baidu.pollIntervalMs || 6000} onChange={(event) => setAiConfigDraft((current) => ({ ...current, baidu: { ...current.baidu, pollIntervalMs: event.target.value.replace(/[^\d]/g, '') } }))} />
-                  </label>
-                  <label>
-                    <span>最大等待 ms</span>
-                    <input inputMode="numeric" value={aiConfigDraft.baidu.timeoutMs || 60000} onChange={(event) => setAiConfigDraft((current) => ({ ...current, baidu: { ...current.baidu, timeoutMs: event.target.value.replace(/[^\d]/g, '') } }))} />
-                  </label>
-                </div>
-              </section>}
+                {aiConfigDraft.deepseek.keySource === 'file' && <p className="ai-key-source-note">当前使用本机桌面的密钥文件，API Key 留空即可。</p>}
+              </section>
             </div>
             <footer>
               <button className="ghost" onClick={() => setAiConfigDialogOpen(false)}>取消</button>
-              <button className="ghost" onClick={() => confirmAiConfig(false)}>只保存配置</button>
-              <button onClick={() => confirmAiConfig(true)}>保存并启用{selectedAiProvider === 'baidu' ? '百度' : '阿里'}</button>
+              <button onClick={confirmAiConfig}>保存配置</button>
             </footer>
           </div>
         </section>
@@ -6279,9 +7304,17 @@ ${colorStyles}
       )}
 
       {saveToast && (
-        <div className={`save-toast ${saveToast.type}`} role="status" aria-live="polite">
+        <div className={`save-toast ${saveToast.type} ${archiveUndo ? 'with-archive-undo' : ''}`} role="status" aria-live="polite">
           <Check size={16} />
           <span>{saveToast.message}</span>
+        </div>
+      )}
+
+      {archiveUndo && (
+        <div className="archive-undo-toast" role="status" aria-live="polite">
+          <Archive size={17} />
+          <span>已归档到已掌握</span>
+          <button onClick={undoMistakeArchive} type="button"><Undo2 size={15} />撤销</button>
         </div>
       )}
 

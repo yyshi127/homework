@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createServer as createHttpServer } from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -110,6 +111,20 @@ test('state API deduplicates repeated saves and rejects real conflicts', { timeo
     assert.equal(initial.version, 0);
     assert.equal(initial.state.months[0].id, 'month-1');
 
+    const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+    const imageUploadResponse = await fetch(`${baseUrl}/api/mistake-images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageData: `data:image/jpeg;base64,${jpegBytes.toString('base64')}` }),
+    });
+    assert.equal(imageUploadResponse.status, 201);
+    const imageUpload = await imageUploadResponse.json();
+    assert.match(imageUpload.url, /^\/api\/mistake-images\/[0-9]+-[0-9a-f-]+\.jpg$/);
+    const storedImageResponse = await fetch(`${baseUrl}${imageUpload.url}`);
+    assert.equal(storedImageResponse.status, 200);
+    assert.equal(storedImageResponse.headers.get('content-type'), 'image/jpeg');
+    assert.deepEqual(Buffer.from(await storedImageResponse.arrayBuffer()), jpegBytes);
+
     const eventResponse = await fetch(`${baseUrl}/api/state/events`, { signal: eventController.signal });
     assert.equal(eventResponse.status, 200);
     assert.match(eventResponse.headers.get('content-type'), /text\/event-stream/);
@@ -189,6 +204,159 @@ test('state API deduplicates repeated saves and rejects real conflicts', { timeo
     eventController.abort();
     child.kill();
     await Promise.race([once(child, 'exit'), new Promise((resolve) => setTimeout(resolve, 2_000))]);
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('homework grading runs as an idempotent background job with precise localization', { timeout: 20_000 }, async () => {
+  const apiPort = await availablePort();
+  const deepSeekPort = await availablePort();
+  const dataDir = await mkdtemp(path.join(os.tmpdir(), 'homework-grading-test-'));
+  const baseUrl = `http://127.0.0.1:${apiPort}`;
+  const modelUrl = `http://127.0.0.1:${deepSeekPort}`;
+  const modelCalls = [];
+  const recognition = {
+    detectedSubject: '数学',
+    subjectConfidence: '高',
+    detectedTitle: '加法练习',
+    questions: [{
+      order: 1,
+      printedNumber: '2',
+      questionText: '3 + 4 =',
+      studentAnswer: '8',
+      gradingContext: '',
+      area: { left: 8, top: 30, width: 72, height: 12 },
+    }],
+  };
+  const grading = {
+    decisions: [{
+      order: 1,
+      verdict: 'wrong',
+      correctAnswer: '7',
+      shortComment: '请重新计算',
+      errorReason: '把 3 加 4 错算成了 8。',
+      knowledgePoint: '10以内加法',
+      errorType: '计算或拼写错误',
+      solutionSteps: ['从 3 开始继续数 4 个数。', '4、5、6、7，所以结果是 7。'],
+      explanation: '加法表示把两部分合在一起。',
+    }],
+  };
+  const localization = {
+    locations: [{ order: 1, box: { x1: 70, y1: 260, x2: 820, y2: 420 } }],
+  };
+  const fakeDeepSeek = createHttpServer((req, res) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      const request = JSON.parse(body);
+      const name = request.text.format.name;
+      modelCalls.push(name);
+      const result = name === 'homework_textbook_grading'
+        ? grading
+        : name === 'homework_mistake_localization'
+          ? localization
+          : recognition;
+      setTimeout(() => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'completed',
+          output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(result) }] }],
+        }));
+      }, 40);
+    });
+  });
+  fakeDeepSeek.listen(deepSeekPort, '127.0.0.1');
+  await once(fakeDeepSeek, 'listening');
+  const child = spawn(process.execPath, ['server/index.js'], {
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      PORT: String(apiPort),
+      DATA_DIR: dataDir,
+      DEEPSEEK_API_KEY: 'test-key',
+      DEEPSEEK_API_BASE_URL: modelUrl,
+    },
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+
+  const requestId = 'grading-idempotency-test';
+  const requestBody = {
+    requestId,
+    term: '二年级上学期',
+    imageData: 'data:image/jpeg;base64,/9j/2Q==',
+    localizationImageData: 'data:image/jpeg;base64,/9j/2Q==',
+  };
+
+  try {
+    await waitForServer(baseUrl);
+    const startResponse = await fetch(`${baseUrl}/api/grade-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+    assert.equal(startResponse.status, 202);
+    let job = await startResponse.json();
+    assert.equal(job.requestId, requestId);
+    assert.match(job.status, /^(?:queued|running)$/);
+
+    const deadline = Date.now() + 5_000;
+    while (job.status !== 'completed' && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      const response = await fetch(`${baseUrl}/api/grade-homework/${requestId}`);
+      assert.equal(response.status, 200);
+      job = await response.json();
+      if (job.status === 'failed') assert.fail(job.error);
+    }
+    assert.equal(job.status, 'completed');
+    assert.equal(job.result.annotationQuality, 'precise');
+    assert.deepEqual(job.result.imageAnnotations[0].area, { left: 6, top: 23, width: 77, height: 19.5 });
+    assert.deepEqual(modelCalls, [
+      'homework_image_recognition',
+      'verified_homework_recognition',
+      'homework_textbook_grading',
+      'homework_mistake_localization',
+    ]);
+
+    const repeatedResponse = await fetch(`${baseUrl}/api/grade-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+    assert.equal(repeatedResponse.status, 200);
+    assert.equal((await repeatedResponse.json()).status, 'completed');
+    assert.equal(modelCalls.length, 4);
+
+    const conflictResponse = await fetch(`${baseUrl}/api/grade-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...requestBody, imageData: 'data:image/jpeg;base64,/9j/4A==' }),
+    });
+    assert.equal(conflictResponse.status, 409);
+    assert.equal((await conflictResponse.json()).code, 'REQUEST_ID_CONFLICT');
+
+    const cancelRequestId = 'grading-cancellation-test';
+    const cancelStart = await fetch(`${baseUrl}/api/grade-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...requestBody, requestId: cancelRequestId }),
+    });
+    assert.equal(cancelStart.status, 202);
+    const cancelResponse = await fetch(`${baseUrl}/api/grade-homework/${cancelRequestId}`, { method: 'DELETE' });
+    assert.equal(cancelResponse.status, 200);
+    let cancelledJob = await cancelResponse.json();
+    const cancelDeadline = Date.now() + 2_000;
+    while (cancelledJob.status !== 'cancelled' && Date.now() < cancelDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      cancelledJob = await fetch(`${baseUrl}/api/grade-homework/${cancelRequestId}`).then((response) => response.json());
+    }
+    assert.equal(cancelledJob.status, 'cancelled');
+    assert.equal(cancelledJob.code, 'CANCELLED');
+  } finally {
+    child.kill();
+    await Promise.race([once(child, 'exit'), new Promise((resolve) => setTimeout(resolve, 2_000))]);
+    await new Promise((resolve) => fakeDeepSeek.close(resolve));
     await rm(dataDir, { recursive: true, force: true });
   }
 });

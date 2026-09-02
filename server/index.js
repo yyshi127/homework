@@ -1,19 +1,32 @@
 import express from 'express';
 import Database from 'better-sqlite3';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { validateAppState } from './state-validation.js';
+import {
+  DEFAULT_DEEPSEEK_BASE_URL,
+  DEFAULT_DEEPSEEK_MODEL,
+  callDeepSeekHomeworkReview,
+} from './deepseek-homework.js';
 
 const PORT = Number(process.env.PORT || 8090);
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'homework.sqlite');
 const STATE_KEY = 'main';
 const AI_CONFIG_KEY = 'main';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-let baiduTokenCache = { token: '', expiresAt: 0 };
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+const DEEPSEEK_API_BASE_URL = process.env.DEEPSEEK_API_BASE_URL || DEFAULT_DEEPSEEK_BASE_URL;
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL;
+const DEFAULT_DEEPSEEK_KEY_FILE = path.join(process.env.USERPROFILE || process.env.HOME || '', 'Desktop', '小小星球api.txt');
+const DEEPSEEK_API_KEY_FILE = process.env.DEEPSEEK_API_KEY_FILE || DEFAULT_DEEPSEEK_KEY_FILE;
+const MISTAKE_IMAGE_DIR = process.env.MISTAKE_IMAGE_DIR || path.join(path.dirname(DB_PATH), 'mistake-images');
+const GRADING_JOB_TTL_MS = 20 * 60 * 1000;
+const MAX_GRADING_JOBS = 30;
+const MAX_RUNNING_GRADING_JOBS = 2;
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(MISTAKE_IMAGE_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
@@ -91,7 +104,9 @@ const upsertAiConfig = db.prepare(`
 
 const app = express();
 const stateEventClients = new Set();
-app.use('/api/grade-homework', express.json({ limit: '10mb' }));
+const gradingJobs = new Map();
+app.use('/api/grade-homework', express.json({ limit: '16mb' }));
+app.use('/api/mistake-images', express.json({ limit: '2mb' }));
 app.use(express.json({ limit: '5mb' }));
 
 function sendStateEvent(response, event) {
@@ -111,35 +126,44 @@ function broadcastStateEvent(event) {
 }
 
 const DEFAULT_AI_CONFIG = {
-  activeProvider: 'aliyun',
-  aliyun: {
+  activeProvider: 'deepseek',
+  deepseek: {
     apiKey: '',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    model: 'qwen3-vl-plus',
-  },
-  baidu: {
-    apiKey: '',
-    secretKey: '',
-    pollIntervalMs: 3000,
-    timeoutMs: 120000,
+    baseUrl: DEEPSEEK_API_BASE_URL,
+    model: DEEPSEEK_MODEL,
   },
 };
 
 function normalizeAiConfig(config = {}) {
   return {
-    activeProvider: config.activeProvider === 'baidu' ? 'baidu' : 'aliyun',
-    aliyun: {
-      apiKey: config.aliyun?.apiKey || '',
-      baseUrl: config.aliyun?.baseUrl || DEFAULT_AI_CONFIG.aliyun.baseUrl,
-      model: config.aliyun?.model || DEFAULT_AI_CONFIG.aliyun.model,
-    },
-    baidu: {
-      apiKey: config.baidu?.apiKey || '',
-      secretKey: config.baidu?.secretKey || '',
-      pollIntervalMs: Math.max(1000, Number(config.baidu?.pollIntervalMs || DEFAULT_AI_CONFIG.baidu.pollIntervalMs)),
-      timeoutMs: Math.max(5000, Number(config.baidu?.timeoutMs || DEFAULT_AI_CONFIG.baidu.timeoutMs)),
+    activeProvider: 'deepseek',
+    deepseek: {
+      apiKey: config.deepseek?.apiKey || '',
+      baseUrl: DEFAULT_AI_CONFIG.deepseek.baseUrl,
+      model: DEFAULT_AI_CONFIG.deepseek.model,
     },
   };
+}
+
+function readDeepSeekKeyFile() {
+  if (!DEEPSEEK_API_KEY_FILE) return '';
+  try {
+    const value = fs.readFileSync(DEEPSEEK_API_KEY_FILE, 'utf8').trim();
+    return value && !/\s/.test(value) ? value : '';
+  } catch {
+    return '';
+  }
+}
+
+function resolvedDeepSeekKey(config = readAiConfig()) {
+  return config.deepseek.apiKey || DEEPSEEK_API_KEY || readDeepSeekKeyFile();
+}
+
+function deepSeekKeySource(config = readAiConfig()) {
+  if (config.deepseek.apiKey) return 'saved';
+  if (DEEPSEEK_API_KEY) return 'environment';
+  if (readDeepSeekKeyFile()) return 'file';
+  return 'none';
 }
 
 function readAiConfig() {
@@ -154,16 +178,12 @@ function readAiConfig() {
 
 function publicAiConfig(config = readAiConfig()) {
   return {
-    activeProvider: config.activeProvider,
-    aliyun: {
-      baseUrl: config.aliyun.baseUrl,
-      model: config.aliyun.model,
-      configured: Boolean(config.aliyun.apiKey),
-    },
-    baidu: {
-      configured: Boolean(config.baidu.apiKey && config.baidu.secretKey),
-      pollIntervalMs: config.baidu.pollIntervalMs,
-      timeoutMs: config.baidu.timeoutMs,
+    activeProvider: 'deepseek',
+    deepseek: {
+      baseUrl: config.deepseek.baseUrl,
+      model: config.deepseek.model,
+      configured: Boolean(resolvedDeepSeekKey(config)),
+      keySource: deepSeekKeySource(config),
     },
   };
 }
@@ -171,6 +191,36 @@ function publicAiConfig(config = readAiConfig()) {
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, dbPath: DB_PATH });
 });
+
+app.post('/api/mistake-images', (req, res) => {
+  const imageData = req.body?.imageData;
+  const match = typeof imageData === 'string' && imageData.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    res.status(400).json({ code: 'INVALID_MISTAKE_IMAGE', error: '错题截图必须是 JPEG 图片' });
+    return;
+  }
+
+  const imageBuffer = Buffer.from(match[1], 'base64');
+  const isJpeg = imageBuffer.length >= 4
+    && imageBuffer[0] === 0xff
+    && imageBuffer[1] === 0xd8
+    && imageBuffer.at(-2) === 0xff
+    && imageBuffer.at(-1) === 0xd9;
+  if (!isJpeg || imageBuffer.length > 1.5 * 1024 * 1024) {
+    res.status(413).json({ code: 'INVALID_MISTAKE_IMAGE_SIZE', error: '错题截图无效或超过 1.5 MB' });
+    return;
+  }
+
+  const fileName = `${Date.now()}-${randomUUID()}.jpg`;
+  fs.writeFileSync(path.join(MISTAKE_IMAGE_DIR, fileName), imageBuffer, { flag: 'wx' });
+  res.status(201).json({ url: `/api/mistake-images/${fileName}` });
+});
+
+app.use('/api/mistake-images', express.static(MISTAKE_IMAGE_DIR, {
+  fallthrough: false,
+  immutable: true,
+  maxAge: '1y',
+}));
 
 app.get('/api/state', (_req, res) => {
   const row = getState.get(STATE_KEY);
@@ -271,17 +321,12 @@ app.put('/api/ai-config', (req, res) => {
   const current = readAiConfig();
   const incoming = req.body?.config || req.body || {};
   const next = normalizeAiConfig({
-    activeProvider: incoming.activeProvider || current.activeProvider,
-    aliyun: {
-      apiKey: incoming.aliyun?.clearApiKey ? '' : incoming.aliyun?.apiKey ? String(incoming.aliyun.apiKey) : current.aliyun.apiKey,
-      baseUrl: incoming.aliyun?.baseUrl || current.aliyun.baseUrl,
-      model: incoming.aliyun?.model || current.aliyun.model,
-    },
-    baidu: {
-      apiKey: incoming.baidu?.clearApiKey ? '' : incoming.baidu?.apiKey ? String(incoming.baidu.apiKey) : current.baidu.apiKey,
-      secretKey: incoming.baidu?.clearSecretKey ? '' : incoming.baidu?.secretKey ? String(incoming.baidu.secretKey) : current.baidu.secretKey,
-      pollIntervalMs: incoming.baidu?.pollIntervalMs || current.baidu.pollIntervalMs,
-      timeoutMs: incoming.baidu?.timeoutMs || current.baidu.timeoutMs,
+    deepseek: {
+      apiKey: incoming.deepseek?.clearApiKey
+        ? ''
+        : incoming.deepseek?.apiKey
+          ? String(incoming.deepseek.apiKey).trim()
+          : current.deepseek.apiKey,
     },
   });
   const updatedAt = new Date().toISOString();
@@ -784,108 +829,292 @@ async function callBaiduHomeworkReview(config, imageData, meta) {
   throw new Error(`百度智能作业批改超过 ${Math.round(timeoutMs / 1000)} 秒仍未返回结果，请换一张更清晰的照片后重试`);
 }
 
-app.post('/api/grade-homework', async (req, res) => {
-  const { imageData, subject = '数学', term = '二年级上学期', title = '', note = '' } = req.body || {};
-  if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
-    res.status(400).json({ error: '请上传有效的作业图片' });
-    return;
+function inspectGradingImage(imageData, label, required = true) {
+  if (!imageData && !required) return { bytes: 0 };
+  const match = typeof imageData === 'string'
+    ? imageData.match(/^data:image\/(?:jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\r\n]+)$/i)
+    : null;
+  if (!match) {
+    return { status: 400, code: 'INVALID_IMAGE', error: `请上传有效的 ${label}` };
   }
-  const imageSize = imageSizeFromDataUrl(imageData);
+  const bytes = Buffer.byteLength(match[1], 'base64');
+  if (!bytes || bytes > 6 * 1024 * 1024) {
+    return { status: 413, code: 'IMAGE_TOO_LARGE', error: `${label}处理后不能超过 6 MB` };
+  }
+  return { bytes };
+}
 
-  const aiConfig = readAiConfig();
-  if (aiConfig.activeProvider === 'baidu') {
-    if (!aiConfig.baidu.apiKey || !aiConfig.baidu.secretKey) {
-      res.status(400).json({ error: '请先在 AI 配置中填写百度 API Key 和 Secret Key' });
-      return;
+function gradingFingerprint({ imageData, localizationImageData, term, title, note }) {
+  const hash = createHash('sha256');
+  for (const value of [imageData, localizationImageData, term, title, note]) {
+    hash.update(String(value || ''), 'utf8');
+    hash.update('\0');
+  }
+  return hash.digest('hex');
+}
+
+function normalizeGradingRequestId(value) {
+  const requestId = typeof value === 'string' ? value.trim() : '';
+  return /^[A-Za-z0-9_-]{8,80}$/.test(requestId) ? requestId : '';
+}
+
+function gradingErrorStatus(error) {
+  if (error?.code === 'TIMEOUT') return 504;
+  if (error?.code === 'CANCELLED') return 409;
+  if (['INVALID_IMAGE', 'MISSING_KEY'].includes(error?.code)) return 400;
+  if (['NO_QUESTIONS', 'NO_VALID_QUESTIONS'].includes(error?.code)) return 422;
+  return 502;
+}
+
+function gradingErrorPayload(error) {
+  return {
+    error: error?.message || 'DeepSeek 批改失败，请稍后再试',
+    code: error?.code || 'DEEPSEEK_ERROR',
+    stage: error?.stage || '',
+  };
+}
+
+function isTerminalGradingStatus(status) {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function publicGradingJob(job) {
+  const payload = {
+    requestId: job.requestId,
+    status: job.status,
+    stage: job.stage,
+    attempt: job.attempt,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  };
+  if (job.status === 'completed') payload.result = job.result;
+  if (job.error) Object.assign(payload, job.error);
+  return payload;
+}
+
+function pruneGradingJobs() {
+  const now = Date.now();
+  for (const [requestId, job] of gradingJobs) {
+    if (isTerminalGradingStatus(job.status) && now - Date.parse(job.updatedAt) > GRADING_JOB_TTL_MS) {
+      gradingJobs.delete(requestId);
     }
-    try {
-      const result = await callBaiduHomeworkReview(aiConfig, imageData, { subject, term, title, imageSize });
-      res.json(result);
-    } catch (error) {
-      res.status(502).json({ error: error?.message || '百度智能作业批改失败，请稍后再试' });
-    }
-    return;
   }
-
-  if (!aiConfig.aliyun.apiKey && !OPENAI_API_KEY) {
-    res.json(demoHomeworkReview({ subject, term, title }));
-    return;
+  if (gradingJobs.size < MAX_GRADING_JOBS) return;
+  const terminalJobs = [...gradingJobs.values()]
+    .filter((job) => isTerminalGradingStatus(job.status))
+    .sort((first, second) => Date.parse(first.updatedAt) - Date.parse(second.updatedAt));
+  while (gradingJobs.size >= MAX_GRADING_JOBS && terminalJobs.length) {
+    gradingJobs.delete(terminalJobs.shift().requestId);
   }
+}
 
-  const prompt = [
-    '你是一名耐心的小学作业批改老师。请根据图片批改作业。',
-    `学期：${term}`,
-    `学科：${subject}`,
-    `作业名称：${title || '未填写'}`,
-    `家长补充说明：${note || '无'}`,
-    '要求：先自动识别图片作业的学科和标题；按图片中的题目顺序从上到下、从左到右输出；只找真实可见的错误；正确题目不要放进 mistakes；如果整页没有错题，mistakes 返回空数组；如果图片不清楚，请在 summary 里说明，并少量列出可确认的问题；解释要适合小学生和家长理解；不要编造图片中不存在的题目。',
-  ].join('\n');
+let runningGradingJobs = 0;
 
-  if (aiConfig.aliyun.apiKey) {
-    try {
-      const aliyunPromise = callAliyunHomeworkReview(aiConfig, prompt, imageData);
-      const baiduGeometryPromise = aiConfig.baidu.apiKey && aiConfig.baidu.secretKey
-        ? callBaiduHomeworkReview(aiConfig, imageData, { subject, term, title, imageSize }).catch((error) => {
-            console.warn(`[hybrid-homework] baidu geometry failed: ${error?.message || error}`);
-            return null;
-          })
-        : Promise.resolve(null);
-      const [aliyunResult, baiduGeometry] = await Promise.all([aliyunPromise, baiduGeometryPromise]);
-      aliyunResult.imageAnnotations = normalizeModelAnnotations(aliyunResult.imageAnnotations, imageSize);
-      const result = mergeHomeworkReviews({ provider: 'aliyun', ...aliyunResult }, baiduGeometry);
-      res.json(result);
-    } catch (error) {
-      res.status(502).json({ error: error?.message || '阿里百炼批改失败，请稍后再试' });
-    }
-    return;
-  }
+function finishGradingJob(job, status, values = {}) {
+  job.status = status;
+  job.stage = status;
+  job.updatedAt = new Date().toISOString();
+  Object.assign(job, values);
+  job.runOptions = null;
+  job.controller = null;
+  job.resolveCompletion?.(job);
+  job.resolveCompletion = null;
+}
 
+async function executeGradingJob(job) {
+  const startedAt = Date.now();
+  const options = job.runOptions;
+  console.info(`[deepseek-homework] requestId=${job.requestId} start imageBytes=${job.imageBytes} localizationBytes=${job.localizationBytes}`);
   try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
+    const result = await callDeepSeekHomeworkReview({
+      ...options,
+      signal: job.controller.signal,
+      onProgress: ({ stage, attempt, status, durationMs, code }) => {
+        job.stage = stage;
+        job.attempt = attempt;
+        job.updatedAt = new Date().toISOString();
+        const duration = Number.isFinite(durationMs) ? ` durationMs=${durationMs}` : '';
+        const resultCode = code ? ` code=${code}` : '';
+        console.info(`[deepseek-homework] requestId=${job.requestId} stage=${stage} attempt=${attempt} status=${status}${duration}${resultCode}`);
       },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        input: [
-          {
-            role: 'user',
-            content: [
-              { type: 'input_text', text: prompt },
-              { type: 'input_image', image_url: imageData, detail: 'high' },
-            ],
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'homework_review',
-            schema: homeworkReviewSchema(),
-            strict: true,
-          },
-        },
-      }),
     });
-
-    const payload = await response.json();
-    if (!response.ok) {
-      res.status(502).json({ error: payload?.error?.message || 'AI 批改服务暂时不可用' });
+    if (job.cancelRequested) {
+      finishGradingJob(job, 'cancelled', { error: { code: 'CANCELLED', error: '批改已取消', stage: job.stage } });
       return;
     }
-
-    const text = extractResponseText(payload);
-    const result = JSON.parse(text);
-    res.json({ provider: 'openai', ...result });
+    finishGradingJob(job, 'completed', { result });
+    console.info(`[deepseek-homework] requestId=${job.requestId} done elapsedMs=${Date.now() - startedAt} questions=${result.recognizedQuestionCount} mistakes=${result.mistakes.length}`);
   } catch (error) {
-    res.status(502).json({ error: error?.message || 'AI 批改失败，请稍后再试' });
+    const payload = gradingErrorPayload(error);
+    const status = error?.code === 'CANCELLED' || job.cancelRequested ? 'cancelled' : 'failed';
+    if (status === 'cancelled') payload.code = 'CANCELLED';
+    finishGradingJob(job, status, { error: payload, errorStatus: gradingErrorStatus(error) });
+    console.warn(`[deepseek-homework] requestId=${job.requestId} failed elapsedMs=${Date.now() - startedAt} stage=${payload.stage || 'unknown'} code=${payload.code}`);
+  } finally {
+    runningGradingJobs -= 1;
+    startQueuedGradingJobs();
   }
+}
+
+function startQueuedGradingJobs() {
+  while (runningGradingJobs < MAX_RUNNING_GRADING_JOBS) {
+    const job = [...gradingJobs.values()].find((candidate) => candidate.status === 'queued');
+    if (!job) return;
+    runningGradingJobs += 1;
+    job.status = 'running';
+    job.stage = 'vision';
+    job.updatedAt = new Date().toISOString();
+    void executeGradingJob(job);
+  }
+}
+
+function createGradingJob({ requestId, fingerprint, runOptions, imageBytes, localizationBytes }) {
+  let resolveCompletion;
+  const completion = new Promise((resolve) => {
+    resolveCompletion = resolve;
+  });
+  const now = new Date().toISOString();
+  const job = {
+    requestId,
+    fingerprint,
+    status: 'queued',
+    stage: 'queued',
+    attempt: 0,
+    createdAt: now,
+    updatedAt: now,
+    imageBytes,
+    localizationBytes,
+    runOptions,
+    controller: new AbortController(),
+    cancelRequested: false,
+    completion,
+    resolveCompletion,
+    result: null,
+    error: null,
+    errorStatus: 502,
+  };
+  gradingJobs.set(requestId, job);
+  startQueuedGradingJobs();
+  return job;
+}
+
+app.post('/api/grade-homework', async (req, res) => {
+  const {
+    imageData,
+    localizationImageData = '',
+    term = '二年级上学期',
+    title = '',
+    note = '',
+  } = req.body || {};
+  const imageInspection = inspectGradingImage(imageData, 'JPG、PNG 或 WebP 作业照片');
+  if (imageInspection.error) {
+    res.status(imageInspection.status).json({ code: imageInspection.code, error: imageInspection.error });
+    return;
+  }
+  const localizationInspection = inspectGradingImage(localizationImageData, '错题定位图片', false);
+  if (localizationInspection.error) {
+    res.status(localizationInspection.status).json({ code: localizationInspection.code, error: localizationInspection.error });
+    return;
+  }
+  const aiConfig = readAiConfig();
+  const apiKey = resolvedDeepSeekKey(aiConfig);
+  if (!apiKey) {
+    res.status(400).json({ error: '请先配置 DeepSeek API Key' });
+    return;
+  }
+
+  const hasRequestId = req.body?.requestId !== undefined;
+  const requestId = hasRequestId ? normalizeGradingRequestId(req.body.requestId) : randomUUID();
+  if (!requestId) {
+    res.status(400).json({ code: 'INVALID_REQUEST_ID', error: '批改请求编号无效，请重新发起批改' });
+    return;
+  }
+  const normalizedInput = {
+    imageData,
+    localizationImageData,
+    term: String(term || '').slice(0, 100),
+    title: String(title || '').slice(0, 160),
+    note: String(note || '').slice(0, 600),
+  };
+  const fingerprint = gradingFingerprint(normalizedInput);
+  pruneGradingJobs();
+  let job = gradingJobs.get(requestId);
+  if (job && job.fingerprint !== fingerprint) {
+    res.status(409).json({ code: 'REQUEST_ID_CONFLICT', error: '同一批改请求编号不能用于不同图片' });
+    return;
+  }
+  if (!job) {
+    if (gradingJobs.size >= MAX_GRADING_JOBS) {
+      res.status(503).json({ code: 'GRADING_QUEUE_FULL', error: '当前批改任务较多，请稍后再试' });
+      return;
+    }
+    job = createGradingJob({
+      requestId,
+      fingerprint,
+      imageBytes: imageInspection.bytes,
+      localizationBytes: localizationInspection.bytes,
+      runOptions: {
+        apiKey,
+        baseUrl: aiConfig.deepseek.baseUrl,
+        model: aiConfig.deepseek.model,
+        ...normalizedInput,
+      },
+    });
+  }
+
+  if (hasRequestId) {
+    res.status(isTerminalGradingStatus(job.status) ? 200 : 202).json(publicGradingJob(job));
+    return;
+  }
+
+  const finishedJob = await job.completion;
+  if (res.destroyed || res.writableEnded) return;
+  if (finishedJob.status === 'completed') {
+    res.json(finishedJob.result);
+    return;
+  }
+  res.status(finishedJob.errorStatus || 502).json(finishedJob.error || { code: 'DEEPSEEK_ERROR', error: 'DeepSeek 批改失败，请稍后再试' });
+});
+
+app.get('/api/grade-homework/:requestId', (req, res) => {
+  pruneGradingJobs();
+  const requestId = normalizeGradingRequestId(req.params.requestId);
+  const job = requestId ? gradingJobs.get(requestId) : null;
+  if (!job) {
+    res.status(404).json({ code: 'GRADING_JOB_NOT_FOUND', error: '批改任务不存在或已过期' });
+    return;
+  }
+  res.set('Cache-Control', 'no-store').json(publicGradingJob(job));
+});
+
+app.delete('/api/grade-homework/:requestId', (req, res) => {
+  const requestId = normalizeGradingRequestId(req.params.requestId);
+  const job = requestId ? gradingJobs.get(requestId) : null;
+  if (!job) {
+    res.status(404).json({ code: 'GRADING_JOB_NOT_FOUND', error: '批改任务不存在或已结束' });
+    return;
+  }
+  if (!isTerminalGradingStatus(job.status)) {
+    job.cancelRequested = true;
+    if (job.status === 'queued') {
+      finishGradingJob(job, 'cancelled', { error: { code: 'CANCELLED', error: '批改已取消', stage: 'queued' } });
+      startQueuedGradingJobs();
+    } else {
+      job.status = 'cancelling';
+      job.updatedAt = new Date().toISOString();
+      job.controller?.abort();
+    }
+  }
+  res.json(publicGradingJob(job));
 });
 
 app.use((error, _req, res, next) => {
   if (error?.type === 'entity.too.large') {
     res.status(413).json({ code: 'PAYLOAD_TOO_LARGE', error: '提交的数据超过大小限制' });
+    return;
+  }
+  if (error?.type === 'entity.parse.failed') {
+    res.status(400).json({ code: 'INVALID_JSON_BODY', error: '提交的数据格式无效' });
     return;
   }
   next(error);

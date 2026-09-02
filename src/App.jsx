@@ -1226,7 +1226,7 @@ function homeworkGradingStatusText(stage = '', seconds = 0) {
     queued: '正在等待批改',
     vision: '正在识别题目',
     verification: '正在核对学生答案',
-    grading: '正在逐题生成解析',
+    grading: '正在识别并逐题批改',
     localization: '正在精确定位错题',
     cancelling: '正在取消批改',
   }[stage];

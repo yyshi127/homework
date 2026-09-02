@@ -241,6 +241,12 @@ test('homework grading runs as an idempotent background job with precise localiz
       explanation: '加法表示把两部分合在一起。',
     }],
   };
+  const directGrading = {
+    ...recognition,
+    summary: '共识别1题，发现1道错题。',
+    suggestions: ['订正后再练一道同类题。'],
+    questions: recognition.questions.map((question) => ({ ...question, ...grading.decisions[0] })),
+  };
   const localization = {
     locations: [{ order: 1, box: { x1: 70, y1: 260, x2: 820, y2: 420 } }],
   };
@@ -252,8 +258,8 @@ test('homework grading runs as an idempotent background job with precise localiz
       const request = JSON.parse(body);
       const name = request.text.format.name;
       modelCalls.push(name);
-      const result = name === 'homework_textbook_grading'
-        ? grading
+      const result = name === 'homework_direct_grading'
+        ? directGrading
         : name === 'homework_mistake_localization'
           ? localization
           : recognition;
@@ -313,9 +319,7 @@ test('homework grading runs as an idempotent background job with precise localiz
     assert.equal(job.result.annotationQuality, 'precise');
     assert.deepEqual(job.result.imageAnnotations[0].area, { left: 6, top: 23, width: 77, height: 19.5 });
     assert.deepEqual(modelCalls, [
-      'homework_image_recognition',
-      'verified_homework_recognition',
-      'homework_textbook_grading',
+      'homework_direct_grading',
       'homework_mistake_localization',
     ]);
 
@@ -326,7 +330,7 @@ test('homework grading runs as an idempotent background job with precise localiz
     });
     assert.equal(repeatedResponse.status, 200);
     assert.equal((await repeatedResponse.json()).status, 'completed');
-    assert.equal(modelCalls.length, 4);
+    assert.equal(modelCalls.length, 2);
 
     const conflictResponse = await fetch(`${baseUrl}/api/grade-homework`, {
       method: 'POST',
